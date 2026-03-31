@@ -1,0 +1,22 @@
+# Web Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Database
+sqlalchemy==2.0.36
+aiosqlite==0.20.0
+
+# LLM via OpenRouter (OpenAI-compatible SDK)
+openai==1.58.1
+
+# Image Processing
+Pillow==11.1.0
+
+# Configuration
+python-dotenv==1.0.1
+pydantic-settings==2.7.1
+
+# Utilities
+python-dateutil==2.9.0
+httpx==0.28.1
