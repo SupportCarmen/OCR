@@ -77,7 +77,7 @@ body {
     font-size: 1.25rem;
 }
 
-/* Upload Controls */
+/* Step 1: Upload Controls */
 .upload-section {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -126,6 +126,7 @@ select:focus, input[type="text"]:focus {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
+/* Custom File Input Styling */
 input[type="file"] {
     padding: 0.6rem 0.5rem;
     cursor: pointer;
@@ -192,7 +193,6 @@ button {
     transform: none;
 }
 
-/* Loader — visibility controlled by React conditional render */
 .loader {
     border: 3px solid var(--gray-200);
     border-top: 3px solid var(--primary);
@@ -200,11 +200,11 @@ button {
     width: 28px;
     height: 28px;
     animation: spin 0.8s linear infinite;
-    flex-shrink: 0;
+    display: none;
 }
 
 @keyframes spin {
-    0%   { transform: rotate(0deg); }
+    0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
 
@@ -217,15 +217,20 @@ button {
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50%       { opacity: 0.6; }
+    50% { opacity: 0.6; }
 }
 
-/* Results Layout — data left, preview right on desktop */
+/* Layout for Results */
 .main-content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column-reverse; /* Data top, Preview bottom */
     gap: 3rem;
-    align-items: start;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+.hidden {
+    display: none !important;
 }
 
 /* Sections */
@@ -261,7 +266,7 @@ button {
     border-radius: var(--radius-md);
     padding: 1.75rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: var(--shadow-sm);
     transition: border-color 0.2s;
 }
 
@@ -269,7 +274,7 @@ button {
     border-color: var(--gray-300);
 }
 
-/* Preview */
+/* Left Pane: Preview */
 .preview-frame {
     border: 2px dashed var(--gray-300);
     background-color: var(--gray-50);
@@ -299,18 +304,18 @@ button {
     font-size: 3.5rem;
     margin-bottom: 1rem;
     color: var(--gray-300);
-    display: block;
 }
 
 .preview-image {
     max-width: 100%;
     max-height: 800px;
     object-fit: contain;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: none;
+    box-shadow: var(--shadow-md);
     border-radius: 4px;
 }
 
-/* Header Form */
+/* Right Pane: Data */
 .header-form {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -347,13 +352,13 @@ button {
     border-bottom-color: var(--primary);
 }
 
-/* Detail Table */
+/* Table */
 .table-wrapper {
     overflow-x: auto;
     background: var(--white);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-sm);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    box-shadow: var(--shadow-sm);
 }
 
 .data-table {
@@ -372,7 +377,6 @@ button {
     letter-spacing: 0.02em;
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--gray-200);
-    white-space: nowrap;
 }
 
 .data-table td {
@@ -393,10 +397,11 @@ button {
     border-bottom: none;
 }
 
+/* The detail inputs are readonly but look clean */
 input[type="text"].detail-input {
     width: 100%;
-    min-width: 100px;
-    border: 1px solid transparent;
+    min-width: 120px;
+    border: 1px solid transparent; /* Hide border until needed/focused */
     background: transparent;
     padding: 0.5rem 0;
     font-size: 0.95rem;
@@ -409,7 +414,6 @@ input[type="text"].detail-input:focus {
     border-bottom: 2px solid var(--primary);
     box-shadow: none;
     background: var(--white);
-    outline: none;
 }
 
 .btn-delete {
@@ -429,6 +433,7 @@ input[type="text"].detail-input:focus {
 
 .btn-add-row {
     background: transparent;
+    color: var(--primary);
     border: 2px dashed var(--gray-300);
     margin-top: 1.5rem;
     width: 100%;
@@ -443,7 +448,7 @@ input[type="text"].detail-input:focus {
     color: var(--primary);
 }
 
-/* Form Actions */
+/* Bottom Actions */
 .form-actions {
     display: flex;
     justify-content: flex-end;
@@ -480,41 +485,25 @@ input[type="text"].detail-input:focus {
 }
 
 /* Responsive */
-@media (max-width: 900px) {
-    .main-content {
-        grid-template-columns: 1fr;
-    }
-
-    /* On mobile, show preview below data */
-    .preview-column {
-        order: 2;
-    }
-
-    .data-column {
-        order: 1;
-    }
-}
-
 @media (max-width: 768px) {
     .app-container {
         padding: 1.5rem;
     }
-
+    
     .upload-section {
         grid-template-columns: 1fr;
     }
-
+    
     .action-bar {
         flex-direction: column;
         align-items: stretch;
     }
-
+    
     .form-actions {
         flex-direction: column;
     }
-
-    .btn-cancel,
-    .btn-submit {
+    
+    .btn-cancel, .btn-submit {
         width: 100%;
     }
 }
