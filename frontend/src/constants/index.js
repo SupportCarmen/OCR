@@ -4,15 +4,37 @@ const BANKS = [
     { value: 'SCB', label: 'Siam Commercial Bank (SCB)' },
 ];
 
-const DETAIL_COLUMNS = ['TerminalID', 'PayAmt', 'CommisAmt', 'TaxAmt', 'WHTAmount', 'Total'];
+const DETAIL_COLUMNS = ['TerminalID', 'PayAmt', 'CommisAmt', 'TaxAmt', 'Total', 'WHTAmount', 'MerchantName', 'Transaction'];
+
+const HEADER_LABELS = {
+    DateProcessed: 'Input Date<br><span style="font-size: 0.8em; color: #666;">Date Processed (วันที่ระบบอ่าน)</span>',
+    BankName: 'Bank Name<br><span style="font-size: 0.8em; color: #666;">Bank Name</span>',
+    DocName: 'Doc. Name<br><span style="font-size: 0.8em; color: #666;">Doc Name</span>',
+    CompanyName: 'Company Name<br><span style="font-size: 0.8em; color: #666;">Company Name</span>',
+    DocDate: 'Doc. Date<br><span style="font-size: 0.8em; color: #666;">Doc Date</span>',
+    DocNo: 'Doc. No<br><span style="font-size: 0.8em; color: #666;">Doc No</span>'
+};
+
+const DETAIL_LABELS = {
+    TerminalID: 'Terminal ID<br><span style="font-size: 0.8em; color: #666;">Terminal ID</span>',
+    PayAmt: 'Amount<br><span style="font-size: 0.8em; color: #666;">Pay Amt</span>',
+    CommisAmt: 'Commision Amt.<br><span style="font-size: 0.8em; color: #666;">Commis Amt</span>',
+    TaxAmt: 'Tax Amt.<br><span style="font-size: 0.8em; color: #666;">Tax Amt</span>',
+    Total: 'Net Amt.<br><span style="font-size: 0.8em; color: #666;">Total</span>',
+    WHTAmount: 'WHT Amount<br><span style="font-size: 0.8em; color: #666;">WHT Amount</span>',
+    MerchantName: 'Merchant name<br><span style="font-size: 0.8em; color: #666;">Merchant name</span>',
+    Transaction: 'Payment Type<br><span style="font-size: 0.8em; color: #666;">Transaction</span>'
+};
 
 const EMPTY_DETAIL_ROW = {
     TerminalID: '',
     PayAmt: '',
     CommisAmt: '',
     TaxAmt: '',
-    WHTAmount: '',
     Total: '',
+    WHTAmount: '',
+    MerchantName: '',
+    Transaction: ''
 };
 
 let currentData = {
@@ -127,8 +149,9 @@ function renderUI(bank) {
     for (const [key, value] of Object.entries(currentData.header)) {
         const div = document.createElement('div');
         div.className = 'form-field';
+        const labelText = HEADER_LABELS[key] || key;
         div.innerHTML = `
-            <label>${key}</label>
+            <label>${labelText}</label>
             <input type="text" id="head_${key}" value="${value}">
         `;
         headerForm.appendChild(div);
@@ -139,7 +162,7 @@ function renderUI(bank) {
     tableHeader.innerHTML = '';
     columns.forEach(col => {
         const th = document.createElement('th');
-        th.innerText = col;
+        th.innerHTML = DETAIL_LABELS[col] || col;
         tableHeader.appendChild(th);
     });
     tableHeader.innerHTML += '<th style="text-align: center;">Action</th>';
