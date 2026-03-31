@@ -1,4 +1,4 @@
-export default function HeaderCard({ headerData, onUpdate }) {
+export default function HeaderCard({ headerData, onUpdate, readOnly }) {
   return (
     <div className="data-card">
       <h3 className="card-title">
@@ -11,7 +11,8 @@ export default function HeaderCard({ headerData, onUpdate }) {
             <input
               type="text"
               value={value}
-              onChange={e => onUpdate(key, e.target.value)}
+              readOnly={readOnly}
+              onChange={e => !readOnly && onUpdate?.(key, e.target.value)}
             />
           </div>
         ))}

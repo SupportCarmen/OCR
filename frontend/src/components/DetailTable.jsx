@@ -1,6 +1,6 @@
 import { DETAIL_COLUMNS } from '../constants'
 
-export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow }) {
+export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, readOnly }) {
   return (
     <div className="data-card">
       <h3 className="card-title">
@@ -11,7 +11,7 @@ export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow }
           <thead>
             <tr>
               {DETAIL_COLUMNS.map(col => <th key={col}>{col}</th>)}
-              <th style={{ textAlign: 'center' }}>Action</th>
+              {!readOnly && <th style={{ textAlign: 'center' }}>Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -23,27 +23,32 @@ export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow }
                       type="text"
                       className="detail-input"
                       value={row[col] ?? ''}
-                      onChange={e => onUpdate(rowIdx, col, e.target.value)}
+                      readOnly={readOnly}
+                      onChange={e => !readOnly && onUpdate?.(rowIdx, col, e.target.value)}
                     />
                   </td>
                 ))}
-                <td style={{ textAlign: 'center' }}>
-                  <button
-                    className="btn-delete"
-                    title="ลบรายการ"
-                    onClick={() => onDeleteRow(rowIdx)}
-                  >
-                    <i className="fas fa-trash" />
-                  </button>
-                </td>
+                {!readOnly && (
+                  <td style={{ textAlign: 'center' }}>
+                    <button
+                      className="btn-delete"
+                      title="ลบรายการ"
+                      onClick={() => onDeleteRow(rowIdx)}
+                    >
+                      <i className="fas fa-trash" />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <button className="btn-add-row" onClick={onAddRow}>
-        <i className="fas fa-plus-circle" /> เพิ่มรายการ
-      </button>
+      {!readOnly && (
+        <button className="btn-add-row" onClick={onAddRow}>
+          <i className="fas fa-plus-circle" /> เพิ่มรายการ
+        </button>
+      )}
     </div>
   )
 }

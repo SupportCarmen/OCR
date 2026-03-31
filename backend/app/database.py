@@ -9,7 +9,7 @@ from app.config import settings
 
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.app_debug,
+    echo=False,
 )
 
 async_session = async_sessionmaker(

@@ -6,7 +6,6 @@ Enhance receipt images before sending to OCR for better accuracy.
 from PIL import Image, ImageFilter, ImageEnhance
 import io
 import os
-from typing import Optional
 
 
 def preprocess_image(
@@ -58,18 +57,6 @@ def preprocess_image(
     output = io.BytesIO()
     img.save(output, format="PNG", optimize=True)
     return output.getvalue()
-
-
-def get_image_info(image_bytes: bytes) -> dict:
-    """Return basic info about an uploaded image."""
-    img = Image.open(io.BytesIO(image_bytes))
-    return {
-        "width": img.width,
-        "height": img.height,
-        "format": img.format,
-        "mode": img.mode,
-        "size_kb": len(image_bytes) / 1024,
-    }
 
 
 def is_valid_image(filename: str) -> bool:

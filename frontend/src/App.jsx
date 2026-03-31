@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { EMPTY_DETAIL_ROW } from './constants'
+import { BANKS, EMPTY_DETAIL_ROW } from './constants'
 import { extractFromFile } from './lib/ocrApi'
-import { submitToCarmen } from './lib/carmenApi'
+import { submitToLocal } from './lib/carmenApi'
 import UploadSection from './components/UploadSection'
 import ActionBar from './components/ActionBar'
 import HeaderCard from './components/HeaderCard'
 import DetailTable from './components/DetailTable'
 import FormActions from './components/FormActions'
 import DocumentPreview from './components/DocumentPreview'
+import CustomModal from './components/CustomModal'
 
 export default function App() {
   const [bank, setBank] = useState('BBL')
@@ -17,11 +18,52 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [showResults, setShowResults] = useState(false)
+  const [receiptId, setReceiptId] = useState(null)
   const [headerData, setHeaderData] = useState({})
   const [details, setDetails] = useState([])
+  const [modal, setModal] = useState({
+    show: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: null,
+    onCancel: null,
+    confirmText: 'ตกลง',
+    cancelText: 'ยกเลิก'
+  })
+
+  const showAlert = (title, message, type = 'info') => {
+    setModal({
+      show: true,
+      title,
+      message,
+      type,
+      onConfirm: () => setModal(prev => ({ ...prev, show: false })),
+      onCancel: null,
+      confirmText: 'ตกลง'
+    })
+  }
+
+  const showConfirm = (title, message, onConfirm, onCancel = null, confirmText = 'ยืนยัน') => {
+    setModal({
+      show: true,
+      title,
+      message,
+      type: 'warning',
+      onConfirm: () => {
+        onConfirm()
+        setModal(prev => ({ ...prev, show: false }))
+      },
+      onCancel: () => {
+        if (onCancel) onCancel()
+        setModal(prev => ({ ...prev, show: false }))
+      },
+      confirmText,
+      cancelText: 'ยกเลิก'
+    })
+  }
 
   const fileInputRef = useRef(null)
-  const submittedDocNos = useRef(new Set())
 
   useEffect(() => {
     return () => {
@@ -57,7 +99,7 @@ export default function App() {
 
   async function processFile() {
     if (!file) {
-      alert('กรุณาเลือกไฟล์ก่อนดำเนินการ')
+      showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกไฟล์ก่อนดำเนินการ', 'warning')
       return
     }
 
@@ -66,11 +108,12 @@ export default function App() {
     setShowResults(false)
 
     try {
-      const ext = await extractFromFile(file)
+      const ext = await extractFromFile(file, bank)
 
+      setReceiptId(ext.receipt_id || null)
       setHeaderData({
         DateProcessed: new Date().toLocaleDateString('en-GB'),
-        BankName: ext.bank_name || '',
+        BankName: BANKS.find(b => b.value === bank)?.label || ext.bank_name || '',
         DocName: ext.doc_name || '',
         CompanyName: ext.company_name || '',
         DocDate: ext.doc_date || '',
@@ -86,7 +129,7 @@ export default function App() {
         Total: ext.total || '',
       }])
 
-      setStatus('อ่านข้อมูลสำเร็จ ✓')
+      setStatus('อ่านข้อมูลสำเร็จ ✓ กรุณาตรวจสอบแล้วกด Submit')
       setShowResults(true)
     } catch (err) {
       setStatus(`❌ ${err.message}`)
@@ -114,41 +157,58 @@ export default function App() {
   }
 
   async function submitData() {
-    const docNo = headerData.DocNo
-
-    if (submittedDocNos.current.has(docNo)) {
-      alert(`❌ เอกสารซ้ำซ้อน!\nหมายเลขบิล: ${docNo}\n\nเอกสารนี้ถูกนำเข้าระบบไปแล้ว`)
+    if (!receiptId) {
+      showAlert('เกิดข้อผิดพลาด', 'ไม่พบ Receipt ID — กรุณาอ่านข้อมูลจากเอกสารก่อน', 'error')
       return
     }
 
-    const payload = {
+    const toFloat = v => parseFloat(String(v ?? '').replace(/,/g, '')) || 0
+    const buildPayload = (ow = false) => ({
       BankType: bank,
-      ImportDate: new Date().toISOString(),
+      Overwrite: ow,
       Header: headerData,
       Details: details.map(row => ({
-        ...row,
-        PayAmt: parseFloat(String(row.PayAmt).replace(/,/g, '')) || 0,
-        CommisAmt: parseFloat(String(row.CommisAmt).replace(/,/g, '')) || 0,
-        TaxAmt: parseFloat(String(row.TaxAmt).replace(/,/g, '')) || 0,
-        Total: parseFloat(String(row.Total).replace(/,/g, '')) || 0,
+        TerminalID: row.TerminalID,
+        PayAmt: toFloat(row.PayAmt),
+        CommisAmt: toFloat(row.CommisAmt),
+        TaxAmt: toFloat(row.TaxAmt),
+        WHTAmount: toFloat(row.WHTAmount),
+        Total: toFloat(row.Total),
       })),
-    }
-
-    console.log('Submitting payload:', JSON.stringify(payload, null, 2))
+    })
 
     try {
-      await submitToCarmen(payload)
-      alert(`✅ Success: อัปโหลดข้อมูลสมบูรณ์\n\nเอกสาร ${docNo} ส่งเข้าระบบแล้ว`)
+      await submitToLocal(receiptId, buildPayload(false))
+      showAlert('สำเร็จ', `เอกสาร ${headerData.DocNo} บันทึกเข้าฐานข้อมูลแล้ว`, 'success')
+      resetAll()
     } catch (err) {
-      alert(`✅ Success (จำลอง): Payload เตรียมพร้อมแล้ว!\n\nบันทึกหมายเลข ${docNo} ไว้แล้ว`)
+      if (err.code === 'DUPLICATE_DOC_NO') {
+        showConfirm(
+          'พบเลขที่เอกสารซ้ำ',
+          `หมายเลขบิล: ${headerData.DocNo} มีอยู่ในระบบแล้ว\nคุณต้องการบันทึกทับ (Overwrite) ข้อมูลเดิมหรือไม่?`,
+          async () => {
+            try {
+              await submitToLocal(receiptId, buildPayload(true))
+              showAlert('สำเร็จ', `เอกสาร ${headerData.DocNo} ถูกอัพเดตแล้ว`, 'success')
+              resetAll()
+            } catch (err2) {
+              showAlert('ผิดพลาด', `บันทึกทับไม่สำเร็จ: ${err2.message}`, 'error')
+            }
+          },
+          null,
+          'บันทึกทับ'
+        )
+      } else if (err.code === 'ALREADY_SUBMITTED') {
+        showAlert('แจ้งเตือน', err.message || 'เอกสารนี้ถูกบันทึกไปแล้ว', 'warning')
+      } else {
+        showAlert('ผิดพลาด', `บันทึกข้อมูลไม่สำเร็จ: ${err.message}`, 'error')
+      }
     }
-
-    submittedDocNos.current.add(docNo)
-    resetAll()
   }
 
   function resetAll() {
     setShowResults(false)
+    setReceiptId(null)
     setFile(null)
     setStatus('')
     if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
@@ -160,8 +220,14 @@ export default function App() {
   }
 
   function handleCancel() {
-    if (!showResults || confirm('คุณต้องการยกเลิกและล้างข้อมูลหรือไม่?')) {
+    if (!showResults) {
       resetAll()
+    } else {
+      showConfirm(
+        'ยกเลิกการแก้ไข',
+        'คุณต้องการยกเลิกและล้างข้อมูลหรือไม่?',
+        resetAll
+      )
     }
   }
 
@@ -206,6 +272,8 @@ export default function App() {
           <DocumentPreview previewUrl={previewUrl} previewType={previewType} />
         </div>
       )}
+
+      <CustomModal {...modal} />
     </div>
   )
 }

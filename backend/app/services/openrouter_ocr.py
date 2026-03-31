@@ -60,6 +60,7 @@ def _get_mime_type(filename: str) -> str:
         ".tiff": "image/tiff",
         ".tif": "image/tiff",
         ".webp": "image/webp",
+        ".pdf": "application/pdf",
     }.get(ext, "image/png")
 
 

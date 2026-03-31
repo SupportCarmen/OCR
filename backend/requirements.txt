@@ -5,7 +5,7 @@ python-multipart==0.0.20
 
 # Database
 sqlalchemy==2.0.36
-aiosqlite==0.20.0
+aiomysql==0.2.0
 
 # LLM via OpenRouter (OpenAI-compatible SDK)
 openai==1.58.1

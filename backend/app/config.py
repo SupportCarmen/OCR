@@ -3,7 +3,6 @@ Application configuration — loads settings from .env file.
 """
 
 from pydantic_settings import BaseSettings
-from typing import Optional
 import os
 
 
@@ -12,7 +11,7 @@ class Settings(BaseSettings):
 
     # OpenRouter API
     openrouter_api_key: str = ""
-    openrouter_model: str = "google/gemini-2.5-flash-preview"
+    openrouter_model: str = "google/gemini-2.0-flash-001"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # OCR engine label (informational — actual engine is the OpenRouter vision LLM)
