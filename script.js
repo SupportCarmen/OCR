@@ -124,6 +124,27 @@ async function processFile() {
                 }
             ]
         };
+    } else if (bank === 'SCB') {
+        currentData = {
+            header: {
+                DateProcessed: todayStr,
+                BankName: "Siam Commercial Bank (SCB)",
+                DocName: "ใบเสร็จรับเงิน / ใบแจ้งหนี้",
+                CompanyName: "บริษัท สยาม โกลบอล จำกัด",
+                DocDate: "15/01/2026",
+                DocNo: "SCB99202601001"
+            },
+            details: [
+                {
+                    TerminalID: "TID-SCB-0081",
+                    PayAmt: 50000.00,
+                    CommisAmt: 1250.00,
+                    TaxAmt: 87.50,
+                    WHTAmount: 37.50,
+                    Total: 48625.00
+                }
+            ]
+        };
     }
 
     // Render Result
