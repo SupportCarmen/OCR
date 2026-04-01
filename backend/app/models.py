@@ -46,11 +46,11 @@ class OCRTask(Base):
     """File upload and processing metadata."""
     __tablename__ = "ocr_tasks"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    original_filename = Column(String, nullable=False)
-    file_path = Column(String, nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    original_filename = Column(String(255), nullable=False)
+    file_path = Column(String(512), nullable=False)
     status = Column(SAEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj]), default=TaskStatus.PENDING, nullable=False)
-    ocr_engine = Column(String, nullable=True)
+    ocr_engine = Column(String(100), nullable=True)
     raw_text = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -63,16 +63,16 @@ class Receipt(Base):
     """Document header — one per OCR task."""
     __tablename__ = "receipts"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    task_id = Column(String, ForeignKey("ocr_tasks.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    task_id = Column(String(36), ForeignKey("ocr_tasks.id"), nullable=False)
 
     # Header fields (from LLM extraction)
-    bank_name = Column(String, nullable=True)
+    bank_name = Column(String(255), nullable=True)
     bank_type = Column(SAEnum(BankType, values_callable=lambda obj: [e.value for e in obj]), nullable=True)   # BBL / KBANK / SCB
-    doc_name = Column(String, nullable=True)
-    company_name = Column(String, nullable=True)
-    doc_date = Column(String, nullable=True)
-    doc_no = Column(String, nullable=True, index=True)
+    doc_name = Column(String(255), nullable=True)
+    company_name = Column(String(255), nullable=True)
+    doc_date = Column(String(50), nullable=True)
+    doc_no = Column(String(100), nullable=True, index=True)
 
     # Submission tracking
     submitted_at = Column(DateTime, nullable=True)        # NULL = not yet submitted
@@ -83,13 +83,13 @@ class Receipt(Base):
 
 
 class ReceiptDetail(Base):
-    """Terminal line item — many per receipt."""
+    """Payment item — many per receipt."""
     __tablename__ = "receipt_details"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    receipt_id = Column(String, ForeignKey("receipts.id"), nullable=False)
+    receipt_id = Column(String(36), ForeignKey("receipts.id"), nullable=False)
 
-    terminal_id = Column(String, nullable=True)
+    transaction = Column(String(255), nullable=True)
     pay_amt = Column(Numeric(15, 2), nullable=True)
     commis_amt = Column(Numeric(15, 2), nullable=True)
     tax_amt = Column(Numeric(15, 2), nullable=True)
@@ -104,7 +104,7 @@ class ReceiptDetail(Base):
 # ═══════════════════════════════════════════════════
 
 class ReceiptDetailSchema(BaseModel):
-    terminal_id: Optional[str] = None
+    transaction: Optional[str] = None
     pay_amt: Optional[float] = None
     commis_amt: Optional[float] = None
     tax_amt: Optional[float] = None
@@ -157,6 +157,16 @@ class OCRUploadResponse(BaseModel):
     total_files: int
 
 
+# ExtractedDetailRow — one line item from LLM (one per payment type / card)
+class ExtractedDetailRow(BaseModel):
+    transaction: Optional[str] = None
+    pay_amt: Optional[str] = None
+    commis_amt: Optional[str] = None
+    tax_amt: Optional[str] = None
+    total: Optional[str] = None
+    wht_amount: Optional[str] = None
+
+
 # ExtractedReceiptData — ใช้ภายในสำหรับ LLM response mapping
 class ExtractedReceiptData(BaseModel):
     bank_name: Optional[str] = Field(None, description="ชื่อธนาคาร")
@@ -164,9 +174,4 @@ class ExtractedReceiptData(BaseModel):
     company_name: Optional[str] = Field(None, description="ชื่อบริษัท")
     doc_date: Optional[str] = Field(None, description="วันที่เอกสาร")
     doc_no: Optional[str] = Field(None, description="เลขที่เอกสาร")
-    terminal_id: Optional[str] = Field(None, description="Terminal ID")
-    pay_amt: Optional[str] = Field(None, description="ยอดชำระ")
-    commis_amt: Optional[str] = Field(None, description="ค่าธรรมเนียม")
-    tax_amt: Optional[str] = Field(None, description="ภาษี")
-    total: Optional[str] = Field(None, description="ยอดรวมสุทธิ")
-    wht_amount: Optional[str] = Field(None, description="ภาษีหัก ณ ที่จ่าย")
+    details: List[ExtractedDetailRow] = Field(default_factory=list, description="รายการ terminal/card rows")

@@ -150,7 +150,7 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
         if receipt:
             for d in receipt.details:
                 details.append({
-                    "terminal_id": d.terminal_id,
+                    "transaction": d.transaction,
                     "pay_amt": float(d.pay_amt) if d.pay_amt is not None else None,
                     "commis_amt": float(d.commis_amt) if d.commis_amt is not None else None,
                     "tax_amt": float(d.tax_amt) if d.tax_amt is not None else None,
@@ -332,6 +332,19 @@ async def export_csv(db: AsyncSession = Depends(get_db)):
         filename=filename,
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ═══════════════════════════════════════════════════
+# GET /api/v1/ocr/debug-llm  (temporary debug endpoint)
+# ═══════════════════════════════════════════════════
+
+@router.get("/debug-llm")
+async def debug_last_llm_response():
+    import pathlib, tempfile
+    p = pathlib.Path(tempfile.gettempdir()) / "last_llm_response.txt"
+    if not p.exists():
+        return {"raw": "(no response saved yet — process a file first)", "path": str(p)}
+    return {"raw": p.read_text(encoding="utf-8"), "path": str(p)}
 
 
 # ═══════════════════════════════════════════════════

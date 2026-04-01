@@ -11,7 +11,7 @@ import DocumentPreview from './components/DocumentPreview'
 import CustomModal from './components/CustomModal'
 
 export default function App() {
-  const [bank, setBank] = useState('BBL')
+  const [bank, setBank] = useState('')
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
@@ -67,6 +67,10 @@ export default function App() {
   }
 
   async function processFile() {
+    if (!bank) {
+      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเลือกธนาคารก่อนดำเนินการ', type: 'warning', onConfirm: closeModal })
+      return
+    }
     if (!file) {
       showModal({ title: 'แจ้งเตือน', message: 'กรุณาเลือกไฟล์ก่อนดำเนินการ', type: 'warning', onConfirm: closeModal })
       return
@@ -88,15 +92,7 @@ export default function App() {
         DocNo: ext.doc_no || '',
       })
 
-      setDetails([{
-        TerminalID: ext.terminal_id || '',
-        PayAmt: ext.pay_amt || '',
-        CommisAmt: ext.commis_amt || '',
-        TaxAmt: ext.tax_amt || '',
-        WHTAmount: ext.wht_amount || '',
-        Total: ext.total || '',
-        Transaction: '',
-      }])
+      setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
 
       // เก็บ receiptId ไว้สำหรับใช้ตอน submit
       setReceiptId(ext.receipt_id || null)
@@ -131,6 +127,11 @@ export default function App() {
   async function submitData(overwrite = false) {
     const docNo = headerData.DocNo
 
+    if (details.length === 0) {
+      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเพิ่มอย่างน้อย 1 รายการก่อนส่ง', type: 'warning', onConfirm: closeModal })
+      return
+    }
+
     const payload = {
       BankType: bank,
       Overwrite: overwrite,
@@ -141,6 +142,7 @@ export default function App() {
         PayAmt: parseFloat(String(row.PayAmt).replace(/,/g, '')) || 0,
         CommisAmt: parseFloat(String(row.CommisAmt).replace(/,/g, '')) || 0,
         TaxAmt: parseFloat(String(row.TaxAmt).replace(/,/g, '')) || 0,
+        WHTAmount: parseFloat(String(row.WHTAmount).replace(/,/g, '')) || null,
         Total: parseFloat(String(row.Total).replace(/,/g, '')) || 0,
       })),
     }

@@ -8,6 +8,7 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
           <i className="fas fa-university" /> 1. เลือกธนาคาร (Bank)
         </label>
         <select id="bankSelector" value={bank} onChange={e => onBankChange(e.target.value)}>
+          <option value="" disabled>-- กรุณาเลือกธนาคาร --</option>
           {BANKS.map(b => (
             <option key={b.value} value={b.value}>{b.label}</option>
           ))}

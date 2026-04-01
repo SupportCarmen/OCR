@@ -1,5 +1,14 @@
 import { DETAIL_COLUMNS, DETAIL_LABELS } from '../constants'
 
+const formatAmount = (value) => {
+  if (!value) return ''
+  const num = parseFloat(String(value).replace(/,/g, ''))
+  if (isNaN(num)) return String(value)
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const amountFields = ['PayAmt', 'CommisAmt', 'TaxAmt', 'Total', 'WHTAmount']
+
 export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, readOnly }) {
   return (
     <div className="data-card">
@@ -22,17 +31,21 @@ export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, 
           <tbody>
             {details.map((row, rowIdx) => (
               <tr key={rowIdx}>
-                {DETAIL_COLUMNS.map(col => (
-                  <td key={col}>
-                    <input
-                      type="text"
-                      className="detail-input"
-                      value={row[col] ?? ''}
-                      readOnly={readOnly}
-                      onChange={e => !readOnly && onUpdate?.(rowIdx, col, e.target.value)}
-                    />
-                  </td>
-                ))}
+                {DETAIL_COLUMNS.map(col => {
+                  const isAmountField = amountFields.includes(col)
+                  const displayValue = isAmountField ? formatAmount(row[col]) : (row[col] ?? '')
+                  return (
+                    <td key={col}>
+                      <input
+                        type="text"
+                        className="detail-input"
+                        value={displayValue}
+                        readOnly={readOnly}
+                        onChange={e => !readOnly && onUpdate?.(rowIdx, col, e.target.value)}
+                      />
+                    </td>
+                  )
+                })}
                 {!readOnly && (
                   <td style={{ textAlign: 'center' }}>
                     <button
