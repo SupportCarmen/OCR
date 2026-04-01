@@ -1,4 +1,4 @@
-import { DETAIL_COLUMNS } from '../constants'
+import { DETAIL_COLUMNS, DETAIL_LABELS } from '../constants'
 
 export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, readOnly }) {
   return (
@@ -10,7 +10,12 @@ export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, 
         <table className="data-table">
           <thead>
             <tr>
-              {DETAIL_COLUMNS.map(col => <th key={col}>{col}</th>)}
+              {DETAIL_COLUMNS.map(col => {
+                const labelHtml = DETAIL_LABELS[col] || col
+                return (
+                  <th key={col} dangerouslySetInnerHTML={{ __html: labelHtml }} />
+                )
+              })}
               {!readOnly && <th style={{ textAlign: 'center' }}>Action</th>}
             </tr>
           </thead>

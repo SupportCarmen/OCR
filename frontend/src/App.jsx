@@ -127,6 +127,8 @@ export default function App() {
         TaxAmt: ext.tax_amt || '',
         WHTAmount: ext.wht_amount || '',
         Total: ext.total || '',
+        MerchantName: ext.merchant_name || '',
+        Transaction: ext.transaction_type || '',
       }])
 
       setStatus('อ่านข้อมูลสำเร็จ ✓ กรุณาตรวจสอบแล้วกด Submit')
