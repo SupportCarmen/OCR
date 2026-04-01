@@ -242,11 +242,37 @@ async def submit_receipt_local(
         existing_receipts = dup_result.scalars().all()
         if existing_receipts:
             if payload.Overwrite:
-                # User confirmed overwrite: delete the old submitted records
+                # UPDATE existing records in place — preserves receipt ID and created_at (audit trail)
                 logger.info(f"Overwriting {len(existing_receipts)} existing submitted record(s) for Doc No: {doc_no}")
                 for old_r in existing_receipts:
-                    await db.delete(old_r)
-                # Note: cascade delete in DB (or relationship) should handle details
+                    old_r.bank_name = payload.Header.BankName
+                    old_r.bank_type = payload.BankType if payload.BankType in ("BBL", "KBANK", "SCB") else old_r.bank_type
+                    old_r.doc_name = payload.Header.DocName
+                    old_r.company_name = payload.Header.CompanyName
+                    old_r.doc_date = payload.Header.DocDate
+                    old_r.doc_no = payload.Header.DocNo
+                    old_r.submitted_at = datetime.utcnow()
+                    await db.execute(delete(ReceiptDetail).where(ReceiptDetail.receipt_id == old_r.id))
+                    for item in payload.Details:
+                        db.add(ReceiptDetail(
+                            receipt_id=old_r.id,
+                            terminal_id=item.TerminalID,
+                            pay_amt=Decimal(str(item.PayAmt or 0)),
+                            commis_amt=Decimal(str(item.CommisAmt or 0)),
+                            tax_amt=Decimal(str(item.TaxAmt or 0)),
+                            wht_amount=Decimal(str(item.WHTAmount or 0)),
+                            total=Decimal(str(item.Total or 0)),
+                        ))
+                # Delete the current (unsubmitted) receipt — data is now merged into the old record
+                await db.delete(receipt)
+                await db.commit()
+                logger.info(f"Receipt {existing_receipts[0].id} updated via overwrite (doc_no={doc_no})")
+                return {
+                    "ok": True,
+                    "receipt_id": existing_receipts[0].id,
+                    "doc_no": doc_no,
+                    "submitted_at": existing_receipts[0].submitted_at.isoformat(),
+                }
             else:
                 return {
                     "ok": False,
