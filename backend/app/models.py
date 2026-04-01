@@ -159,12 +159,11 @@ class OCRUploadResponse(BaseModel):
 
 # ExtractedDetailRow — one line item from LLM (one per payment type / card)
 class ExtractedDetailRow(BaseModel):
-    transaction: Optional[str] = None
+    transaction: Optional[str] = None   # card type / payment type label
     pay_amt: Optional[str] = None
     commis_amt: Optional[str] = None
     tax_amt: Optional[str] = None
     total: Optional[str] = None
-    wht_amount: Optional[str] = None
 
 
 # ExtractedReceiptData — ใช้ภายในสำหรับ LLM response mapping
@@ -172,6 +171,14 @@ class ExtractedReceiptData(BaseModel):
     bank_name: Optional[str] = Field(None, description="ชื่อธนาคาร")
     doc_name: Optional[str] = Field(None, description="ประเภทเอกสาร")
     company_name: Optional[str] = Field(None, description="ชื่อบริษัท")
+    company_tax_id: Optional[str] = Field(None, description="เลขประจำตัวผู้เสียภาษีร้านค้า")
+    company_address: Optional[str] = Field(None, description="ที่อยู่ร้านค้า")
+    account_no: Optional[str] = Field(None, description="เลขที่บัญชีรับเงิน")
     doc_date: Optional[str] = Field(None, description="วันที่เอกสาร")
     doc_no: Optional[str] = Field(None, description="เลขที่เอกสาร")
-    details: List[ExtractedDetailRow] = Field(default_factory=list, description="รายการ terminal/card rows")
+    merchant_name: Optional[str] = Field(None, description="ชื่อร้านค้า / MERCHANT NAME จากธนาคาร")
+    merchant_id: Optional[str] = Field(None, description="หมายเลขร้านค้า / MERCHANT NUMBER / Terminal ID")
+    wht_rate: Optional[str] = Field(None, description="อัตราภาษีหัก ณ ที่จ่าย % เช่น '3.00'")
+    wht_amount: Optional[str] = Field(None, description="ภาษีหัก ณ ที่จ่าย รวมทั้งเอกสาร (บาท)")
+    net_amount: Optional[str] = Field(None, description="ยอดเงินสุทธิรวมทั้งเอกสาร (NET AMOUNT) หลังหัก WHT")
+    details: List[ExtractedDetailRow] = Field(default_factory=list, description="รายการ card/payment type rows")
