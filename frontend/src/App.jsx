@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { EMPTY_DETAIL_ROW } from './constants'
 import { extractFromFile } from './lib/ocrApi'
-import { submitToCarmen } from './lib/carmenApi'
+import { submitToLocal } from './lib/carmenApi'
 import UploadSection from './components/UploadSection'
 import ActionBar from './components/ActionBar'
 import HeaderCard from './components/HeaderCard'
@@ -19,6 +19,7 @@ export default function App() {
   const [showResults, setShowResults] = useState(false)
   const [headerData, setHeaderData] = useState({})
   const [details, setDetails] = useState([])
+  const [receiptId, setReceiptId] = useState(null)
 
   const fileInputRef = useRef(null)
   const submittedDocNos = useRef(new Set())
@@ -66,7 +67,7 @@ export default function App() {
     setShowResults(false)
 
     try {
-      const ext = await extractFromFile(file)
+      const ext = await extractFromFile(file, bank)
 
       setHeaderData({
         DateProcessed: new Date().toLocaleDateString('en-GB'),
@@ -84,9 +85,11 @@ export default function App() {
         TaxAmt: ext.tax_amt || '',
         WHTAmount: ext.wht_amount || '',
         Total: ext.total || '',
-        MerchantName: ext.merchant_name || '',
-        Transaction: ext.transaction_type || '',
+        Transaction: '',
       }])
+
+      // เก็บ receiptId ไว้สำหรับใช้ตอน submit
+      setReceiptId(ext.receipt_id || null)
 
       setStatus('อ่านข้อมูลสำเร็จ ✓')
       setShowResults(true)
@@ -139,14 +142,13 @@ export default function App() {
     console.log('Submitting payload:', JSON.stringify(payload, null, 2))
 
     try {
-      await submitToCarmen(payload)
+      await submitToLocal(receiptId, payload)
       alert(`✅ Success: อัปโหลดข้อมูลสมบูรณ์\n\nเอกสาร ${docNo} ส่งเข้าระบบแล้ว`)
+      submittedDocNos.current.add(docNo)
+      resetAll()
     } catch (err) {
-      alert(`✅ Success (จำลอง): Payload เตรียมพร้อมแล้ว!\n\nบันทึกหมายเลข ${docNo} ไว้แล้ว`)
+      alert(`❌ Error: ${err.message}`)
     }
-
-    submittedDocNos.current.add(docNo)
-    resetAll()
   }
 
   function resetAll() {
@@ -158,6 +160,7 @@ export default function App() {
     setPreviewType(null)
     setHeaderData({})
     setDetails([])
+    setReceiptId(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
