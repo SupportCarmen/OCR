@@ -89,7 +89,7 @@ export default function App() {
       })
       return
     }
-    if (!file) {
+    if (files.length === 0) {
       showModal({
         title: 'ไม่พบไฟล์เอกสาร',
         message: 'กรุณาเลือกไฟล์รูปภาพหรือ PDF ที่ต้องการประมวลผล',
@@ -162,7 +162,7 @@ export default function App() {
     const payload = {
       BankType: bank,
       Overwrite: overwrite,
-      OriginalFilename: file?.name,
+      OriginalFilename: files[0]?.name,
       ImportDate: new Date().toISOString().split('T')[0],
       Header: { ...headerData, ...receiptMeta },
       Details: details.map(row => ({
