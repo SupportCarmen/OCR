@@ -89,8 +89,16 @@ async def process_single_file(
             bank_type=bank_type,
             doc_name=extracted.doc_name,
             company_name=extracted.company_name,
+            company_tax_id=extracted.company_tax_id,
+            company_address=extracted.company_address,
+            account_no=extracted.account_no,
             doc_date=extracted.doc_date,
             doc_no=extracted.doc_no,
+            merchant_name=extracted.merchant_name,
+            merchant_id=extracted.merchant_id,
+            wht_rate=extracted.wht_rate,
+            wht_amount=_parse_amount(extracted.wht_amount),
+            net_amount=_parse_amount(extracted.net_amount),
         )
         db.add(receipt)
         await db.flush()
@@ -103,7 +111,7 @@ async def process_single_file(
                 pay_amt=_parse_amount(row.pay_amt),
                 commis_amt=_parse_amount(row.commis_amt),
                 tax_amt=_parse_amount(row.tax_amt),
-                wht_amount=_parse_amount(row.wht_amount),
+                wht_amount=None,
                 total=_parse_amount(row.total),
             ))
 
@@ -171,14 +179,20 @@ async def export_tasks_to_csv(db: AsyncSession) -> str:
         "Bank Name",
         "Doc Name",
         "Company Name",
+        "Tax ID",
+        "Merchant Name",
+        "Merchant ID",
+        "Account No",
         "Doc Date",
         "Doc No",
+        "WHT Rate (%)",
+        "WHT Amount",
+        "Net Amount",
         "Transaction",
         "Pay Amt",
         "Commis Amt",
         "Tax Amt",
         "Total",
-        "WHT Amount",
     ]
 
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
@@ -190,14 +204,20 @@ async def export_tasks_to_csv(db: AsyncSession) -> str:
                 receipt.bank_name or "",
                 receipt.doc_name or "",
                 receipt.company_name or "",
+                receipt.company_tax_id or "",
+                receipt.merchant_name or "",
+                receipt.merchant_id or "",
+                receipt.account_no or "",
                 receipt.doc_date or "",
                 receipt.doc_no or "",
+                receipt.wht_rate or "",
+                receipt.wht_amount or "",
+                receipt.net_amount or "",
                 detail.transaction or "",
                 detail.pay_amt or "",
                 detail.commis_amt or "",
                 detail.tax_amt or "",
                 detail.total or "",
-                detail.wht_amount or "",
             ])
 
     logger.info(f"Exported {len(rows)} rows to {csv_path}")

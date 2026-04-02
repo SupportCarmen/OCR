@@ -12,10 +12,13 @@ const amountFields = ['PayAmt', 'CommisAmt', 'TaxAmt', 'Total', 'WHTAmount']
 export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, readOnly }) {
   return (
     <div className="data-card">
-      <h3 className="card-title">
-        <i className="fas fa-list-alt" /> ข้อมูลรายการ (Detail)
-      </h3>
-      <div className="table-wrapper">
+      <div className="card-title">
+        <div className="card-title-left">
+          <i className="fas fa-list" /> ข้อมูลรายการ (Details)
+        </div>
+        <span className="row-count">{details.length} รายการ</span>
+      </div>
+      <div className="card-body-flush table-wrapper">
         <table className="data-table">
           <thead>
             <tr>

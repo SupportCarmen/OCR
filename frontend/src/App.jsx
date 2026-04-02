@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { EMPTY_DETAIL_ROW } from './constants'
 import { extractFromFile } from './lib/ocrApi'
 import { submitToLocal } from './lib/carmenApi'
+import StepWizard from './components/StepWizard'
 import UploadSection from './components/UploadSection'
 import ActionBar from './components/ActionBar'
 import HeaderCard from './components/HeaderCard'
@@ -9,29 +10,37 @@ import DetailTable from './components/DetailTable'
 import FormActions from './components/FormActions'
 import DocumentPreview from './components/DocumentPreview'
 import CustomModal from './components/CustomModal'
+import AccountingReview from './components/AccountingReview'
+import JournalVoucher from './components/JournalVoucher'
 
 export default function App() {
+  const [step, setStep] = useState(1)
   const [bank, setBank] = useState('')
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
-  const [showResults, setShowResults] = useState(false)
   const [headerData, setHeaderData] = useState({})
+  const [receiptMeta, setReceiptMeta] = useState({})
   const [details, setDetails] = useState([])
   const [receiptId, setReceiptId] = useState(null)
+  const [jvRows, setJvRows] = useState([])
   const [modal, setModal] = useState({ show: false })
+  const [toasts, setToasts] = useState([])
 
   const fileInputRef = useRef(null)
   const submittedDocNos = useRef(new Set())
 
-  function showModal(config) {
-    setModal({ show: true, ...config })
-  }
+  function showModal(config) { setModal({ show: true, ...config }) }
+  function closeModal() { setModal({ show: false }) }
 
-  function closeModal() {
-    setModal({ show: false })
+  function showToast(msg, type = 'info') {
+    const id = Date.now() + Math.random()
+    setToasts(prev => [...prev, { id, msg, type }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 3500)
   }
 
   useEffect(() => {
@@ -41,19 +50,14 @@ export default function App() {
   }, [previewUrl])
 
   function handleFileChange(e) {
-    const f = e.target.files[0]
+    const f = e.target.files?.[0] || e.target?.files?.[0]
     if (!f) return
-
     if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
-
     const name = f.name.toLowerCase()
     const isImage = f.type.startsWith('image/') || /\.(jpe?g|png|gif|bmp|webp)$/i.test(name)
     const isPDF = f.type === 'application/pdf' || /\.pdf$/i.test(name)
-
     setFile(f)
-    setShowResults(false)
     setStatus('')
-
     if (isImage) {
       setPreviewUrl(URL.createObjectURL(f))
       setPreviewType('image')
@@ -64,43 +68,52 @@ export default function App() {
       setPreviewUrl(null)
       setPreviewType(name.split('.').pop().toUpperCase() || 'other')
     }
+    setStep(1) // Keep step 1 when file is chosen
   }
 
   async function processFile() {
     if (!bank) {
-      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเลือกธนาคารก่อนดำเนินการ', type: 'warning', onConfirm: closeModal })
+      showToast('กรุณาเลือกธนาคารก่อนดำเนินการ', 'error')
       return
     }
     if (!file) {
-      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเลือกไฟล์ก่อนดำเนินการ', type: 'warning', onConfirm: closeModal })
+      showToast('กรุณาเลือกไฟล์ก่อนดำเนินการ', 'error')
       return
     }
-
     setLoading(true)
+    setStep(2)
     setStatus('AI กำลังอ่านข้อมูลจากเอกสาร...')
-    setShowResults(false)
-
     try {
       const ext = await extractFromFile(file, bank)
-
       setHeaderData({
         DateProcessed: new Date().toLocaleDateString('en-GB'),
-        BankName: ext.bank_name || '',
-        DocName: ext.doc_name || '',
+        BankName:    ext.bank_name    || '',
+        DocName:     ext.doc_name     || '',
         CompanyName: ext.company_name || '',
-        DocDate: ext.doc_date || '',
-        DocNo: ext.doc_no || '',
+        DocDate:     ext.doc_date     || '',
+        DocNo:       ext.doc_no       || '',
+        MerchantName: ext.merchant_name || '',
+        MerchantId:   ext.merchant_id   || '',
+        Prefix:      'TX',
+        Source:      'TaxR'
       })
-
+      setReceiptMeta({
+        CompanyTaxId:    ext.company_tax_id || '',
+        CompanyAddress:  ext.company_address || '',
+        AccountNo:       ext.account_no      || '',
+        WhtRate:         ext.wht_rate        || '',
+        WhtAmount:       ext.wht_amount  != null ? parseFloat(ext.wht_amount)  || null : null,
+        NetAmount:       ext.net_amount  != null ? parseFloat(ext.net_amount)  || null : null,
+      })
       setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
-
-      // เก็บ receiptId ไว้สำหรับใช้ตอน submit
       setReceiptId(ext.receipt_id || null)
-
       setStatus('อ่านข้อมูลสำเร็จ ✓')
-      setShowResults(true)
+      setStep(3)
+      showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
     } catch (err) {
       setStatus(`❌ ${err.message}`)
+      showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error')
+      setStep(1)
     } finally {
       setLoading(false)
     }
@@ -116,85 +129,69 @@ export default function App() {
     )
   }
 
-  function addRow() {
-    setDetails(prev => [...prev, { ...EMPTY_DETAIL_ROW }])
-  }
+  function addRow() { setDetails(prev => [...prev, { ...EMPTY_DETAIL_ROW }]) }
+  function deleteRow(index) { setDetails(prev => prev.filter((_, i) => i !== index)) }
 
-  function deleteRow(index) {
-    setDetails(prev => prev.filter((_, i) => i !== index))
-  }
-
-  async function submitData(overwrite = false) {
+  async function handleSubmitFinal(rows, overwrite = false) {
+    setJvRows(rows)
     const docNo = headerData.DocNo
-
-    if (details.length === 0) {
-      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเพิ่มอย่างน้อย 1 รายการก่อนส่ง', type: 'warning', onConfirm: closeModal })
-      return
-    }
-
     const payload = {
-      BankType: bank,
-      Overwrite: overwrite,
-      ImportDate: new Date().toISOString(),
-      Header: headerData,
-      Details: details.map(row => ({
+      BankType:   bank,
+      Overwrite:  overwrite,
+      ImportDate: new Date().toISOString().split('T')[0],
+      Header:     { ...headerData, ...receiptMeta },
+      Details:    details.map(row => ({
         ...row,
-        PayAmt: parseFloat(String(row.PayAmt).replace(/,/g, '')) || 0,
+        PayAmt:    parseFloat(String(row.PayAmt).replace(/,/g, ''))    || 0,
         CommisAmt: parseFloat(String(row.CommisAmt).replace(/,/g, '')) || 0,
-        TaxAmt: parseFloat(String(row.TaxAmt).replace(/,/g, '')) || 0,
-        WHTAmount: parseFloat(String(row.WHTAmount).replace(/,/g, '')) || null,
-        Total: parseFloat(String(row.Total).replace(/,/g, '')) || 0,
+        TaxAmt:    parseFloat(String(row.TaxAmt).replace(/,/g, ''))    || 0,
+        WHTAmount: parseFloat(String(row.WHTAmount).replace(/,/g, '')) || 0,
+        Total:     parseFloat(String(row.Total).replace(/,/g, ''))     || 0,
+        TerminalID: row.TerminalID || ''
       })),
     }
-
-    console.log('Submitting payload:', JSON.stringify(payload, null, 2))
-
     try {
+      showToast('กำลังส่งข้อมูล...', 'info')
       await submitToLocal(receiptId, payload)
       submittedDocNos.current.add(docNo)
-      showModal({ title: 'อัปโหลดสำเร็จ', message: `เอกสาร ${docNo} ส่งเข้าระบบแล้ว`, type: 'success', onConfirm: () => { closeModal(); resetAll() } })
+      showToast('อัปโหลดข้อมูลสำเร็จ', 'success')
+      setStep(5)
     } catch (err) {
       if (err.code === 'DUPLICATE_DOC_NO') {
         showModal({
-          title: 'เอกสารซ้ำซ้อนในระบบ',
-          message: `หมายเลข ${docNo} ถูก submit ไปแล้ว\n\nต้องการ Overwrite ข้อมูลเดิมหรือไม่?`,
+          title: 'พบเอกสารซ้ำ',
+          message: `ระบบตรวจพบเอกสารหมายเลข ${docNo}\nมีอยู่ใน Database แล้ว ต้องการเขียนทับ (Overwrite) หรือไม่?`,
           type: 'warning',
           confirmText: 'Overwrite',
           cancelText: 'ยกเลิก',
-          onConfirm: () => { closeModal(); submitData(true) },
+          onConfirm: () => { closeModal(); handleSubmitFinal(rows, true) },
           onCancel: closeModal,
         })
       } else {
-        showModal({ title: 'เกิดข้อผิดพลาด', message: err.message, type: 'error', onConfirm: closeModal })
+        showToast(err.message, 'error')
       }
     }
   }
 
   function resetAll() {
-    setShowResults(false)
+    if (!window.confirm('ยืนยันการยกเลิกและล้างข้อมูลทั้งหมด?')) return
+    setStep(1)
     setFile(null)
     setStatus('')
     if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
     setPreviewUrl(null)
     setPreviewType(null)
     setHeaderData({})
+    setReceiptMeta({})
     setDetails([])
     setReceiptId(null)
+    setJvRows([])
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function handleCancel() {
-    if (!showResults) {
-      resetAll()
-      return
-    }
-    showModal({
-      title: 'ยืนยันการยกเลิก',
-      message: 'คุณต้องการยกเลิกและล้างข้อมูลหรือไม่?',
-      type: 'warning',
-      onConfirm: () => { closeModal(); resetAll() },
-      onCancel: closeModal,
-    })
+    if (step === 1) return
+    resetAll()
   }
 
   return (
@@ -204,48 +201,98 @@ export default function App() {
         title={modal.title}
         message={modal.message}
         type={modal.type}
+        confirmText={modal.confirmText}
+        cancelText={modal.cancelText}
         onConfirm={modal.onConfirm}
         onCancel={modal.onCancel}
       />
-      <div className="app-header">
-        <h1>
-          <i className="fas fa-file-invoice-dollar" />
-          ระบบนำเข้าข้อมูล Credit Card Report
-        </h1>
+
+      <div className="toast-container" id="toastContainer">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast ${t.type}`} style={{ opacity: 1, transform: 'none' }}>
+            <i className={`fas ${t.type === 'success' ? 'fa-circle-check' : t.type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info'}`} />
+            {t.msg}
+          </div>
+        ))}
       </div>
 
-      <UploadSection
-        bank={bank}
-        onBankChange={setBank}
-        onFileChange={handleFileChange}
-        fileInputRef={fileInputRef}
-      />
-
-      <ActionBar
-        loading={loading}
-        status={status}
-        onProcess={processFile}
-      />
-
-      {showResults && (
-        <div className="main-content">
-          <div className="data-column">
-            <h2 className="section-title">
-              <i className="fas fa-edit" /> ตรวจสอบและแก้ไขข้อมูล
-            </h2>
-            <HeaderCard headerData={headerData} onUpdate={updateHeader} />
-            <DetailTable
-              details={details}
-              onUpdate={updateDetail}
-              onAddRow={addRow}
-              onDeleteRow={deleteRow}
-            />
-            <FormActions onCancel={handleCancel} onSubmit={() => submitData()} />
+      <div className="app-header">
+        <div className="brand">
+          <div className="logo-box">
+            <i className="fas fa-file-invoice-dollar" />
           </div>
-
-          <DocumentPreview previewUrl={previewUrl} previewType={previewType} />
+          <h1>ระบบนำเข้าข้อมูล Credit Card Report</h1>
         </div>
+      </div>
+
+      <StepWizard step={step} />
+
+      {/* Step 1 & 2: Upload */}
+      {step <= 2 && (
+        <>
+          <UploadSection
+            bank={bank}
+            onBankChange={setBank}
+            onFileChange={handleFileChange}
+            fileInputRef={fileInputRef}
+            fileName={file?.name}
+          />
+          <ActionBar loading={loading} status={status} onProcess={processFile} />
+        </>
       )}
+
+      {/* Main Grid: Data and Previews */}
+      <div 
+        className={`main-content ${step < 3 ? 'hide-data' : ''} ${!file && step < 3 ? 'hidden' : ''}`} 
+        style={step >= 4 ? { gridTemplateColumns: '1fr' } : {}}
+      >
+        {step <= 3 && (
+          <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={file?.name} />
+        )}
+        
+        <div className="data-column">
+          {step <= 3 && (
+            <div id="step3">
+              <h2 className="section-title">
+                <i className="fas fa-edit" /> Step 3: ตรวจสอบข้อมูล
+              </h2>
+              <HeaderCard headerData={headerData} onUpdate={updateHeader} />
+              <DetailTable
+                details={details}
+                onUpdate={updateDetail}
+                onAddRow={addRow}
+                onDeleteRow={deleteRow}
+              />
+              <FormActions
+                onCancel={handleCancel}
+                onSubmit={() => setStep(4)}
+                submitLabel="ถัดไป (Review Accounting)"
+              />
+            </div>
+          )}
+
+          {step === 4 && (
+            <div id="step4">
+              <AccountingReview
+                details={details}
+                onBack={() => setStep(3)}
+                onSubmit={handleSubmitFinal}
+                onGoMapping={() => { window.location.hash = '#mapping' }}
+              />
+            </div>
+          )}
+
+          {step === 5 && (
+            <div id="step5">
+              <JournalVoucher
+                jvRows={jvRows}
+                headerData={headerData}
+                onFinish={resetAll}
+              />
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

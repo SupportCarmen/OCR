@@ -37,13 +37,29 @@ CREATE TABLE IF NOT EXISTS ocr_tasks (
 CREATE TABLE IF NOT EXISTS receipts (
     id              VARCHAR(36)     NOT NULL,
     task_id         VARCHAR(36)     NOT NULL,
+
+    -- Basic header fields
     bank_name       VARCHAR(255)    NULL,
     bank_type       ENUM('BBL','KBANK','SCB') NULL,
     doc_name        VARCHAR(255)    NULL,
     company_name    VARCHAR(255)    NULL,
+    company_tax_id  VARCHAR(50)     NULL        COMMENT 'เลขประจำตัวผู้เสียภาษี',
+    company_address TEXT            NULL        COMMENT 'ที่อยู่ร้านค้า',
+    account_no      VARCHAR(100)    NULL        COMMENT 'เลขที่บัญชีรับเงิน',
     doc_date        VARCHAR(20)     NULL        COMMENT 'DD/MM/YYYY as extracted from document',
     doc_no          VARCHAR(100)    NULL,
-    submitted_at    DATETIME        NULL        COMMENT 'NULL = not yet submitted to Carmen',
+
+    -- Merchant fields
+    merchant_name   VARCHAR(255)    NULL        COMMENT 'MERCHANT NAME จากธนาคาร',
+    merchant_id     VARCHAR(100)    NULL        COMMENT 'MERCHANT NUMBER / หมายเลขร้านค้า',
+
+    -- WHT / Net fields (document-level)
+    wht_rate        VARCHAR(20)     NULL        COMMENT 'อัตราภาษีหัก ณ ที่จ่าย เช่น 3.00',
+    wht_amount      DECIMAL(15,2)   NULL        COMMENT 'ภาษีหัก ณ ที่จ่าย รวมทั้งเอกสาร (บาท)',
+    net_amount      DECIMAL(15,2)   NULL        COMMENT 'ยอดเงินสุทธิรวมทั้งเอกสาร หลังหัก WHT',
+
+    -- Submission tracking
+    submitted_at    DATETIME        NULL        COMMENT 'NULL = not yet submitted',
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (id),
@@ -57,13 +73,13 @@ CREATE TABLE IF NOT EXISTS receipts (
 
 
 -- ============================================================
--- receipt_details — terminal line items (many per receipt)
+-- receipt_details — payment type line items (many per receipt)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS receipt_details (
     id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     receipt_id      VARCHAR(36)     NOT NULL,
-    terminal_id     VARCHAR(100)    NULL,
+    transaction     VARCHAR(255)    NULL        COMMENT 'card type / payment type label',
     pay_amt         DECIMAL(15,2)   NULL,
     commis_amt      DECIMAL(15,2)   NULL,
     tax_amt         DECIMAL(15,2)   NULL,

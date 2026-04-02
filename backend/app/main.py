@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import init_db
+from app.database import init_db, migrate_db
 from app.routers.ocr import router as ocr_router
 
 
@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"   Database   : {settings.database_url}")
 
     await init_db()
+    await migrate_db()
     logger.info("✅ Database initialized")
 
     yield

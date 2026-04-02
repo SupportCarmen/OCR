@@ -47,7 +47,11 @@ CRITICAL: Each payment/card type row = ONE separate JSON object inside the "deta
 Do NOT merge multiple rows into one object.
 
 Header fields to extract:
-- bank_name        : full bank name (e.g. "Bangkok Bank", "ธนาคารกสิกรไทย")
+- bank_name        : ชื่อธนาคารภาษาไทยเต็มๆ เท่านั้น — ใช้ค่าที่กำหนดตายตัวตามธนาคาร:
+                     SCB   → "ธนาคารไทยพาณิชย์"
+                     BBL   → "ธนาคารกรุงเทพ"
+                     KBANK → "ธนาคารกสิกรไทย"
+                     ห้ามใส่ชื่อภาษาอังกฤษหรือตัวย่อ
 - doc_name         : document title (e.g. "ใบเสร็จรับเงิน/ใบกำกับภาษี")
 - company_name     : company name from address section (ชื่อ / NAME)
 - company_tax_id   : merchant tax ID (เลขประจำตัวผู้เสียภาษี / TAX ID) — digits only, no label
@@ -74,7 +78,7 @@ Detail row fields (one object per card/payment type row):
 
 Example — document with 2 payment rows:
 {
-  "bank_name":       "Bangkok Bank",
+  "bank_name":       "ธนาคารกรุงเทพ",
   "doc_name":        "ใบเสร็จรับเงิน/ใบกำกับภาษี",
   "company_name":    "บริษัท COMPANY NAME จำกัด",
   "company_tax_id":  "0105555181506",
@@ -109,6 +113,8 @@ Example — document with 2 payment rows:
 # ── SCB ──────────────────────────────────────────────────────────────────────
 VISION_PROMPT_SCB = """You are extracting structured data from an SCB (ธนาคารไทยพาณิชย์) credit card summary receipt.
 
+IMPORTANT: bank_name must always be exactly "ธนาคารไทยพาณิชย์" — no English, no abbreviation.
+
 Document layout:
 - Title: "ใบนำฝากเงิน/ใบสรุปยอดขายบัตรเครดิต/ใบกำกับภาษี"
 - "เลขที่"                → doc_no
@@ -134,6 +140,8 @@ CRITICAL FOR SCB:
 
 # ── BBL ──────────────────────────────────────────────────────────────────────
 VISION_PROMPT_BBL = """You are extracting structured data from a Bangkok Bank (ธนาคารกรุงเทพ / BBL) receipt and tax invoice.
+
+IMPORTANT: bank_name must always be exactly "ธนาคารกรุงเทพ" — no English, no abbreviation.
 
 Document layout:
 - Title: "ใบเสร็จรับเงิน/ใบกำกับภาษี"
@@ -166,6 +174,8 @@ net_amount for BBL:
 
 # ── KBANK ─────────────────────────────────────────────────────────────────────
 VISION_PROMPT_KBANK = """You are extracting structured data from a KBANK (ธนาคารกสิกรไทย / Kasikornbank) receipt and tax invoice.
+
+IMPORTANT: bank_name must always be exactly "ธนาคารกสิกรไทย" — no English, no abbreviation.
 
 Document layout:
 - Title: "ใบเสร็จรับเงิน / ใบกำกับภาษี" / "RECEIPT / TAX INVOICE"
