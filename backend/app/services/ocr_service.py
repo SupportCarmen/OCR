@@ -127,6 +127,7 @@ async def process_single_file(
         task.error_message = str(e)
         task.completed_at = datetime.utcnow()
 
+    await db.commit()
     return task
 
 

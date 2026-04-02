@@ -16,7 +16,8 @@ import JournalVoucher from './components/JournalVoucher'
 export default function App() {
   const [step, setStep] = useState(1)
   const [bank, setBank] = useState('')
-  const [file, setFile] = useState(null)
+  // cc// รองรับหลายไฟล์ (multi-file) — files เป็น array ของไฟล์ทั้งหมด
+  const [files, setFiles] = useState([])
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -49,15 +50,21 @@ export default function App() {
     }
   }, [previewUrl])
 
+  // cc// รองรับ multi-file — เมื่อเลือกหลายไฟล์จะสร้าง detail row ตามจำนวนไฟล์
   function handleFileChange(e) {
-    const f = e.target.files?.[0] || e.target?.files?.[0]
-    if (!f) return
+    const selectedFiles = e.target.files
+    if (!selectedFiles || selectedFiles.length === 0) return
     if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
+
+    const fileArray = Array.from(selectedFiles)
+    setFiles(fileArray)
+    setStatus('')
+
+    // Preview ไฟล์แรก
+    const f = fileArray[0]
     const name = f.name.toLowerCase()
     const isImage = f.type.startsWith('image/') || /\.(jpe?g|png|gif|bmp|webp)$/i.test(name)
     const isPDF = f.type === 'application/pdf' || /\.pdf$/i.test(name)
-    setFile(f)
-    setStatus('')
     if (isImage) {
       setPreviewUrl(URL.createObjectURL(f))
       setPreviewType('image')
@@ -68,15 +75,16 @@ export default function App() {
       setPreviewUrl(null)
       setPreviewType(name.split('.').pop().toUpperCase() || 'other')
     }
-    setStep(1) // Keep step 1 when file is chosen
+    setStep(1)
   }
 
+  // cc// ประมวลผลทุกไฟล์ที่เลือก — detail rows เพิ่มตามจำนวน PDF/ไฟล์
   async function processFile() {
     if (!bank) {
       showToast('กรุณาเลือกธนาคารก่อนดำเนินการ', 'error')
       return
     }
-    if (!file) {
+    if (files.length === 0) {
       showToast('กรุณาเลือกไฟล์ก่อนดำเนินการ', 'error')
       return
     }
@@ -84,7 +92,9 @@ export default function App() {
     setStep(2)
     setStatus('AI กำลังอ่านข้อมูลจากเอกสาร...')
     try {
-      const ext = await extractFromFile(file, bank)
+      // ประมวลผลไฟล์แรกเพื่อดึง Header
+      const ext = await extractFromFile(files[0], bank)
+      // cc// ลบ Prefix และ Source ออกจาก headerData ตามที่ user ต้องการ
       setHeaderData({
         DateProcessed: new Date().toLocaleDateString('en-GB'),
         BankName:    ext.bank_name    || '',
@@ -94,8 +104,6 @@ export default function App() {
         DocNo:       ext.doc_no       || '',
         MerchantName: ext.merchant_name || '',
         MerchantId:   ext.merchant_id   || '',
-        Prefix:      'TX',
-        Source:      'TaxR'
       })
       setReceiptMeta({
         CompanyTaxId:    ext.company_tax_id || '',
@@ -105,11 +113,33 @@ export default function App() {
         WhtAmount:       ext.wht_amount  != null ? parseFloat(ext.wht_amount)  || null : null,
         NetAmount:       ext.net_amount  != null ? parseFloat(ext.net_amount)  || null : null,
       })
-      setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
       setReceiptId(ext.receipt_id || null)
+
+      // cc// ถ้ามีหลายไฟล์ ให้ประมวลผลแต่ละไฟล์แล้วรวม details ทั้งหมด
+      let allDetails = ext.details?.length ? [...ext.details] : [{ ...EMPTY_DETAIL_ROW }]
+
+      if (files.length > 1) {
+        setStatus(`AI กำลังอ่านข้อมูลจากเอกสาร... (1/${files.length})`)
+        for (let i = 1; i < files.length; i++) {
+          setStatus(`AI กำลังอ่านข้อมูลจากเอกสาร... (${i + 1}/${files.length})`)
+          try {
+            const extN = await extractFromFile(files[i], bank)
+            if (extN.details?.length) {
+              allDetails = [...allDetails, ...extN.details]
+            } else {
+              allDetails.push({ ...EMPTY_DETAIL_ROW })
+            }
+          } catch {
+            // ถ้าไฟล์ใดไฟล์หนึ่งอ่านไม่ได้ ให้เพิ่ม row เปล่าแทน
+            allDetails.push({ ...EMPTY_DETAIL_ROW })
+          }
+        }
+      }
+
+      setDetails(allDetails)
       setStatus('อ่านข้อมูลสำเร็จ ✓')
       setStep(3)
-      showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
+      showToast(`อ่านข้อมูลสำเร็จ ${files.length} ไฟล์ — กรุณาตรวจสอบและแก้ไข`, 'success')
     } catch (err) {
       setStatus(`❌ ${err.message}`)
       showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error')
@@ -145,7 +175,6 @@ export default function App() {
         PayAmt:    parseFloat(String(row.PayAmt).replace(/,/g, ''))    || 0,
         CommisAmt: parseFloat(String(row.CommisAmt).replace(/,/g, '')) || 0,
         TaxAmt:    parseFloat(String(row.TaxAmt).replace(/,/g, ''))    || 0,
-        WHTAmount: parseFloat(String(row.WHTAmount).replace(/,/g, '')) || 0,
         Total:     parseFloat(String(row.Total).replace(/,/g, ''))     || 0,
         TerminalID: row.TerminalID || ''
       })),
@@ -176,7 +205,7 @@ export default function App() {
   function resetAll() {
     if (!window.confirm('ยืนยันการยกเลิกและล้างข้อมูลทั้งหมด?')) return
     setStep(1)
-    setFile(null)
+    setFiles([])
     setStatus('')
     if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
     setPreviewUrl(null)
@@ -192,6 +221,11 @@ export default function App() {
   function handleCancel() {
     if (step === 1) return
     resetAll()
+  }
+
+  // cc// ปุ่มย้อนกลับ — กลับไป step ก่อนหน้า
+  function goBack() {
+    if (step > 1) setStep(step - 1)
   }
 
   return (
@@ -235,7 +269,8 @@ export default function App() {
             onBankChange={setBank}
             onFileChange={handleFileChange}
             fileInputRef={fileInputRef}
-            fileName={file?.name}
+            fileName={files.length > 1 ? `${files.length} ไฟล์ที่เลือก` : files[0]?.name}
+            multiple={true}
           />
           <ActionBar loading={loading} status={status} onProcess={processFile} />
         </>
@@ -243,11 +278,11 @@ export default function App() {
 
       {/* Main Grid: Data and Previews */}
       <div 
-        className={`main-content ${step < 3 ? 'hide-data' : ''} ${!file && step < 3 ? 'hidden' : ''}`} 
+        className={`main-content ${step < 3 ? 'hide-data' : ''} ${files.length === 0 && step < 3 ? 'hidden' : ''}`} 
         style={step >= 4 ? { gridTemplateColumns: '1fr' } : {}}
       >
         {step <= 3 && (
-          <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={file?.name} />
+          <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={files[0]?.name} />
         )}
         
         <div className="data-column">
@@ -265,8 +300,10 @@ export default function App() {
               />
               <FormActions
                 onCancel={handleCancel}
+                onBack={goBack}
                 onSubmit={() => setStep(4)}
                 submitLabel="ถัดไป (Review Accounting)"
+                showBack={step >= 3}
               />
             </div>
           )}
@@ -288,6 +325,7 @@ export default function App() {
                 jvRows={jvRows}
                 headerData={headerData}
                 onFinish={resetAll}
+                onBack={() => setStep(4)}
               />
             </div>
           )}

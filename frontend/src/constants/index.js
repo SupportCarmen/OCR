@@ -4,7 +4,8 @@ export const BANKS = [
   { value: 'SCB', label: 'Siam Commercial Bank', full: 'Siam Commercial Bank (SCB)' },
 ];
 
-export const DETAIL_COLUMNS = ['Transaction', 'PayAmt', 'CommisAmt', 'TaxAmt', 'Total', 'WHTAmount'];
+// cc// ลบ WHTAmount ออกจากคอลัมน์ Detail ตามที่ user ต้องการ
+export const DETAIL_COLUMNS = ['Transaction', 'PayAmt', 'CommisAmt', 'TaxAmt', 'Total'];
 
 export const HEADER_LABELS = {
   DateProcessed: 'Input Date<br><span style="font-size: 0.8em; color: #666;">Date Processed (วันที่ระบบอ่าน)</span>',
@@ -23,14 +24,13 @@ export const DETAIL_LABELS = {
   CommisAmt: 'Commision Amt.<br><span style="font-size: 0.8em; color: #666;">Commis Amt</span>',
   TaxAmt: 'Tax Amt.<br><span style="font-size: 0.8em; color: #666;">Tax Amt</span>',
   Total: 'Net Amt.<br><span style="font-size: 0.8em; color: #666;">Total</span>',
-  WHTAmount: 'WHT Amount<br><span style="font-size: 0.8em; color: #666;">WHT Amount</span>'
 };
 
+// cc// ลบ WHTAmount ออกจาก EMPTY_DETAIL_ROW ด้วย
 export const EMPTY_DETAIL_ROW = {
   Transaction: '',
   PayAmt: '',
   CommisAmt: '',
   TaxAmt: '',
   Total: '',
-  WHTAmount: ''
 };

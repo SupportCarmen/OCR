@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BANKS } from '../constants'
 
-export default function UploadSection({ bank, onBankChange, onFileChange, fileInputRef, fileName }) {
+export default function UploadSection({ bank, onBankChange, onFileChange, fileInputRef, fileName, multiple }) {
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleDragOver = (e) => {
@@ -69,6 +69,7 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
           id="fileInput" 
           ref={fileInputRef}
           accept="image/*, application/pdf"
+          multiple={multiple}
           onChange={onFileChange}
         />
         <div className="upload-icon"><i className="fas fa-cloud-upload-alt"></i></div>
