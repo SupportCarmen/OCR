@@ -29,6 +29,9 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./ocr_database.db"
+    
+    # Carmen API
+    carmen_authorization: str = ""
 
     class Config:
         env_file = ".env"

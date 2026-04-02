@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
+import httpx
 
 from app.database import get_db
 from app.config import settings
@@ -361,3 +362,42 @@ async def health_check():
         "openrouter_configured": bool(settings.openrouter_api_key),
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+
+# ═══════════════════════════════════════════════════
+# GET /api/v1/ocr/carmen/account-codes
+# ═══════════════════════════════════════════════════
+
+@router.get("/carmen/account-codes")
+async def proxy_account_codes():
+    if not settings.carmen_authorization:
+        raise HTTPException(status_code=500, detail="carmen_authorization not configured")
+        
+    url = "https://dev.carmen4.com/Carmen.API/api/interface/accountCode"
+    headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
+
+
+# ═══════════════════════════════════════════════════
+# GET /api/v1/ocr/carmen/departments
+# ═══════════════════════════════════════════════════
+
+@router.get("/carmen/departments")
+async def proxy_departments():
+    if not settings.carmen_authorization:
+        raise HTTPException(status_code=500, detail="carmen_authorization not configured")
+        
+    url = "https://dev.carmen4.com/Carmen.API/api/interface/department"
+    headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
+

@@ -14,17 +14,24 @@ import AccountingReview from './components/AccountingReview'
 import JournalVoucher from './components/JournalVoucher'
 
 export default function App() {
-  const [step, setStep] = useState(1)
-  const [bank, setBank] = useState('')
+  const initialState = (() => {
+    try {
+      const saved = localStorage.getItem('ocr_wizard_state')
+      return saved ? JSON.parse(saved) : null
+    } catch { return null }
+  })()
+
+  const [step, setStep] = useState(initialState?.step > 1 ? initialState.step : 1)
+  const [bank, setBank] = useState(initialState?.bank || '')
   // cc// รองรับหลายไฟล์ (multi-file) — files เป็น array ของไฟล์ทั้งหมด
   const [files, setFiles] = useState([])
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
-  const [headerData, setHeaderData] = useState({})
-  const [receiptMeta, setReceiptMeta] = useState({})
-  const [details, setDetails] = useState([])
+  const [headerData, setHeaderData] = useState(initialState?.headerData || {})
+  const [receiptMeta, setReceiptMeta] = useState(initialState?.receiptMeta || {})
+  const [details, setDetails] = useState(initialState?.details || [])
   const [jvRows, setJvRows] = useState([])
   const [modal, setModal] = useState({ show: false })
   const [toasts, setToasts] = useState([])
@@ -48,6 +55,15 @@ export default function App() {
       if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
     }
   }, [previewUrl])
+
+  // cc// บันทึกสถานะล่าสุดลลง localStorage (Auto-Save)
+  useEffect(() => {
+    // Save only if we have passed the initial steps
+    if (step > 1) {
+      const ocrState = { step, bank, headerData, receiptMeta, details }
+      localStorage.setItem('ocr_wizard_state', JSON.stringify(ocrState))
+    }
+  }, [step, bank, headerData, receiptMeta, details])
 
   // cc// รองรับ multi-file — เมื่อเลือกหลายไฟล์จะสร้าง detail row ตามจำนวนไฟล์
   function handleFileChange(e) {
@@ -210,6 +226,7 @@ export default function App() {
     setDetails([])
     setJvRows([])
     if (fileInputRef.current) fileInputRef.current.value = ''
+    localStorage.removeItem('ocr_wizard_state')
   }
 
   function handleCancel() {
@@ -309,7 +326,7 @@ export default function App() {
                   details={details}
                   onBack={() => setStep(3)}
                   onSubmit={handleSubmitFinal}
-                  onGoMapping={() => { window.location.hash = '#mapping' }}
+                  onGoMapping={() => { window.open('#mapping', '_blank') }}
                 />
               </div>
             )}

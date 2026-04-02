@@ -38,3 +38,25 @@ export async function submitToLocal(payload) {
 
   return data
 }
+
+/**
+ * Fetch Account Codes from proxy API
+ * @returns {Promise<object[]>} Array of account codes
+ */
+export async function fetchAccountCodes() {
+  const res = await fetch('/api/v1/ocr/carmen/account-codes')
+  if (!res.ok) throw new Error(`Failed to fetch account codes (${res.status})`)
+  const json = await res.json()
+  return json.Data || []
+}
+
+/**
+ * Fetch Departments from proxy API
+ * @returns {Promise<object[]>} Array of departments
+ */
+export async function fetchDepartments() {
+  const res = await fetch('/api/v1/ocr/carmen/departments')
+  if (!res.ok) throw new Error(`Failed to fetch departments (${res.status})`)
+  const json = await res.json()
+  return json.Data || []
+}

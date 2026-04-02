@@ -8,6 +8,16 @@ function buildRows(details, config) {
   const { mappings = {}, paymentAmount = {} } = config
   const rows = []
 
+  const addRow = (cfg, amount, desc, defaultIsDebit) => {
+    if (!amount) return
+    const isDebit = cfg.nature ? (cfg.nature.toLowerCase() === 'debit') : defaultIsDebit
+    if (isDebit) {
+      rows.push({ dept: cfg.dept, acc: cfg.acc, desc, debit: amount, credit: 0 })
+    } else {
+      rows.push({ dept: cfg.dept, acc: cfg.acc, desc, debit: 0, credit: amount })
+    }
+  }
+
   details.forEach(detail => {
     const payType = detail.Transaction || 'UNKNOWN'
     const amtCfg  = paymentAmount[payType] || { dept: '', acc: '' }
@@ -20,10 +30,10 @@ function buildRows(details, config) {
     const taxAmt    = toNum(detail.TaxAmt)
     const total     = toNum(detail.Total)
 
-    if (payAmt)    rows.push({ dept: amtCfg.dept,  acc: amtCfg.acc,  desc: payType,      debit: payAmt,    credit: 0         })
-    if (commisAmt) rows.push({ dept: commCfg.dept, acc: commCfg.acc, desc: 'Commission',  debit: 0,         credit: commisAmt })
-    if (taxAmt)    rows.push({ dept: taxCfg.dept,  acc: taxCfg.acc,  desc: 'Tax',         debit: 0,         credit: taxAmt    })
-    if (total)     rows.push({ dept: netCfg.dept,  acc: netCfg.acc,  desc: 'Net Payment', debit: 0,         credit: total     })
+    addRow(amtCfg, payAmt, payType, true)
+    addRow(commCfg, commisAmt, 'Commission', false)
+    addRow(taxCfg, taxAmt, 'Tax Amount', false)
+    addRow(netCfg, total, 'Net Payment', false)
   })
   return rows
 }
@@ -33,11 +43,34 @@ const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) :
 export default function AccountingReview({ details, onBack, onSubmit, onGoMapping }) {
   const [config, setConfig] = useState(null)
 
-  useEffect(() => {
+  const loadConfig = () => {
     try {
       const raw = localStorage.getItem('accountingConfig')
-      if (raw) setConfig(JSON.parse(raw))
+      let parsedConfig = raw ? JSON.parse(raw) : null;
+      
+      const rawAmt = localStorage.getItem('accountMappingAmount');
+      if (rawAmt) {
+        const parsedAmt = JSON.parse(rawAmt);
+        if (!parsedConfig) parsedConfig = { paymentAmount: parsedAmt };
+        else parsedConfig.paymentAmount = { ...parsedConfig.paymentAmount, ...parsedAmt };
+      }
+      
+      if (parsedConfig) setConfig(parsedConfig);
     } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadConfig()
+
+    // cc// ฟังเหตุการณ์การเปลี่ยนแปลง localStorage จาก tab อื่น (Auto-Sync)
+    const handleStorageChange = (e) => {
+      if (e.key === 'accountingConfig' || e.key === 'accountMappingAmount') {
+        loadConfig()
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
   const rows = config ? buildRows(details, config) : []
@@ -100,8 +133,8 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
               )}
               {rows.map((r, i) => (
                 <tr key={i}>
-                  <td className={!r.dept ? 'missing-cell' : ''}>{r.dept || <span><i className="fas fa-exclamation-circle" /> MISSING</span>}</td>
-                  <td className={!r.acc  ? 'missing-cell' : ''}>{r.acc  || <span><i className="fas fa-exclamation-circle" /> MISSING</span>}</td>
+                  <td className={!r.dept ? 'missing-cell animate-pulse' : ''}>{r.dept || <span><i className="fas fa-exclamation-circle" /> MISSING</span>}</td>
+                  <td className={!r.acc  ? 'missing-cell animate-pulse' : ''}>{r.acc  || <span><i className="fas fa-exclamation-circle" /> MISSING</span>}</td>
                   <td>{r.desc}</td>
                   <td className="text-right">{fmt(r.debit)}</td>
                   <td className="text-right">{fmt(r.credit)}</td>
@@ -127,7 +160,7 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
           <button className="btn-cancel" style={{ marginRight: 'auto' }} onClick={onGoMapping}>
             <i className="fas fa-cog" /> ตั้งค่า Mapping
           </button>
-          <button className="btn-cancel" onClick={() => { try { const raw = localStorage.getItem('accountingConfig'); if (raw) setConfig(JSON.parse(raw)) } catch(e){} }}>
+          <button className="btn-cancel" onClick={loadConfig}>
             <i className="fas fa-sync-alt" /> Refresh
           </button>
           <button className="btn-submit" disabled={hasMissing || rows.length === 0} onClick={() => onSubmit(rows)}>
