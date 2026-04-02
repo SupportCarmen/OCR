@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { fetchAccountCodes, fetchDepartments } from '../lib/carmenApi';
+import CustomModal from '../components/CustomModal';
 import './Mapping.css';
 
 // ─── CUSTOM SEARCH SELECT ───
@@ -116,6 +117,7 @@ export default function Mapping() {
   });
 
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ show: false, title: '', message: '', type: 'info' });
 
   const loadInitialData = async () => {
     setLoadingOpts(true);
@@ -198,7 +200,12 @@ export default function Mapping() {
       // cc// ถ้าไม่ใช่หน้าต่างแยก ให้กกลับไปหน้าหลัก (ตัว App จะโหลด Step ล่าสุดมาเอง)
       window.location.hash = '';
       if (!shouldClose) {
-        alert('บันทึกการตั้งค่าเรียบร้อยแล้ว!');
+        setModalConfig({
+          show: true,
+          title: 'บันทึกสำเร็จ',
+          message: 'บันทึกการตั้งค่า Account Mapping เรียบร้อยแล้ว',
+          type: 'success'
+        });
       }
     }
   };
@@ -251,6 +258,13 @@ export default function Mapping() {
 
   return (
     <>
+      <CustomModal 
+        show={modalConfig.show}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={() => setModalConfig({ ...modalConfig, show: false })}
+      />
     <div className="container" style={{ margin: '2rem auto', maxWidth: '800px' }}>
       <h1><i className="fas fa-project-diagram"></i> Account Mapping Configuration</h1>
 

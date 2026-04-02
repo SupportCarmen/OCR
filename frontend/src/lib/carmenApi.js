@@ -16,7 +16,11 @@ export async function submitToLocal(payload) {
     let detail = errTxt
     try {
       const parsed = JSON.parse(errTxt)
-      detail = parsed.detail || errTxt
+      if (Array.isArray(parsed.detail)) {
+        detail = parsed.detail.map(d => typeof d === 'object' ? (d.msg || JSON.stringify(d)) : d).join(', ')
+      } else {
+        detail = parsed.detail || errTxt
+      }
     } catch (e) { /* ignore */ }
 
     const error = new Error(`ไม่สามารถบันทึกข้อมูลได้ (${res.status})\n${detail}`)

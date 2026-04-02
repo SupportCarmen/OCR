@@ -208,13 +208,18 @@ export default function App() {
           onCancel: closeModal,
         })
       } else {
-        showToast(err.message, 'error')
+        showModal({
+          title: 'เกิดข้อผิดพลาดในการบันทึก',
+          message: err.message,
+          type: 'error',
+          confirmText: 'ปิด',
+          onConfirm: closeModal
+        })
       }
     }
   }
 
   function resetAll() {
-    if (!window.confirm('ยืนยันการยกเลิกและล้างข้อมูลทั้งหมด?')) return
     setStep(1)
     setFiles([])
     setStatus('')
@@ -227,11 +232,20 @@ export default function App() {
     setJvRows([])
     if (fileInputRef.current) fileInputRef.current.value = ''
     localStorage.removeItem('ocr_wizard_state')
+    closeModal()
   }
 
   function handleCancel() {
     if (step === 1) return
-    resetAll()
+    showModal({
+      title: 'ยกเลิกการทำงาน',
+      message: 'ยืนยันการยกเลิกและล้างข้อมูลทั้งหมดหรือไม่?',
+      type: 'warning',
+      confirmText: 'ยืนยัน',
+      cancelText: 'กลับตัว',
+      onConfirm: resetAll,
+      onCancel: closeModal
+    })
   }
 
   // cc// ปุ่มย้อนกลับ — กลับไป step ก่อนหน้า
