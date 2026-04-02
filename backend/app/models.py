@@ -71,8 +71,16 @@ class Receipt(Base):
     bank_type = Column(SAEnum(BankType, values_callable=lambda obj: [e.value for e in obj]), nullable=True)   # BBL / KBANK / SCB
     doc_name = Column(String(255), nullable=True)
     company_name = Column(String(255), nullable=True)
+    company_tax_id = Column(String(50), nullable=True)
+    company_address = Column(Text, nullable=True)
+    account_no = Column(String(100), nullable=True)
     doc_date = Column(String(50), nullable=True)
     doc_no = Column(String(100), nullable=True, index=True)
+    merchant_name = Column(String(255), nullable=True)
+    merchant_id = Column(String(100), nullable=True)
+    wht_rate = Column(String(20), nullable=True)
+    wht_amount = Column(Numeric(15, 2), nullable=True)
+    net_amount = Column(Numeric(15, 2), nullable=True)
 
     # Submission tracking
     submitted_at = Column(DateTime, nullable=True)        # NULL = not yet submitted
@@ -122,8 +130,16 @@ class ReceiptSchema(BaseModel):
     bank_type: Optional[BankType] = None
     doc_name: Optional[str] = None
     company_name: Optional[str] = None
+    company_tax_id: Optional[str] = None
+    company_address: Optional[str] = None
+    account_no: Optional[str] = None
     doc_date: Optional[str] = None
     doc_no: Optional[str] = None
+    merchant_name: Optional[str] = None
+    merchant_id: Optional[str] = None
+    wht_rate: Optional[str] = None
+    wht_amount: Optional[float] = None
+    net_amount: Optional[float] = None
     submitted_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     details: List[ReceiptDetailSchema] = []

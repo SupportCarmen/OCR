@@ -48,13 +48,22 @@ export async function extractFromFile(file, bankType) {
   return {
     task_id: task.id,
     receipt_id: receipt.id,
-    // header fields
+    // display header fields (6 fields shown in UI)
     bank_name: receipt.bank_name || '',
     bank_type: receipt.bank_type || '',
     doc_name: receipt.doc_name || '',
     company_name: receipt.company_name || '',
     doc_date: receipt.doc_date || '',
     doc_no: receipt.doc_no || '',
+    // extra fields (stored in DB, not displayed in UI yet)
+    company_tax_id: receipt.company_tax_id || '',
+    company_address: receipt.company_address || '',
+    account_no: receipt.account_no || '',
+    merchant_name: receipt.merchant_name || '',
+    merchant_id: receipt.merchant_id || '',
+    wht_rate: receipt.wht_rate || '',
+    wht_amount: receipt.wht_amount != null ? String(receipt.wht_amount) : '',
+    net_amount: receipt.net_amount != null ? String(receipt.net_amount) : '',
     // all detail rows
     details,
   }

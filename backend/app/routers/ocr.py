@@ -30,7 +30,7 @@ from app.utils.image_processing import is_valid_image
 
 # ── Pydantic schemas for submit endpoint ────────────
 class SubmitDetailItem(BaseModel):
-    TerminalID: Optional[str] = None
+    Transaction: Optional[str] = None
     PayAmt: Optional[float] = 0
     CommisAmt: Optional[float] = 0
     TaxAmt: Optional[float] = 0
@@ -42,8 +42,16 @@ class SubmitHeader(BaseModel):
     BankName: Optional[str] = None
     DocName: Optional[str] = None
     CompanyName: Optional[str] = None
+    CompanyTaxId: Optional[str] = None
+    CompanyAddress: Optional[str] = None
+    AccountNo: Optional[str] = None
     DocDate: Optional[str] = None
     DocNo: Optional[str] = None
+    MerchantName: Optional[str] = None
+    MerchantId: Optional[str] = None
+    WhtRate: Optional[str] = None
+    WhtAmount: Optional[float] = None
+    NetAmount: Optional[float] = None
 
 class SubmitPayload(BaseModel):
     BankType: Optional[str] = None
@@ -173,8 +181,16 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
                 "bank_type": receipt.bank_type.value if receipt.bank_type and hasattr(receipt.bank_type, "value") else receipt.bank_type,
                 "doc_name": receipt.doc_name,
                 "company_name": receipt.company_name,
+                "company_tax_id": receipt.company_tax_id,
+                "company_address": receipt.company_address,
+                "account_no": receipt.account_no,
                 "doc_date": receipt.doc_date,
                 "doc_no": receipt.doc_no,
+                "merchant_name": receipt.merchant_name,
+                "merchant_id": receipt.merchant_id,
+                "wht_rate": receipt.wht_rate,
+                "wht_amount": float(receipt.wht_amount) if receipt.wht_amount is not None else None,
+                "net_amount": float(receipt.net_amount) if receipt.net_amount is not None else None,
                 "submitted_at": receipt.submitted_at.isoformat() if receipt.submitted_at else None,
                 "created_at": receipt.created_at.isoformat() if receipt.created_at else None,
                 "details": details,
@@ -249,14 +265,22 @@ async def submit_receipt_local(
                     old_r.bank_type = payload.BankType if payload.BankType in ("BBL", "KBANK", "SCB") else old_r.bank_type
                     old_r.doc_name = payload.Header.DocName
                     old_r.company_name = payload.Header.CompanyName
+                    old_r.company_tax_id = payload.Header.CompanyTaxId
+                    old_r.company_address = payload.Header.CompanyAddress
+                    old_r.account_no = payload.Header.AccountNo
                     old_r.doc_date = payload.Header.DocDate
                     old_r.doc_no = payload.Header.DocNo
+                    old_r.merchant_name = payload.Header.MerchantName
+                    old_r.merchant_id = payload.Header.MerchantId
+                    old_r.wht_rate = payload.Header.WhtRate
+                    old_r.wht_amount = payload.Header.WhtAmount
+                    old_r.net_amount = payload.Header.NetAmount
                     old_r.submitted_at = datetime.utcnow()
                     await db.execute(delete(ReceiptDetail).where(ReceiptDetail.receipt_id == old_r.id))
                     for item in payload.Details:
                         db.add(ReceiptDetail(
                             receipt_id=old_r.id,
-                            terminal_id=item.TerminalID,
+                            transaction=item.Transaction,
                             pay_amt=Decimal(str(item.PayAmt or 0)),
                             commis_amt=Decimal(str(item.CommisAmt or 0)),
                             tax_amt=Decimal(str(item.TaxAmt or 0)),
@@ -286,8 +310,16 @@ async def submit_receipt_local(
     receipt.bank_type = payload.BankType if payload.BankType in ("BBL", "KBANK", "SCB") else receipt.bank_type
     receipt.doc_name = payload.Header.DocName
     receipt.company_name = payload.Header.CompanyName
+    receipt.company_tax_id = payload.Header.CompanyTaxId
+    receipt.company_address = payload.Header.CompanyAddress
+    receipt.account_no = payload.Header.AccountNo
     receipt.doc_date = payload.Header.DocDate
     receipt.doc_no = payload.Header.DocNo
+    receipt.merchant_name = payload.Header.MerchantName
+    receipt.merchant_id = payload.Header.MerchantId
+    receipt.wht_rate = payload.Header.WhtRate
+    receipt.wht_amount = payload.Header.WhtAmount
+    receipt.net_amount = payload.Header.NetAmount
     receipt.submitted_at = datetime.utcnow()
 
     # 3. Replace detail rows — delete old, insert new
@@ -298,7 +330,7 @@ async def submit_receipt_local(
     for item in payload.Details:
         detail = ReceiptDetail(
             receipt_id=receipt_id,
-            terminal_id=item.TerminalID,
+            transaction=item.Transaction,
             pay_amt=Decimal(str(item.PayAmt or 0)),
             commis_amt=Decimal(str(item.CommisAmt or 0)),
             tax_amt=Decimal(str(item.TaxAmt or 0)),

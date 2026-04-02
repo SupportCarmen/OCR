@@ -240,7 +240,7 @@ input[type="text"]:focus {
 }
 
 /* Modal Styling */
-.modal {
+.mapping-modal {
     position: fixed;
     inset: 0;
     z-index: 2000;
@@ -252,21 +252,22 @@ input[type="text"]:focus {
     transition: all 0.3s var(--ease);
 }
 
-.modal.hidden {
+.mapping-modal.hidden {
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
 }
 
-.modal-overlay {
+.mapping-modal-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1;
 }
 
-.modal-content {
+.mapping-modal-content {
     position: relative;
+    z-index: 2;
     background: white;
     width: 100%;
     max-width: 850px; /* ขยายให้กว้างขึ้น */
@@ -281,7 +282,7 @@ input[type="text"]:focus {
     to { transform: translateY(0); opacity: 1; }
 }
 
-.modal-header {
+.mapping-modal-header {
     font-size: 1.1rem;
     font-weight: 700;
     margin-bottom: 1.5rem;
@@ -290,7 +291,7 @@ input[type="text"]:focus {
     padding-bottom: 1rem;
 }
 
-.modal-body {
+.mapping-modal-body {
     max-height: 500px; /* เพิ่มความสูง */
     overflow-y: auto;
     margin-bottom: 1.5rem;
@@ -350,7 +351,7 @@ input[type="text"]:focus {
     margin: 0;
 }
 
-.modal-footer {
+.mapping-modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
