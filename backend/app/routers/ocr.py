@@ -23,8 +23,9 @@ from app.models import (
     OCRTask,
     Receipt,
     ReceiptDetail,
+    ExtractedReceiptData,
 )
-from app.services.ocr_service import process_single_file, get_all_tasks, export_tasks_to_csv
+from app.services import ocr_service
 from app.utils.image_processing import is_valid_image
 
 
@@ -120,7 +121,7 @@ async def list_tasks(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    tasks, total = await get_all_tasks(db, status=status, limit=limit, offset=offset)
+    tasks, total = await ocr_service.get_all_tasks(db, status=status, limit=limit, offset=offset)
     return JSONResponse(content={
         "total": total,
         "tasks": [
@@ -324,7 +325,7 @@ async def submit_receipt_stateless(
 
 @router.get("/export")
 async def export_csv(db: AsyncSession = Depends(get_db)):
-    csv_path = await export_tasks_to_csv(db)
+    csv_path = await ocr_service.export_tasks_to_csv(db)
     filename = csv_path.replace("\\", "/").split("/")[-1]
     return FileResponse(
         path=csv_path,

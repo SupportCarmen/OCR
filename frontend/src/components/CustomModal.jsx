@@ -26,32 +26,33 @@ export default function CustomModal({
 
   const getIcon = () => {
     switch (type) {
-      case 'success': return <i className="fas fa-check-circle" />
-      case 'warning': return <i className="fas fa-exclamation-triangle" />
-      case 'error': return <i className="fas fa-times-circle" />
-      default: return <i className="fas fa-info-circle" />
+      case 'success': return <i className="fas fa-circle-check" />
+      case 'warning': return <i className="fas fa-triangle-exclamation" />
+      case 'error':   return <i className="fas fa-circle-xmark" />
+      default:        return <i className="fas fa-circle-info" />
     }
   }
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
-        <div className="modal-header">
-          <div className={`modal-icon-wrapper ${type}`}>
-            {getIcon()}
-          </div>
-          <h3 className="modal-title">{title}</h3>
+      <div className="modal-box">
+        <div className={`modal-icon ${type}`}>
+          {getIcon()}
         </div>
-        <div className="modal-body">
-          {message}
-        </div>
-        <div className="modal-footer">
+        <h3 className="modal-title">{title}</h3>
+        <p className="modal-msg">{message}</p>
+        
+        <div className="modal-actions">
           {onCancel && (
-            <button className="btn-cancel" onClick={onCancel}>
+            <button className="btn btn-outline" onClick={onCancel}>
               {cancelText}
             </button>
           )}
-          <button className={`btn-submit ${type === 'error' ? 'danger' : ''}`} style={type === 'error' ? { background: '#ef4444' } : {}} onClick={onConfirm}>
+          <button 
+            className={`btn ${type === 'error' ? 'btn-danger' : type === 'warning' ? 'btn-primary' : 'btn-primary'}`} 
+            style={type === 'error' ? { background: 'var(--rose)' } : type === 'warning' ? { background: 'var(--amber)' } : {}}
+            onClick={onConfirm}
+          >
             {confirmText}
           </button>
         </div>

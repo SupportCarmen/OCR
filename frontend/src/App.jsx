@@ -72,11 +72,23 @@ export default function App() {
 
   async function processFile() {
     if (!bank) {
-      showToast('กรุณาเลือกธนาคารก่อนดำเนินการ', 'error')
+      showModal({
+        title: 'ข้อมูลไม่ครบถ้วน',
+        message: 'กรุณาเลือกธนาคารที่ต้องการนำเข้าข้อมูลก่อนดำเนินการ',
+        type: 'warning',
+        confirmText: 'รับทราบ',
+        onConfirm: closeModal
+      })
       return
     }
     if (!file) {
-      showToast('กรุณาเลือกไฟล์ก่อนดำเนินการ', 'error')
+      showModal({
+        title: 'ไม่พบไฟล์เอกสาร',
+        message: 'กรุณาเลือกไฟล์รูปภาพหรือ PDF ที่ต้องการประมวลผล',
+        type: 'warning',
+        confirmText: 'ตกลง',
+        onConfirm: closeModal
+      })
       return
     }
     setLoading(true)
@@ -110,7 +122,13 @@ export default function App() {
       showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
     } catch (err) {
       setStatus(`❌ ${err.message}`)
-      showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error')
+      showModal({
+        title: 'เกิดข้อผิดพลาด',
+        message: `ไม่สามารถอ่านข้อมูลได้: ${err.message}`,
+        type: 'error',
+        confirmText: 'ปิด',
+        onConfirm: closeModal
+      })
       setStep(1)
     } finally {
       setLoading(false)
@@ -193,7 +211,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <>
       <CustomModal
         show={modal.show}
         title={modal.title}
@@ -205,14 +223,15 @@ export default function App() {
         onCancel={modal.onCancel}
       />
 
-      <div className="toast-container" id="toastContainer">
-        {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.type}`} style={{ opacity: 1, transform: 'none' }}>
-            <i className={`fas ${t.type === 'success' ? 'fa-circle-check' : t.type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info'}`} />
-            {t.msg}
-          </div>
-        ))}
-      </div>
+      <div className="app-container">
+        <div className="toast-container" id="toastContainer">
+          {toasts.slice(-1).map(t => (
+            <div key={t.id} className={`toast ${t.type}`} style={{ opacity: 1, transform: 'none' }}>
+              <i className={`fas ${t.type === 'success' ? 'fa-circle-check' : t.type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info'}`} />
+              {t.msg}
+            </div>
+          ))}
+        </div>
 
       <div className="app-header">
         <div className="brand">
@@ -291,6 +310,7 @@ export default function App() {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

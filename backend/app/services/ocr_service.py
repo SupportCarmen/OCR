@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 
 from app.config import settings
-from app.models import OCRTask, Receipt, ReceiptDetail, TaskStatus
+from app.models import OCRTask, Receipt, ReceiptDetail, TaskStatus, ExtractedReceiptData
 from app.utils.image_processing import preprocess_image
 from app.services.openrouter_ocr import extract_from_image
 
