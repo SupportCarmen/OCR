@@ -24,7 +24,6 @@ export default function App() {
   const [headerData, setHeaderData] = useState({})
   const [receiptMeta, setReceiptMeta] = useState({})
   const [details, setDetails] = useState([])
-  const [receiptId, setReceiptId] = useState(null)
   const [jvRows, setJvRows] = useState([])
   const [modal, setModal] = useState({ show: false })
   const [toasts, setToasts] = useState([])
@@ -106,7 +105,6 @@ export default function App() {
         NetAmount:       ext.net_amount  != null ? parseFloat(ext.net_amount)  || null : null,
       })
       setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
-      setReceiptId(ext.receipt_id || null)
       setStatus('อ่านข้อมูลสำเร็จ ✓')
       setStep(3)
       showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
@@ -138,6 +136,7 @@ export default function App() {
     const payload = {
       BankType:   bank,
       Overwrite:  overwrite,
+      OriginalFilename: file?.name,
       ImportDate: new Date().toISOString().split('T')[0],
       Header:     { ...headerData, ...receiptMeta },
       Details:    details.map(row => ({
@@ -152,7 +151,7 @@ export default function App() {
     }
     try {
       showToast('กำลังส่งข้อมูล...', 'info')
-      await submitToLocal(receiptId, payload)
+      await submitToLocal(payload)
       submittedDocNos.current.add(docNo)
       showToast('อัปโหลดข้อมูลสำเร็จ', 'success')
       setStep(5)
@@ -184,7 +183,6 @@ export default function App() {
     setHeaderData({})
     setReceiptMeta({})
     setDetails([])
-    setReceiptId(null)
     setJvRows([])
     if (fileInputRef.current) fileInputRef.current.value = ''
   }

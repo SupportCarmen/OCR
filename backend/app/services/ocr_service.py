@@ -33,6 +33,36 @@ def _parse_amount(value: Optional[str]) -> Optional[float]:
         return None
 
 
+async def extract_stateless(
+    file_bytes: bytes,
+    original_filename: str,
+    bank_type: Optional[str] = None,
+) -> ExtractedReceiptData:
+    """
+    Stateless OCR extraction:
+    resize → OpenRouter vision LLM → return structured data.
+    Does NOT save to DB or Disk.
+    """
+    ext = os.path.splitext(original_filename)[1].lower()
+
+    # 1. Pre-process / Resize (keep colour)
+    if ext == ".pdf":
+        processed_bytes = file_bytes
+    else:
+        processed_bytes = preprocess_image(
+            file_bytes,
+            grayscale=False,
+            contrast_factor=1.0,
+            sharpness_factor=1.0,
+            denoise=False,
+        )
+
+    # 2. Vision LLM
+    logger.info(f"Extracting stateless: {original_filename} (bank={bank_type})")
+    _, extracted = await extract_from_image(processed_bytes, original_filename, bank_type)
+    return extracted
+
+
 async def process_single_file(
     db: AsyncSession,
     file_bytes: bytes,
@@ -40,7 +70,7 @@ async def process_single_file(
     bank_type: Optional[str] = None,
 ) -> OCRTask:
     """
-    Full pipeline for a single uploaded file:
+    Legacy pipeline for a single uploaded file:
     save → resize → OpenRouter vision LLM → store in ocr_tasks + receipts + receipt_details.
     Receipt is saved with submitted_at=NULL (pending review).
     """
@@ -48,6 +78,9 @@ async def process_single_file(
     file_id = str(uuid.uuid4())
     ext = os.path.splitext(original_filename)[1].lower()
     file_path = os.path.join(settings.upload_dir, f"{file_id}{ext}")
+
+    if not os.path.exists(settings.upload_dir):
+        os.makedirs(settings.upload_dir, exist_ok=True)
 
     with open(file_path, "wb") as f:
         f.write(file_bytes)
@@ -64,25 +97,10 @@ async def process_single_file(
     await db.flush()
 
     try:
-        # ── 3. Resize image (keep colour) — skip for PDF ──
-        logger.info(f"[{file_id}] Pre-processing: {original_filename}")
-        if ext == ".pdf":
-            processed_bytes = file_bytes
-        else:
-            processed_bytes = preprocess_image(
-                file_bytes,
-                grayscale=False,
-                contrast_factor=1.0,
-                sharpness_factor=1.0,
-                denoise=False,
-            )
+        # ── 3. OCR Extraction ──
+        extracted = await extract_stateless(file_bytes, original_filename, bank_type)
 
-        # ── 4. Vision LLM ──
-        logger.info(f"[{file_id}] Calling OpenRouter: {settings.openrouter_model}")
-        raw_text, extracted = await extract_from_image(processed_bytes, original_filename, bank_type)
-        task.raw_text = raw_text
-
-        # ── 5. Create Receipt (header) — submitted_at=NULL = pending review ──
+        # ── 4. Create Receipt (header) — submitted_at=NULL = pending review ──
         receipt = Receipt(
             task_id=task.id,
             bank_name=extracted.bank_name,
@@ -103,7 +121,7 @@ async def process_single_file(
         db.add(receipt)
         await db.flush()
 
-        # ── 6. Create ReceiptDetail rows from LLM details[] ──
+        # ── 5. Create ReceiptDetail rows ──
         for row in extracted.details:
             db.add(ReceiptDetail(
                 receipt_id=receipt.id,
@@ -117,9 +135,6 @@ async def process_single_file(
 
         task.status = TaskStatus.COMPLETED
         task.completed_at = datetime.utcnow()
-
-        n_details = len(extracted.details)
-        logger.info(f"[{file_id}] ✅ Completed — Doc: {extracted.doc_no}, Rows: {n_details}")
 
     except Exception as e:
         logger.error(f"[{file_id}] ❌ Failed: {e}")

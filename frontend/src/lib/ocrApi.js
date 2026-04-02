@@ -12,58 +12,46 @@ export async function extractFromFile(file, bankType) {
     ? `/api/v1/ocr/extract?bank_type=${bankType}`
     : '/api/v1/ocr/extract'
 
-  const uploadRes = await fetch(url, {
+  const res = await fetch(url, {
     method: 'POST',
     body: formData,
   })
 
-  if (!uploadRes.ok) {
-    const err = await uploadRes.json().catch(() => ({}))
-    throw new Error(err.detail || `Upload failed (${uploadRes.status})`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || `Upload failed (${res.status})`)
   }
 
-  const { task_ids } = await uploadRes.json()
-  const taskId = task_ids[0]
+  const results = await res.json()
+  const receipt = results[0] || {}
 
-  const taskRes = await fetch(`/api/v1/ocr/tasks/${taskId}`)
-  if (!taskRes.ok) throw new Error(`ดึงผล OCR ไม่สำเร็จ (${taskRes.status})`)
-
-  const task = await taskRes.json()
-  if (task.status === 'failed') {
-    throw new Error(task.error_message || 'OCR processing failed')
-  }
-
-  const receipt = task.receipt || {}
-
-  // Map all detail rows from DB (preserves multi-row BBL, single-row SCB/KBANK)
+  // Map all detail rows from stateless response
   const details = (receipt.details || []).map(d => ({
     Transaction: d.transaction || '',
-    PayAmt: d.pay_amt != null ? String(d.pay_amt) : '',
-    CommisAmt: d.commis_amt != null ? String(d.commis_amt) : '',
-    TaxAmt: d.tax_amt != null ? String(d.tax_amt) : '',
-    WHTAmount: d.wht_amount != null ? String(d.wht_amount) : '',
-    Total: d.total != null ? String(d.total) : '',
+    PayAmt: d.pay_amt || '',
+    CommisAmt: d.commis_amt || '',
+    TaxAmt: d.tax_amt || '',
+    WHTAmount: '', // extracted separately in header usually, or can be empty for now
+    Total: d.total || '',
   }))
 
   return {
-    task_id: task.id,
-    receipt_id: receipt.id,
     // display header fields (6 fields shown in UI)
     bank_name: receipt.bank_name || '',
-    bank_type: receipt.bank_type || '',
+    bank_type: bankType || '',
     doc_name: receipt.doc_name || '',
     company_name: receipt.company_name || '',
     doc_date: receipt.doc_date || '',
     doc_no: receipt.doc_no || '',
-    // extra fields (stored in DB, not displayed in UI yet)
+    // extra fields
     company_tax_id: receipt.company_tax_id || '',
     company_address: receipt.company_address || '',
     account_no: receipt.account_no || '',
     merchant_name: receipt.merchant_name || '',
     merchant_id: receipt.merchant_id || '',
     wht_rate: receipt.wht_rate || '',
-    wht_amount: receipt.wht_amount != null ? String(receipt.wht_amount) : '',
-    net_amount: receipt.net_amount != null ? String(receipt.net_amount) : '',
+    wht_amount: receipt.wht_amount || '',
+    net_amount: receipt.net_amount || '',
     // all detail rows
     details,
   }

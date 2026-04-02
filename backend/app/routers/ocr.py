@@ -56,6 +56,7 @@ class SubmitHeader(BaseModel):
 class SubmitPayload(BaseModel):
     BankType: Optional[str] = None
     Overwrite: bool = False
+    OriginalFilename: Optional[str] = None
     Header: SubmitHeader
     Details: List[SubmitDetailItem] = []
 
@@ -67,16 +68,21 @@ router = APIRouter(prefix="/api/v1/ocr", tags=["OCR"])
 # POST /api/v1/ocr/extract
 # ═══════════════════════════════════════════════════
 
-@router.post("/extract", response_model=OCRUploadResponse)
+@router.post("/extract", response_model=List[ExtractedReceiptData])
 async def extract_receipt(
     files: List[UploadFile] = File(..., description="รูปใบเสร็จ (JPG, PNG, PDF)"),
     bank_type: Optional[BankType] = Query(None, description="ประเภทธนาคาร BBL/KBANK/SCB"),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Stateless extraction:
+    Read files, call LLM, return JSON data.
+    Does NOT save to DB or Disk.
+    """
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
-    task_ids = []
+    results = []
 
     for upload_file in files:
         if not is_valid_image(upload_file.filename):
@@ -93,19 +99,14 @@ async def extract_receipt(
                 detail=f"{upload_file.filename} exceeds {settings.max_file_size_mb}MB limit",
             )
 
-        task = await process_single_file(
-            db=db,
+        extracted = await ocr_service.extract_stateless(
             file_bytes=file_bytes,
             original_filename=upload_file.filename,
             bank_type=bank_type.value if bank_type else None,
         )
-        task_ids.append(task.id)
+        results.append(extracted)
 
-    return OCRUploadResponse(
-        message=f"Processed {len(task_ids)} file(s) successfully",
-        task_ids=task_ids,
-        total_files=len(task_ids),
-    )
+    return results
 
 
 # ═══════════════════════════════════════════════════
@@ -223,129 +224,96 @@ async def mark_receipt_submitted(receipt_id: str, db: AsyncSession = Depends(get
 # Save edited data to local DB and mark as submitted
 # ═══════════════════════════════════════════════════
 
-@router.post("/receipts/{receipt_id}/submit-local")
-async def submit_receipt_local(
-    receipt_id: str,
+@router.post("/submit")
+async def submit_receipt_stateless(
     payload: SubmitPayload,
     db: AsyncSession = Depends(get_db),
 ):
-    """Save user-edited header + details to local DB and mark as submitted."""
-
-    # 1. Find receipt
-    result = await db.execute(select(Receipt).where(Receipt.id == receipt_id))
-    receipt = result.scalar_one_or_none()
-    if not receipt:
-        raise HTTPException(status_code=404, detail=f"Receipt {receipt_id} not found")
-
-    # 1.5 Check if already submitted
-    if receipt.submitted_at is not None:
-        return {
-            "ok": False,
-            "error": "ALREADY_SUBMITTED",
-            "detail": f"เอกสารถูก submit ไปแล้วเมื่อ {receipt.submitted_at.isoformat()}"
-        }
-
-    # 1.6 Duplicate doc_no check — only among submitted receipts
+    """
+    Save user-confirmed data to DB for the first time.
+    Handles duplicate doc_no check and potential overwrite.
+    """
     doc_no = payload.Header.DocNo
+    
+    # 1. Duplicate check (only among already submitted ones)
     if doc_no:
         dup_result = await db.execute(
             select(Receipt).where(
                 Receipt.doc_no == doc_no,
                 Receipt.submitted_at.isnot(None),
-                Receipt.id != receipt_id,
             )
         )
         existing_receipts = dup_result.scalars().all()
+        
         if existing_receipts:
-            if payload.Overwrite:
-                # UPDATE existing records in place — preserves receipt ID and created_at (audit trail)
-                logger.info(f"Overwriting {len(existing_receipts)} existing submitted record(s) for Doc No: {doc_no}")
-                for old_r in existing_receipts:
-                    old_r.bank_name = payload.Header.BankName
-                    old_r.bank_type = payload.BankType if payload.BankType in ("BBL", "KBANK", "SCB") else old_r.bank_type
-                    old_r.doc_name = payload.Header.DocName
-                    old_r.company_name = payload.Header.CompanyName
-                    old_r.company_tax_id = payload.Header.CompanyTaxId
-                    old_r.company_address = payload.Header.CompanyAddress
-                    old_r.account_no = payload.Header.AccountNo
-                    old_r.doc_date = payload.Header.DocDate
-                    old_r.doc_no = payload.Header.DocNo
-                    old_r.merchant_name = payload.Header.MerchantName
-                    old_r.merchant_id = payload.Header.MerchantId
-                    old_r.wht_rate = payload.Header.WhtRate
-                    old_r.wht_amount = payload.Header.WhtAmount
-                    old_r.net_amount = payload.Header.NetAmount
-                    old_r.submitted_at = datetime.utcnow()
-                    await db.execute(delete(ReceiptDetail).where(ReceiptDetail.receipt_id == old_r.id))
-                    for item in payload.Details:
-                        db.add(ReceiptDetail(
-                            receipt_id=old_r.id,
-                            transaction=item.Transaction,
-                            pay_amt=Decimal(str(item.PayAmt or 0)),
-                            commis_amt=Decimal(str(item.CommisAmt or 0)),
-                            tax_amt=Decimal(str(item.TaxAmt or 0)),
-                            wht_amount=Decimal(str(item.WHTAmount or 0)),
-                            total=Decimal(str(item.Total or 0)),
-                        ))
-                # Delete the current (unsubmitted) receipt — data is now merged into the old record
-                await db.delete(receipt)
-                await db.commit()
-                logger.info(f"Receipt {existing_receipts[0].id} updated via overwrite (doc_no={doc_no})")
-                return {
-                    "ok": True,
-                    "receipt_id": existing_receipts[0].id,
-                    "doc_no": doc_no,
-                    "submitted_at": existing_receipts[0].submitted_at.isoformat(),
-                }
-            else:
+            if not payload.Overwrite:
                 return {
                     "ok": False,
                     "error": "DUPLICATE_DOC_NO",
                     "doc_no": doc_no,
-                    "detail": f"หมายเลข {doc_no} ถูก submit ไปแล้ว"
+                    "detail": f"หมายเลข {doc_no} ถูกบันทึกไว้ในระบบแล้ว"
                 }
+            else:
+                # Overwrite mode: find and delete existing record before re-creating
+                # (Or update in place - but since we don't have a receipt_id yet, we just delete old and make new)
+                for old_r in existing_receipts:
+                    await db.delete(old_r)
+                await db.flush()
 
-    # 2. Update header fields from payload
-    receipt.bank_name = payload.Header.BankName
-    receipt.bank_type = payload.BankType if payload.BankType in ("BBL", "KBANK", "SCB") else receipt.bank_type
-    receipt.doc_name = payload.Header.DocName
-    receipt.company_name = payload.Header.CompanyName
-    receipt.company_tax_id = payload.Header.CompanyTaxId
-    receipt.company_address = payload.Header.CompanyAddress
-    receipt.account_no = payload.Header.AccountNo
-    receipt.doc_date = payload.Header.DocDate
-    receipt.doc_no = payload.Header.DocNo
-    receipt.merchant_name = payload.Header.MerchantName
-    receipt.merchant_id = payload.Header.MerchantId
-    receipt.wht_rate = payload.Header.WhtRate
-    receipt.wht_amount = payload.Header.WhtAmount
-    receipt.net_amount = payload.Header.NetAmount
-    receipt.submitted_at = datetime.utcnow()
-
-    # 3. Replace detail rows — delete old, insert new
-    await db.execute(
-        delete(ReceiptDetail).where(ReceiptDetail.receipt_id == receipt_id)
+    # 2. Create OCRTask (dummy task for record keeping)
+    task_id = str(uuid.uuid4())
+    task = OCRTask(
+        id=task_id,
+        original_filename=payload.OriginalFilename or "uploaded_file",
+        file_path="STATLESS_MODE", # No physical file saved
+        status=TaskStatus.COMPLETED,
+        ocr_engine=settings.ocr_engine,
+        completed_at=datetime.utcnow()
     )
+    db.add(task)
+    await db.flush()
 
+    # 3. Create Receipt (Header)
+    receipt = Receipt(
+        task_id=task.id,
+        bank_name=payload.Header.BankName,
+        bank_type=payload.BankType if payload.BankType in ("BBL", "KBANK", "SCB") else None,
+        doc_name=payload.Header.DocName,
+        company_name=payload.Header.CompanyName,
+        company_tax_id=payload.Header.CompanyTaxId,
+        company_address=payload.Header.CompanyAddress,
+        account_no=payload.Header.AccountNo,
+        doc_date=payload.Header.DocDate,
+        doc_no=doc_no,
+        merchant_name=payload.Header.MerchantName,
+        merchant_id=payload.Header.MerchantId,
+        wht_rate=payload.Header.WhtRate,
+        wht_amount=payload.Header.WhtAmount,
+        net_amount=payload.Header.NetAmount,
+        submitted_at=datetime.utcnow()
+    )
+    db.add(receipt)
+    await db.flush()
+
+    # 4. Create ReceiptDetails
     for item in payload.Details:
-        detail = ReceiptDetail(
-            receipt_id=receipt_id,
+        db.add(ReceiptDetail(
+            receipt_id=receipt.id,
             transaction=item.Transaction,
             pay_amt=Decimal(str(item.PayAmt or 0)),
             commis_amt=Decimal(str(item.CommisAmt or 0)),
             tax_amt=Decimal(str(item.TaxAmt or 0)),
             wht_amount=Decimal(str(item.WHTAmount or 0)),
             total=Decimal(str(item.Total or 0)),
-        )
-        db.add(detail)
+        ))
 
     await db.commit()
+    logger.info(f"Stateless submission completed for doc_no={doc_no}")
 
-    logger.info(f"Receipt {receipt_id} submitted locally (doc_no={receipt.doc_no})")
     return {
         "ok": True,
-        "receipt_id": receipt_id,
-        "doc_no": receipt.doc_no,
+        "receipt_id": receipt.id,
+        "doc_no": doc_no,
         "submitted_at": receipt.submitted_at.isoformat(),
     }
 

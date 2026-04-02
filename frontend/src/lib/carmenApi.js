@@ -1,17 +1,16 @@
 /**
- * Submit the processed document payload to the LOCAL backend DB.
- * @param {string} receiptId - receipt UUID from OCR extraction
- * @param {{ BankType: string, Overwrite: boolean, Header: object, Details: object[] }} payload
+ * Submit the processed document payload to the LOCAL backend DB (Stateless Creation).
+ * @param {{ BankType: string, Overwrite: boolean, OriginalFilename: string, Header: object, Details: object[] }} payload
  * @returns {Promise<object>} response from backend
  */
-export async function submitToLocal(receiptId, payload) {
-  const res = await fetch(`/api/v1/ocr/receipts/${receiptId}/submit-local`, {
+export async function submitToLocal(payload) {
+  const res = await fetch('/api/v1/ocr/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
 
-  // Basic check for transport-level errors (4xx/5xx NOT handled by our custom logic)
+  // Basic check for transport-level errors
   if (!res.ok) {
     const errTxt = await res.text()
     let detail = errTxt
@@ -28,11 +27,11 @@ export async function submitToLocal(receiptId, payload) {
 
   const data = await res.json()
 
-  // Handle application-level errors (returned as 200 OK but with ok: false)
+  // Handle application-level errors (e.g. DUPLICATE_DOC_NO)
   if (data.ok === false) {
     const error = new Error(data.detail || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล')
-    error.status = 200 // Technically it was a 200 OK
-    error.code = data.error // e.g., 'DUPLICATE_DOC_NO'
+    error.status = 200
+    error.code = data.error
     error.detail = data.detail
     throw error
   }
