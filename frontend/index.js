@@ -4,7 +4,7 @@ const BANKS = [
     { value: 'SCB',   label: 'Siam Commercial Bank', full: 'Siam Commercial Bank (SCB)' },
 ];
 
-const DETAIL_COLUMNS = ['Transaction','PayAmt','CommisAmt','TaxAmt','Net'];
+const DETAIL_COLUMNS = ['Transaction','PayAmt','CommisAmt','TaxAmt','Total','WHTAmount'];
 
 const HEADER_LABELS = {
     DateProcessed: 'Input Date<br><span>Date Processed (วันที่ระบบอ่าน)</span>',
@@ -21,13 +21,14 @@ const DETAIL_LABELS = {
     PayAmt:      'Amount<br><span>Pay Amt</span>',
     CommisAmt:   'Commision Amt.<br><span>Commis Amt.</span>',
     TaxAmt:      'Tax Amt.<br><span>Tax Amt.</span>',
-    Net:         'Net Amt.<br><span>Net</span>',
+    Total:       'Net Amt.<br><span>Total</span>',
+    WHTAmount:   'WHT Amount<br><span>WHT Amount</span>',
     Transaction: 'Payment Type<br><span>Transaction</span>',
 };
 
 const EMPTY_DETAIL_ROW = () => ({
     PayAmt: '', CommisAmt: '', TaxAmt: '',
-    Net: '', Transaction: '',
+    Total: '', WHTAmount: '', Transaction: '',
     TerminalID: '', // คืนค่าไว้สำหรับ API แต่ไม่แสดงในตาราง
 });
 
@@ -73,20 +74,17 @@ BANKS.forEach((b, i) => {
     bankOptions.appendChild(label);
 });
 
-// cc// ดึงค่ารหัสธนาคารที่ผู้ใช้งานเลือกจาก Radio Button
 function getSelectedBank() {
     const checked = document.querySelector('input[name="bank"]:checked');
     return checked ? checked.value : 'BBL';
 }
 
-// cc// ดึงชื่อเต็มของธนาคารที่เลือกเพื่อนำไปแสดงผล
 function getSelectedBankFull() {
     const val = getSelectedBank();
     return BANKS.find(b => b.value === val)?.full || val;
 }
 
 // Step Wizard
-// cc// จัดการการเปลี่ยนหน้า (Step) ของระบบ และควบคุมการแสดงผลของ UI ในแต่ละขั้นตอน
 function setStep(n) {
     [1, 2, 3, 4, 5].forEach(i => {
         // 1. Update Wizard UI
@@ -122,12 +120,10 @@ function setStep(n) {
 
     if (n === 4 || n === 5) {
         if (previewCol) previewCol.style.display = 'none';
-        if (container)  container.style.gridTemplateColumns = '1fr';
-        resultArea.style.display = 'block'; // Override grid to block for centering
+        if (container)  container.style.gridTemplateColumns = '1fr'; 
     } else {
         if (previewCol) previewCol.style.display = 'block';
-        if (container)  container.style.gridTemplateColumns = '1fr 1fr';
-        resultArea.style.display = ''; // Reset to default grid
+        if (container)  container.style.gridTemplateColumns = '1fr 1fr'; 
     }
 
     if (n >= 3 && n <= 5) {
@@ -156,7 +152,6 @@ fileInput.addEventListener('change', e => {
     if (e.target.files[0]) handleFileSelected(e.target.files[0]);
 });
 
-// cc// จัดการเมื่อผู้ใช้งานเลือกไฟล์ โดยตรวจสอบประเภทไฟล์ (รูปภาพ/PDF) และแสดงตัวอย่างเบื้องต้น
 function handleFileSelected(file) {
     const name = file.name.toLowerCase();
     const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(name);
@@ -201,7 +196,6 @@ function handleFileSelected(file) {
 }
 
 // Process File
-// cc// จำลองการทำงานของ AI ในการอ่านข้อมูลจากไฟล์เอกสาร และนำข้อมูลที่ได้มาใส่ในระบบ
 async function processFile() {
     if (!fileInput.files.length) {
         showToast('กรุณาเลือกไฟล์ก่อนดำเนินการ', 'error');
@@ -220,7 +214,7 @@ async function processFile() {
 
     currentData = {
         header: {
-            DateProcessed: todayStr,
+            DateProcessed: '01/01/2026',
             BankName:      'Bangkok Bank',
             DocName:       'Credit Card Report',
             CompanyName:   'SAMPLE CORP CO., LTD.',
@@ -228,36 +222,32 @@ async function processFile() {
             DocNo:         '25120004',
             MerchantName:  'Sample Store',
             MerchantID:    'MID-999999',
+            Prefix:        'TX',
+            Source:        'TaxR'
         },
         details: [
-            { Transaction: 'VISA-INT-P', PayAmt: 4090.00, CommisAmt: 130.88, TaxAmt: 9.16, Net: 3949.96, TerminalID: '' },
-            { Transaction: 'VISA-INT',   PayAmt: 6520.00, CommisAmt: 169.52, TaxAmt: 11.87, Net: 6338.61, TerminalID: '' }
+            { Transaction: 'VISA-INT-P', PayAmt: 4090.00, CommisAmt: 130.88, TaxAmt: 9.16, Total: 3949.96, WHTAmount: 0, TerminalID: '' },
+            { Transaction: 'VISA-INT',   PayAmt: 6520.00, CommisAmt: 169.52, TaxAmt: 11.87, Total: 6338.61, WHTAmount: 0, TerminalID: '' }
         ],
     };
 
-    // จำลองค่า Mapping เบื้องต้นลงใน localStorage เพื่อให้เห็นผลใน Step 4 ทันที (Demo Mode: ใส่ทุกครั้ง)
-    const mockConfig = {
-        mappings: {
-            commission: { dept: 'DEPT-HO', acc: '5100-001 - Commission Expense' },
-            tax:        { dept: 'DEPT-HO', acc: '2100-010 - VAT Payable' },
-            net:        { dept: 'DEPT-FIN', acc: '1100-005 - Cash at Bank - Current' }
-        },
-        paymentAmount: {
-            'VISA-INT-P':  { dept: 'DEPT-ACC',   acc: '1100-011 - Receivable - VISA' },
-            'VISA-INT':    { dept: 'DEPT-SALES',  acc: '1100-012 - Receivable - MasterCard' },
-            'VSA-DCC-P':   { dept: 'DEPT-ACC',    acc: '1100-011 - Receivable - VISA' },
-            'VSA-P':       { dept: 'DEPT-ACC',    acc: '1100-011 - Receivable - VISA' },
-            'VSA-AFF-P':   { dept: 'DEPT-ACC',    acc: '1100-011 - Receivable - VISA' },
-            'VSC':         { dept: 'DEPT-ACC',    acc: '1100-012 - Receivable - MasterCard' },
-            'TPN':         { dept: 'DEPT-FIN',    acc: '1100-020 - Receivable - QR Payment' },
-            'THSTD-P':     { dept: 'DEPT-ACC',    acc: '1100-011 - Receivable - VISA' },
-            'QR-JCB':      { dept: 'DEPT-FIN',    acc: '1100-013 - Receivable - JCB' },
-            'QR-UPI':      { dept: 'DEPT-FIN',    acc: '1100-020 - Receivable - QR Payment' },
-            'VSA-SCB-P':   { dept: 'DEPT-ACC',    acc: '1100-011 - Receivable - VISA' },
-            'MCA-SCB-P':   { dept: 'DEPT-ACC',    acc: '1100-012 - Receivable - MasterCard' }
-        }
-    };
-    localStorage.setItem('accountingConfig', JSON.stringify(mockConfig));
+    // จำลองค่า Mapping เบื้องต้นลงใน localStorage (ถ้ายังไม่มี) เพื่อให้เห็นผลใน Step 4 ทันที
+    const currentConfig = localStorage.getItem('accountingConfig');
+    if (!currentConfig) {
+        const mockConfig = {
+            mappings: {
+                commission: { dept: 'DEPT-HO', acc: '5100-001' },
+                tax: { dept: 'DEPT-HO', acc: '2100-010' },
+                net: { dept: 'DEPT-HO', acc: '1100-005' },
+                wht: { dept: 'DEPT-HO', acc: '2100-050' }
+            },
+            paymentAmount: {
+                'VISA-INT-P': { dept: 'DEPT-ACC', acc: '1100-011' },
+                'VISA-INT':   { dept: 'DEPT-SALES', acc: '1100-012' }
+            }
+        };
+        localStorage.setItem('accountingConfig', JSON.stringify(mockConfig));
+    }
 
     renderUI();
 
@@ -270,7 +260,6 @@ async function processFile() {
 }
 
 // Render UI
-// cc// วาดส่วนประกอบของหน้าจอ (UI) ทั้งส่วนหัว (Header) และตารางข้อมูล (Detail)
 function renderUI() {
     headerForm.innerHTML = '';
     for (const [key, value] of Object.entries(currentData.header)) {
@@ -289,12 +278,11 @@ function renderUI() {
         th.innerHTML = DETAIL_LABELS[col] || col;
         tableHeader.appendChild(th);
     });
-
+    tableHeader.innerHTML += '<th style="text-align:center;width:44px;">Del</th>';
 
     renderTableBody();
 }
 
-// cc// วาดเฉพาะส่วนของตารางรายการข้อมูล เพื่อรองรับการเพิ่มหรือลบแถว
 function renderTableBody() {
     tableBody.innerHTML = '';
     currentData.details.forEach((row, index) => {
@@ -303,73 +291,24 @@ function renderTableBody() {
         DETAIL_COLUMNS.forEach(col => {
             html += `<td><input type="text" value="${row[col] ?? ''}" data-row="${index}" data-col="${col}" class="detail-input"></td>`;
         });
-
+        html += `<td style="text-align:center;"><button class="btn-delete" onclick="deleteRow(${index})" title="ลบ"><i class="fas fa-trash"></i></button></td>`;
         tr.innerHTML = html;
         tableBody.appendChild(tr);
     });
     rowCount.textContent = currentData.details.length + ' รายการ';
-    renderTotalSummary();
 }
 
-// cc// คำนวณและแสดงยอดรวมของคอลัมน์ตัวเลขทั้งหมดในตาราง Detail
-function renderTotalSummary() {
-    const grid = document.getElementById('totalSummaryGrid');
-    if (!grid) return;
-
-    // Sync latest input values before calculating
-    document.querySelectorAll('.detail-input').forEach(input => {
-        const r = input.dataset.row;
-        const c = input.dataset.col;
-        if (['PayAmt', 'CommisAmt', 'TaxAmt', 'Net'].includes(c)) {
-            const val = parseFloat(input.value.replace(/,/g, ''));
-            currentData.details[r][c] = isNaN(val) ? 0 : val;
-        }
-    });
-
-    const totals = { PayAmt: 0, CommisAmt: 0, TaxAmt: 0, Net: 0 };
-    currentData.details.forEach(row => {
-        totals.PayAmt    += parseFloat(row.PayAmt) || 0;
-        totals.CommisAmt += parseFloat(row.CommisAmt) || 0;
-        totals.TaxAmt    += parseFloat(row.TaxAmt) || 0;
-        totals.Net       += parseFloat(row.Net) || 0;
-    });
-
-    const fmt = (v) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    grid.innerHTML = `
-        <div class="total-item">
-            <div class="total-label">Pay Amt (Amount)</div>
-            <div class="total-value">${fmt(totals.PayAmt)}</div>
-        </div>
-        <div class="total-item">
-            <div class="total-label">Commission Amt.</div>
-            <div class="total-value">${fmt(totals.CommisAmt)}</div>
-        </div>
-        <div class="total-item">
-            <div class="total-label">Tax Amt.</div>
-            <div class="total-value">${fmt(totals.TaxAmt)}</div>
-        </div>
-        <div class="total-item highlight">
-            <div class="total-label">Net Amt. (ยอดสุทธิ)</div>
-            <div class="total-value">${fmt(totals.Net)}</div>
-        </div>
-    `;
-}
-
-// cc// เพิ่มแถวว่างใหม่เข้าไปในตารางข้อมูล
 function addRow() {
     currentData.details.push(EMPTY_DETAIL_ROW());
     renderTableBody();
 }
 
-// cc// ลบแถวข้อมูลตามลำดับ (Index) ที่ระบุ
 function deleteRow(index) {
     currentData.details.splice(index, 1);
     renderTableBody();
 }
 
 // Cancel
-// cc// ยกเลิกการทำงานทั้งหมด ล้างข้อมูล และกลับไปเริ่มขั้นตอนแรก
 function cancelProcess() {
     if (!confirm('ยืนยันการยกเลิกและล้างข้อมูลทั้งหมด?')) return;
     resultArea.classList.add('hidden');
@@ -389,7 +328,6 @@ function cancelProcess() {
 }
 
 // Modal
-// cc// แสดงหน้าต่างยืนยันเมื่อมีการส่งข้อมูลซ้ำ (Doc No เดิม)
 function showConfirmModal(docNo) {
     return new Promise(resolve => {
         document.getElementById('modalDocNo').textContent = docNo;
@@ -398,14 +336,12 @@ function showConfirmModal(docNo) {
     });
 }
 
-// cc// จัดการผลลัพธ์จากการตอบตกลงหรือยกเลิกในหน้าต่าง Modal
 function resolveModal(result) {
     document.getElementById('confirmModal').classList.add('hidden');
     if (_modalResolve) { _modalResolve(result); _modalResolve = null; }
 }
 
 // Toast
-// cc// แสดงข้อความแจ้งเตือนขนาดเล็ก (Toast) ที่มุมหน้าจอ
 function showToast(msg, type = 'info') {
     const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', info: 'fa-circle-info' };
     const tc = document.getElementById('toastContainer');
@@ -421,7 +357,6 @@ function showToast(msg, type = 'info') {
 }
 
 // Submit
-// cc// รวบรวมข้อมูลทั้งหมดและส่งไปยัง API (ในตัวอย่างนี้เป็นโหมดจำลอง)
 async function submitData() {
     for (const key of Object.keys(currentData.header)) {
         const input = document.getElementById(`head_${key}`);
@@ -431,7 +366,7 @@ async function submitData() {
     document.querySelectorAll('.detail-input').forEach(input => {
         const r = input.dataset.row;
         const c = input.dataset.col;
-        if (['PayAmt', 'CommisAmt', 'TaxAmt', 'Net'].includes(c)) {
+        if (['PayAmt', 'CommisAmt', 'TaxAmt', 'Total'].includes(c)) {
             const val = parseFloat(input.value.replace(/,/g, ''));
             currentData.details[r][c] = isNaN(val) ? 0 : val;
         } else {
@@ -460,7 +395,8 @@ async function submitData() {
         PayAmt:      parseFloat(row.PayAmt) || 0,
         CommisAmt:   parseFloat(row.CommisAmt) || 0,
         TaxAmt:      parseFloat(row.TaxAmt) || 0,
-        Net:         parseFloat(row.Net) || 0,
+        Total:       parseFloat(row.Total) || 0,
+        WHTAmount:   parseFloat(row.WHTAmount) || 0,
         TerminalID:  row.TerminalID || ''   // Ensure not null
     }));
 
@@ -500,32 +436,9 @@ async function submitData() {
         showToast('เกิดข้อผิดพลาดในการส่งข้อมูล', 'error');
     }
 }
-// --- Step Back Navigation ---
-
-// cc// ย้อนกลับจาก Step 3 ไปยัง Step 1 (เลือกไฟล์ใหม่)
-function goBackToStep1() {
-    resultArea.classList.add('hidden');
-    setStep(1);
-    showToast('กลับไปหน้าเลือกไฟล์', 'info');
-}
-
-// cc// ย้อนกลับจาก Step 4 ไปยัง Step 3 (แก้ไขข้อมูล)
-function goBackToStep3() {
-    setStep(3);
-    renderUI();
-    showToast('กลับไปหน้าตรวจสอบข้อมูล', 'info');
-}
-
-// cc// ย้อนกลับจาก Step 5 ไปยัง Step 4 (ตรวจสอบบัญชี)
-function goBackToStep4() {
-    setStep(4);
-    renderAccountingRows();
-    showToast('กลับไปหน้า Review Accounting', 'info');
-}
 
 // --- Step 4: Accounting Review Logic ---
 
-// cc// ตรวจสอบข้อมูลและเตรียมตัวเข้าสู่ขั้นตอนการตรวจสอบทางบัญชี (Step 4)
 function proceedToStep4() {
     // 1. Sync data from inputs first
     syncDataFromInputs();
@@ -539,7 +452,6 @@ function proceedToStep4() {
     renderAccountingRows();
 }
 
-// cc// ดึงข้อมูลจากช่อง Input ต่างๆ บนหน้าจอมาเก็บไว้ในตัวแปรหลัก (Sync Data)
 function syncDataFromInputs() {
     // 1. Sync Header Fields
     for (const key of Object.keys(currentData.header)) {
@@ -551,7 +463,7 @@ function syncDataFromInputs() {
     document.querySelectorAll('.detail-input').forEach(input => {
         const r = input.dataset.row;
         const c = input.dataset.col;
-        if (['PayAmt', 'CommisAmt', 'TaxAmt', 'Net'].includes(c)) {
+        if (['PayAmt', 'CommisAmt', 'TaxAmt', 'Total', 'WHTAmount'].includes(c)) {
             const val = parseFloat(input.value.replace(/,/g, ''));
             currentData.details[r][c] = isNaN(val) ? 0 : val;
         } else {
@@ -560,7 +472,6 @@ function syncDataFromInputs() {
     });
 }
 
-// cc// คำนวณและแสดงรายการบันทึกบัญชี (Debit/Credit) ตามการตั้งค่า Mapping
 function renderAccountingRows() {
     const tbody = document.getElementById('accountingRows');
     const alert = document.getElementById('mappingAlert');
@@ -595,7 +506,7 @@ function renderAccountingRows() {
         
         // 4. Credit Row (Net Payment)
         const netConfig = config.mappings.net;
-        rowsHtml += createJournalRow(netConfig.dept, netConfig.acc, 'Net Payment', 0, detail.Net);
+        rowsHtml += createJournalRow(netConfig.dept, netConfig.acc, 'Net Payment', 0, detail.Total);
 
         // Check if any mapping is missing for these rows
         if (!amtConfig.dept || !amtConfig.acc || !commConfig.dept || !commConfig.acc || !taxConfig.dept || !taxConfig.acc || !netConfig.dept || !netConfig.acc) {
@@ -609,7 +520,6 @@ function renderAccountingRows() {
     else alert.classList.add('hidden');
 }
 
-// cc// สร้างแถวรายการบัญชี (HTML) สำหรับแสดงในตารางตรวจสอบ
 function createJournalRow(dept, acc, desc, debit, credit) {
     if (!debit && !credit) return ''; // Skip empty rows
 
@@ -628,13 +538,11 @@ function createJournalRow(dept, acc, desc, debit, credit) {
     `;
 }
 
-// cc// สั่งใหระบบคำนวณรายการบัญชีใหม่ตาม Mapping ล่าสุด
 function refreshAccountingReview() {
     showToast('กำลังอัปเดตข้อมูลจาก Mapping...', 'info');
     renderAccountingRows();
 }
 
-// cc// ตรวจสอบความถูกต้องขั้นสุดท้ายก่อนทำการส่งข้อมูลจริง
 function submitFinalData() {
     const alert = document.getElementById('mappingAlert');
     if (!alert.classList.contains('hidden')) {
@@ -646,7 +554,6 @@ function submitFinalData() {
     submitData();
 }
 
-// cc// สร้างและแสดงผลใบสำคัญรายวัน (Journal Voucher) ในขั้นตอนสุดท้าย
 function renderJV() {
     const jvRows = document.getElementById('jvRows');
     const accRows = document.getElementById('accountingRows'); // We pull from Step 4
@@ -698,7 +605,6 @@ function renderJV() {
 }
 
 // 🔥 Enlarged Preview Control (Open in New Tab)
-// cc// เปิดรูปภาพหรือไฟล์ PDF ตัวอย่างในหน้าต่างใหม่แบบเต็มจอ
 window.toggleFullScreenPreview = function() {
     const isImage = documentPreview.style.display === 'block';
     const isPDF   = pdfPreview.style.display === 'block';

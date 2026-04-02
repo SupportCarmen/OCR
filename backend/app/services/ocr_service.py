@@ -79,7 +79,7 @@ async def process_single_file(
 
         # ── 4. Vision LLM ──
         logger.info(f"[{file_id}] Calling OpenRouter: {settings.openrouter_model}")
-        raw_text, extracted = await extract_from_image(processed_bytes, original_filename)
+        raw_text, extracted = await extract_from_image(processed_bytes, original_filename, bank_type)
         task.raw_text = raw_text
 
         # ── 5. Create Receipt (header) — submitted_at=NULL = pending review ──
@@ -95,22 +95,23 @@ async def process_single_file(
         db.add(receipt)
         await db.flush()
 
-        # ── 6. Create ReceiptDetail (line item from LLM) ──
-        detail = ReceiptDetail(
-            receipt_id=receipt.id,
-            terminal_id=extracted.terminal_id,
-            pay_amt=_parse_amount(extracted.pay_amt),
-            commis_amt=_parse_amount(extracted.commis_amt),
-            tax_amt=_parse_amount(extracted.tax_amt),
-            wht_amount=_parse_amount(extracted.wht_amount),
-            total=_parse_amount(extracted.total),
-        )
-        db.add(detail)
+        # ── 6. Create ReceiptDetail rows from LLM details[] ──
+        for row in extracted.details:
+            db.add(ReceiptDetail(
+                receipt_id=receipt.id,
+                transaction=row.transaction,
+                pay_amt=_parse_amount(row.pay_amt),
+                commis_amt=_parse_amount(row.commis_amt),
+                tax_amt=_parse_amount(row.tax_amt),
+                wht_amount=_parse_amount(row.wht_amount),
+                total=_parse_amount(row.total),
+            ))
 
         task.status = TaskStatus.COMPLETED
         task.completed_at = datetime.utcnow()
 
-        logger.info(f"[{file_id}] ✅ Completed — Doc: {extracted.doc_no}, Total: {extracted.total}")
+        n_details = len(extracted.details)
+        logger.info(f"[{file_id}] ✅ Completed — Doc: {extracted.doc_no}, Rows: {n_details}")
 
     except Exception as e:
         logger.error(f"[{file_id}] ❌ Failed: {e}")
@@ -172,7 +173,7 @@ async def export_tasks_to_csv(db: AsyncSession) -> str:
         "Company Name",
         "Doc Date",
         "Doc No",
-        "Terminal ID",
+        "Transaction",
         "Pay Amt",
         "Commis Amt",
         "Tax Amt",
@@ -191,7 +192,7 @@ async def export_tasks_to_csv(db: AsyncSession) -> str:
                 receipt.company_name or "",
                 receipt.doc_date or "",
                 receipt.doc_no or "",
-                detail.terminal_id or "",
+                detail.transaction or "",
                 detail.pay_amt or "",
                 detail.commis_amt or "",
                 detail.tax_amt or "",

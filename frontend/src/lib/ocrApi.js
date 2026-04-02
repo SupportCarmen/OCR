@@ -34,7 +34,16 @@ export async function extractFromFile(file, bankType) {
   }
 
   const receipt = task.receipt || {}
-  const detail = (receipt.details || [])[0] || {}
+
+  // Map all detail rows from DB (preserves multi-row BBL, single-row SCB/KBANK)
+  const details = (receipt.details || []).map(d => ({
+    Transaction: d.transaction || '',
+    PayAmt: d.pay_amt != null ? String(d.pay_amt) : '',
+    CommisAmt: d.commis_amt != null ? String(d.commis_amt) : '',
+    TaxAmt: d.tax_amt != null ? String(d.tax_amt) : '',
+    WHTAmount: d.wht_amount != null ? String(d.wht_amount) : '',
+    Total: d.total != null ? String(d.total) : '',
+  }))
 
   return {
     task_id: task.id,
@@ -46,12 +55,8 @@ export async function extractFromFile(file, bankType) {
     company_name: receipt.company_name || '',
     doc_date: receipt.doc_date || '',
     doc_no: receipt.doc_no || '',
-    // detail fields (first row)
-    terminal_id: detail.terminal_id || '',
-    pay_amt: detail.pay_amt != null ? String(detail.pay_amt) : '',
-    commis_amt: detail.commis_amt != null ? String(detail.commis_amt) : '',
-    tax_amt: detail.tax_amt != null ? String(detail.tax_amt) : '',
-    net: detail.total != null ? String(detail.total) : '',
+    // all detail rows
+    details,
   }
 }
 

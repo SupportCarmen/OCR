@@ -8,9 +8,10 @@ import HeaderCard from './components/HeaderCard'
 import DetailTable from './components/DetailTable'
 import FormActions from './components/FormActions'
 import DocumentPreview from './components/DocumentPreview'
+import CustomModal from './components/CustomModal'
 
 export default function App() {
-  const [bank, setBank] = useState('BBL')
+  const [bank, setBank] = useState('')
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
@@ -20,9 +21,18 @@ export default function App() {
   const [headerData, setHeaderData] = useState({})
   const [details, setDetails] = useState([])
   const [receiptId, setReceiptId] = useState(null)
+  const [modal, setModal] = useState({ show: false })
 
   const fileInputRef = useRef(null)
   const submittedDocNos = useRef(new Set())
+
+  function showModal(config) {
+    setModal({ show: true, ...config })
+  }
+
+  function closeModal() {
+    setModal({ show: false })
+  }
 
   useEffect(() => {
     return () => {
@@ -57,8 +67,12 @@ export default function App() {
   }
 
   async function processFile() {
+    if (!bank) {
+      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเลือกธนาคารก่อนดำเนินการ', type: 'warning', onConfirm: closeModal })
+      return
+    }
     if (!file) {
-      alert('กรุณาเลือกไฟล์ก่อนดำเนินการ')
+      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเลือกไฟล์ก่อนดำเนินการ', type: 'warning', onConfirm: closeModal })
       return
     }
 
@@ -78,14 +92,7 @@ export default function App() {
         DocNo: ext.doc_no || '',
       })
 
-      setDetails([{
-        TerminalID: ext.terminal_id || '',
-        PayAmt: ext.pay_amt || '',
-        CommisAmt: ext.commis_amt || '',
-        TaxAmt: ext.tax_amt || '',
-        Net: ext.net || '',
-        Transaction: '',
-      }])
+      setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
 
       // เก็บ receiptId ไว้สำหรับใช้ตอน submit
       setReceiptId(ext.receipt_id || null)
@@ -117,16 +124,17 @@ export default function App() {
     setDetails(prev => prev.filter((_, i) => i !== index))
   }
 
-  async function submitData() {
+  async function submitData(overwrite = false) {
     const docNo = headerData.DocNo
 
-    if (submittedDocNos.current.has(docNo)) {
-      alert(`❌ เอกสารซ้ำซ้อน!\nหมายเลขบิล: ${docNo}\n\nเอกสารนี้ถูกนำเข้าระบบไปแล้ว`)
+    if (details.length === 0) {
+      showModal({ title: 'แจ้งเตือน', message: 'กรุณาเพิ่มอย่างน้อย 1 รายการก่อนส่ง', type: 'warning', onConfirm: closeModal })
       return
     }
 
     const payload = {
       BankType: bank,
+      Overwrite: overwrite,
       ImportDate: new Date().toISOString(),
       Header: headerData,
       Details: details.map(row => ({
@@ -134,7 +142,8 @@ export default function App() {
         PayAmt: parseFloat(String(row.PayAmt).replace(/,/g, '')) || 0,
         CommisAmt: parseFloat(String(row.CommisAmt).replace(/,/g, '')) || 0,
         TaxAmt: parseFloat(String(row.TaxAmt).replace(/,/g, '')) || 0,
-        Net: parseFloat(String(row.Net).replace(/,/g, '')) || 0,
+        WHTAmount: parseFloat(String(row.WHTAmount).replace(/,/g, '')) || null,
+        Total: parseFloat(String(row.Total).replace(/,/g, '')) || 0,
       })),
     }
 
@@ -142,11 +151,22 @@ export default function App() {
 
     try {
       await submitToLocal(receiptId, payload)
-      alert(`✅ Success: อัปโหลดข้อมูลสมบูรณ์\n\nเอกสาร ${docNo} ส่งเข้าระบบแล้ว`)
       submittedDocNos.current.add(docNo)
-      resetAll()
+      showModal({ title: 'อัปโหลดสำเร็จ', message: `เอกสาร ${docNo} ส่งเข้าระบบแล้ว`, type: 'success', onConfirm: () => { closeModal(); resetAll() } })
     } catch (err) {
-      alert(`❌ Error: ${err.message}`)
+      if (err.code === 'DUPLICATE_DOC_NO') {
+        showModal({
+          title: 'เอกสารซ้ำซ้อนในระบบ',
+          message: `หมายเลข ${docNo} ถูก submit ไปแล้ว\n\nต้องการ Overwrite ข้อมูลเดิมหรือไม่?`,
+          type: 'warning',
+          confirmText: 'Overwrite',
+          cancelText: 'ยกเลิก',
+          onConfirm: () => { closeModal(); submitData(true) },
+          onCancel: closeModal,
+        })
+      } else {
+        showModal({ title: 'เกิดข้อผิดพลาด', message: err.message, type: 'error', onConfirm: closeModal })
+      }
     }
   }
 
@@ -164,13 +184,29 @@ export default function App() {
   }
 
   function handleCancel() {
-    if (!showResults || confirm('คุณต้องการยกเลิกและล้างข้อมูลหรือไม่?')) {
+    if (!showResults) {
       resetAll()
+      return
     }
+    showModal({
+      title: 'ยืนยันการยกเลิก',
+      message: 'คุณต้องการยกเลิกและล้างข้อมูลหรือไม่?',
+      type: 'warning',
+      onConfirm: () => { closeModal(); resetAll() },
+      onCancel: closeModal,
+    })
   }
 
   return (
     <div className="app-container">
+      <CustomModal
+        show={modal.show}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={modal.onConfirm}
+        onCancel={modal.onCancel}
+      />
       <div className="app-header">
         <h1>
           <i className="fas fa-file-invoice-dollar" />
@@ -204,7 +240,7 @@ export default function App() {
               onAddRow={addRow}
               onDeleteRow={deleteRow}
             />
-            <FormActions onCancel={handleCancel} onSubmit={submitData} />
+            <FormActions onCancel={handleCancel} onSubmit={() => submitData()} />
           </div>
 
           <DocumentPreview previewUrl={previewUrl} previewType={previewType} />

@@ -148,23 +148,12 @@
                                 <thead><tr id="tableHeader"></tr></thead>
                                 <tbody id="tableBody"></tbody>
                             </table>
-                    </div>
-                    </div>
-                </div>
-
-                <!-- Total Summary Card -->
-                <div class="data-card" style="margin-top: 1.25rem;" id="totalSummaryCard">
-                    <div class="card-title">
-                        <div class="card-title-left"><i class="fas fa-calculator"></i> สรุปยอดรวม (Total Summary)</div>
-                    </div>
-                    <div class="card-body">
-                        <div class="total-summary-grid" id="totalSummaryGrid">
-                            <!-- Rendered by JS -->
                         </div>
+                        <button class="btn-add-row" onclick="addRow()">
+                            <i class="fas fa-plus"></i> เพิ่มรายการ
+                        </button>
                     </div>
                     <div class="form-actions">
-                        <button class="btn-cancel" onclick="goBackToStep1()"><i class="fas fa-arrow-left"></i> ย้อนกลับ</button>
-                        <div style="flex:1;"></div>
                         <button class="btn-cancel" onclick="cancelProcess()"><i class="fas fa-times"></i> ยกเลิก</button>
                         <button class="btn-submit" onclick="proceedToStep4()"><i class="fas fa-file-invoice-dollar"></i> ถัดไป (Review Accounting)</button>
                     </div>
@@ -174,136 +163,122 @@
 
         <!-- Step 4: Accounting Review (Preview Mapping) -->
         <div id="step4" class="section hidden">
-            <div class="step-center-wrap">
-                <div class="section-header">
-                    <span><i class="fas fa-check-double"></i> Step 4: ตรวจสอบการบันทึกบัญชี (Journal Concept)</span>
+            <div class="section-header">
+                <span><i class="fas fa-check-double"></i> Step 4: ตรวจสอบการบันทึกบัญชี (Journal Concept)</span>
+            </div>
+            
+            <div id="mappingAlert" class="hidden" style="margin-bottom: 1rem; padding: 1rem; background: #fff1f2; border: 1px solid var(--rose); border-radius: var(--radius-md); color: var(--rose); font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>พบรายการที่ยังไม่ตั้งรหัสบัญชี กรุณาตรวจสอบแผนกและรหัสบัญชีให้ครบถ้วน</span>
                 </div>
-
-                <div class="data-column">
-                    <div id="mappingAlert" class="hidden" style="padding: 1rem; background: #fff1f2; border: 1px solid var(--rose); border-radius: var(--radius-md); color: var(--rose); font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display:flex; align-items:center; gap:0.5rem;">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <span>พบรายการที่ยังไม่ตั้งรหัสบัญชี กรุณาตรวจสอบแผนกและรหัสบัญชีให้ครบถ้วน</span>
-                        </div>
-                        <a href="Mapping.html" target="_blank" class="btn btn-sm" style="background:var(--rose); color:white; padding: 0.4rem 0.8rem; border-radius: 4px; text-decoration: none;">แก้ไข Mapping</a>
+                <a href="Mapping.html" target="_blank" class="btn btn-sm" style="background:var(--rose); color:white; padding: 0.4rem 0.8rem; border-radius: 4px; text-decoration: none;">แก้ไข Mapping</a>
+            </div>
+            
+            <div class="data-card">
+                <div class="card-title">
+                    <div class="card-title-left"><i class="fas fa-file-invoice"></i> รายละเอียดรายการรายวัน (Journal Details)</div>
+                </div>
+                <div class="card-body-flush">
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="150">Dept. Code</th>
+                                    <th width="150">Acc code</th>
+                                    <th>Description</th>
+                                    <th width="150" class="text-right">Debit</th>
+                                    <th width="150" class="text-right">Credit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accountingRows"></tbody>
+                        </table>
                     </div>
-
-                    <div class="data-card">
-                        <div class="card-title">
-                            <div class="card-title-left"><i class="fas fa-file-invoice"></i> รายละเอียดรายการรายวัน (Journal Details)</div>
-                        </div>
-                        <div class="card-body-flush">
-                            <div class="table-wrapper">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th width="150">Dept. Code</th>
-                                            <th width="150">Acc code</th>
-                                            <th>Description</th>
-                                            <th width="150" class="text-right">Debit</th>
-                                            <th width="150" class="text-right">Credit</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="accountingRows"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div class="form-actions">
-                            <button class="btn-cancel" onclick="goBackToStep3()"><i class="fas fa-arrow-left"></i> ย้อนกลับ</button>
-                            <div style="flex:1;"></div>
-                            <a href="Mapping.html" target="_blank" class="btn btn-outline" style="text-decoration:none;">
-                                <i class="fas fa-cog"></i> ตั้งค่า Mapping
-                            </a>
-                            <button class="btn btn-secondary" onclick="refreshAccountingReview()">
-                                <i class="fas fa-sync-alt"></i> Refresh Data
-                            </button>
-                            <button class="btn btn-submit" id="btnSubmitFinal" onclick="submitFinalData()">
-                                <i class="fas fa-cloud-upload-alt"></i> ยืนยันและส่งข้อมูล
-                            </button>
-                        </div>
-                    </div>
+                </div>
+                <div class="form-actions">
+                    <a href="Mapping.html" target="_blank" class="btn btn-outline" style="text-decoration:none;">
+                        <i class="fas fa-cog"></i> ตั้งค่า Mapping
+                    </a>
+                    <button class="btn btn-secondary" onclick="refreshAccountingReview()">
+                        <i class="fas fa-sync-alt"></i> Refresh Data
+                    </button>
+                    <button class="btn btn-submit" id="btnSubmitFinal" onclick="submitFinalData()">
+                        <i class="fas fa-cloud-upload-alt"></i> ยืนยันและส่งข้อมูล
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Step 5: Journal Voucher Success -->
         <div id="step5" class="section hidden">
-            <div class="step-center-wrap">
-                <div class="section-header">
-                    <span class="status-badge success"><i class="fas fa-check-circle"></i> Step 5: Created Successfully</span>
+            <div class="section-header">
+                <span class="status-badge success"><i class="fas fa-check-circle"></i> Step 5: Created Successfully</span>
+            </div>
+
+            <div class="data-card">
+                <div class="card-title">
+                    <div class="card-title-left"><i class="fas fa-receipt"></i> Journal Voucher</div>
+                    <div class="btn-group">
+                        <span class="status-badge info">Normal</span>
+                    </div>
                 </div>
-
-                <div class="data-column">
-                    <div class="data-card">
-                        <div class="card-title">
-                            <div class="card-title-left"><i class="fas fa-receipt"></i> Journal Voucher</div>
-                            <div class="btn-group">
-                                <span class="status-badge info">Normal</span>
-                            </div>
+                <div class="card-body">
+                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 1.5rem; background: var(--gray-50); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size: 0.65rem; color:var(--text-4);">Prefix</label>
+                            <div id="jvPrefix" style="font-weight:700; color:var(--text-2);">TX</div>
                         </div>
-                        <div class="card-body">
-                            <!-- JV Header Info -->
-                            <div class="jv-info-grid">
-                                <div class="jv-info-item">
-                                    <div class="jv-info-label">Prefix</div>
-                                    <div class="jv-info-value" id="jvPrefix">TX</div>
-                                </div>
-                                <div class="jv-info-item">
-                                    <div class="jv-info-label">Voucher No.</div>
-                                    <div class="jv-info-value mono" id="jvVoucherNo">—</div>
-                                </div>
-                                <div class="jv-info-item">
-                                    <div class="jv-info-label">Date</div>
-                                    <div class="jv-info-value" id="jvDate">—</div>
-                                </div>
-                                <div class="jv-info-item">
-                                    <div class="jv-info-label">Source</div>
-                                    <div class="jv-info-value" style="color:var(--teal);">TaxR</div>
-                                </div>
-                                <div class="jv-info-item span-full">
-                                    <div class="jv-info-label">Description</div>
-                                    <div class="jv-info-value" id="jvDescription">Tax Reconcile (Post from OCR)</div>
-                                </div>
-                            </div>
-
-                            <!-- Quick Links Area -->
-                            <div style="display:flex; gap:1rem; margin-bottom: 1.5rem; font-size: 0.8rem;">
-                                <a href="javascript:void(0)" onclick="toggleFullScreenPreview()" class="text-blue" style="text-decoration:none;"><i class="fas fa-file-image"></i> ตัวอย่างเอกสารต้นฉบับ</a>
-                                <span class="text-muted">|</span>
-                                <a href="javascript:window.open('https://dev.carmen4.com/Carmen.API/api/interface/PMS/Test/Daily','_blank')" class="text-blue" style="text-decoration:none;"><i class="fas fa-external-link-alt"></i> รายละเอียดในระบบ</a>
-                            </div>
-
-                            <!-- JV Table -->
-                            <div class="table-wrapper" style="border: 1px solid var(--border); border-radius: var(--radius-md);">
-                                <table class="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th width="60">#</th>
-                                            <th width="120">Dept.</th>
-                                            <th width="120">Acc code</th>
-                                            <th>Description</th>
-                                            <th width="150" class="text-right">Debit</th>
-                                            <th width="150" class="text-right">Credit</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="jvRows"></tbody>
-                                    <tfoot>
-                                        <tr style="background: var(--blue-light); font-weight: 700;">
-                                            <td colspan="4" style="text-align: right; border-top: 2px solid var(--blue-mid);">ยอดรวม (TOTAL):</td>
-                                            <td id="totalDr" style="text-align: right; border-top: 2px solid var(--blue-mid); color:var(--blue);">0.00</td>
-                                            <td id="totalCr" style="text-align: right; border-top: 2px solid var(--blue-mid); color:var(--blue);">0.00</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size: 0.65rem; color:var(--text-4);">Voucher No.</label>
+                            <div id="jvVoucherNo" style="font-weight:700; color:var(--text-2); font-family:'DM Mono',monospace;">—</div>
                         </div>
-                        <div class="form-actions">
-                            <button class="btn-cancel" onclick="goBackToStep4()"><i class="fas fa-arrow-left"></i> ย้อนกลับ</button>
-                            <div style="flex:1;"></div>
-                            <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> พิมพ์ Voucher</button>
-                            <button class="btn btn-success" onclick="cancelProcess()"><i class="fas fa-check"></i> เสร็จสิ้น (Finish)</button>
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size: 0.65rem; color:var(--text-4);">Date</label>
+                            <div id="jvDate" style="font-weight:700; color:var(--text-2);">—</div>
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size: 0.65rem; color:var(--text-4);">Source</label>
+                            <div style="font-weight:700; color:var(--teal);">TaxR</div>
+                        </div>
+                        <div class="form-group" style="grid-column: span 4; margin:0;">
+                            <label style="font-size: 0.65rem; color:var(--text-4);">Description</label>
+                            <div id="jvDescription" style="font-weight:500; color:var(--text-2);">Tax Reconcile (Post from OCR)</div>
                         </div>
                     </div>
+
+                    <!-- Quick Links Area -->
+                    <div style="display:flex; gap:1rem; margin-bottom: 1.5rem; font-size: 0.8rem;">
+                        <a href="javascript:void(0)" onclick="toggleFullScreenPreview()" class="text-blue" style="text-decoration:none;"><i class="fas fa-file-image"></i> ตัวอย่างเอกสารต้นฉบับ</a>
+                        <span class="text-muted">|</span>
+                        <a href="javascript:window.open('https://dev.carmen4.com/Carmen.API/api/interface/PMS/Test/Daily','_blank')" class="text-blue" style="text-decoration:none;"><i class="fas fa-external-link-alt"></i> รายละเอียดในระบบ</a>
+                    </div>
+
+                    <div class="table-wrapper" style="border: 1px solid var(--border); border-radius: var(--radius-md);">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th width="60">#</th>
+                                    <th width="120">Dept.</th>
+                                    <th width="120">Acc code</th>
+                                    <th>Description</th>
+                                    <th width="150" class="text-right">Debit</th>
+                                    <th width="150" class="text-right">Credit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="jvRows"></tbody>
+                            <tfoot>
+                                <tr style="background: var(--blue-light); font-weight: 700;">
+                                    <td colspan="4" style="text-align: right; border-top: 2px solid var(--blue-mid);">ยอดรวม (TOTAL):</td>
+                                    <td id="totalDr" style="text-align: right; border-top: 2px solid var(--blue-mid); color:var(--blue);">0.00</td>
+                                    <td id="totalCr" style="text-align: right; border-top: 2px solid var(--blue-mid); color:var(--blue);">0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> พิมพ์ Voucher</button>
+                    <button class="btn btn-success" onclick="cancelProcess()"><i class="fas fa-check"></i> เสร็จสิ้น (Finish)</button>
                 </div>
             </div>
         </div>
