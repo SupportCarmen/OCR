@@ -1,6 +1,6 @@
 const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'
 
-export default function JournalVoucher({ jvRows, headerData, onFinish }) {
+export default function JournalVoucher({ jvRows, headerData, onFinish, onBack }) {
   const totalDr = jvRows.reduce((s, r) => s + r.debit,  0)
   const totalCr = jvRows.reduce((s, r) => s + r.credit, 0)
 
@@ -78,6 +78,11 @@ export default function JournalVoucher({ jvRows, headerData, onFinish }) {
           </div>
 
           <div className="form-actions">
+            {onBack && (
+              <button className="btn btn-outline" onClick={onBack} style={{ marginRight: 'auto' }}>
+                <i className="fas fa-arrow-left" /> ย้อนกลับ
+              </button>
+            )}
             <button className="btn-cancel" onClick={() => window.print()}>
               <i className="fas fa-print" /> พิมพ์ Voucher
             </button>

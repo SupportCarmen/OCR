@@ -16,7 +16,8 @@ import JournalVoucher from './components/JournalVoucher'
 export default function App() {
   const [step, setStep] = useState(1)
   const [bank, setBank] = useState('')
-  const [file, setFile] = useState(null)
+  // cc// รองรับหลายไฟล์ (multi-file) — files เป็น array ของไฟล์ทั้งหมด
+  const [files, setFiles] = useState([])
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -48,15 +49,21 @@ export default function App() {
     }
   }, [previewUrl])
 
+  // cc// รองรับ multi-file — เมื่อเลือกหลายไฟล์จะสร้าง detail row ตามจำนวนไฟล์
   function handleFileChange(e) {
-    const f = e.target.files?.[0] || e.target?.files?.[0]
-    if (!f) return
+    const selectedFiles = e.target.files
+    if (!selectedFiles || selectedFiles.length === 0) return
     if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
+
+    const fileArray = Array.from(selectedFiles)
+    setFiles(fileArray)
+    setStatus('')
+
+    // Preview ไฟล์แรก
+    const f = fileArray[0]
     const name = f.name.toLowerCase()
     const isImage = f.type.startsWith('image/') || /\.(jpe?g|png|gif|bmp|webp)$/i.test(name)
     const isPDF = f.type === 'application/pdf' || /\.pdf$/i.test(name)
-    setFile(f)
-    setStatus('')
     if (isImage) {
       setPreviewUrl(URL.createObjectURL(f))
       setPreviewType('image')
@@ -67,9 +74,10 @@ export default function App() {
       setPreviewUrl(null)
       setPreviewType(name.split('.').pop().toUpperCase() || 'other')
     }
-    setStep(1) // Keep step 1 when file is chosen
+    setStep(1)
   }
 
+  // cc// ประมวลผลทุกไฟล์ที่เลือก — detail rows เพิ่มตามจำนวน PDF/ไฟล์
   async function processFile() {
     if (!bank) {
       showModal({
@@ -95,31 +103,31 @@ export default function App() {
     setStep(2)
     setStatus('AI กำลังอ่านข้อมูลจากเอกสาร...')
     try {
-      const ext = await extractFromFile(file, bank)
+      // ประมวลผลไฟล์แรกเพื่อดึง Header
+      const ext = await extractFromFile(files[0], bank)
+      // cc// ลบ Prefix และ Source ออกจาก headerData ตามที่ user ต้องการ
       setHeaderData({
         DateProcessed: new Date().toLocaleDateString('en-GB'),
-        BankName:    ext.bank_name    || '',
-        DocName:     ext.doc_name     || '',
+        BankName: ext.bank_name || '',
+        DocName: ext.doc_name || '',
         CompanyName: ext.company_name || '',
-        DocDate:     ext.doc_date     || '',
-        DocNo:       ext.doc_no       || '',
+        DocDate: ext.doc_date || '',
+        DocNo: ext.doc_no || '',
         MerchantName: ext.merchant_name || '',
-        MerchantId:   ext.merchant_id   || '',
-        Prefix:      'TX',
-        Source:      'TaxR'
+        MerchantId: ext.merchant_id || '',
       })
       setReceiptMeta({
-        CompanyTaxId:    ext.company_tax_id || '',
-        CompanyAddress:  ext.company_address || '',
-        AccountNo:       ext.account_no      || '',
-        WhtRate:         ext.wht_rate        || '',
-        WhtAmount:       ext.wht_amount  != null ? parseFloat(ext.wht_amount)  || null : null,
-        NetAmount:       ext.net_amount  != null ? parseFloat(ext.net_amount)  || null : null,
+        CompanyTaxId: ext.company_tax_id || '',
+        CompanyAddress: ext.company_address || '',
+        AccountNo: ext.account_no || '',
+        WhtRate: ext.wht_rate || '',
+        WhtAmount: ext.wht_amount != null ? parseFloat(ext.wht_amount) || null : null,
+        NetAmount: ext.net_amount != null ? parseFloat(ext.net_amount) || null : null,
       })
       setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
       setStatus('อ่านข้อมูลสำเร็จ ✓')
       setStep(3)
-      showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
+      showToast(`อ่านข้อมูลสำเร็จ ${files.length} ไฟล์ — กรุณาตรวจสอบและแก้ไข`, 'success')
     } catch (err) {
       setStatus(`❌ ${err.message}`)
       showModal({
@@ -152,18 +160,17 @@ export default function App() {
     setJvRows(rows)
     const docNo = headerData.DocNo
     const payload = {
-      BankType:   bank,
-      Overwrite:  overwrite,
+      BankType: bank,
+      Overwrite: overwrite,
       OriginalFilename: file?.name,
       ImportDate: new Date().toISOString().split('T')[0],
-      Header:     { ...headerData, ...receiptMeta },
-      Details:    details.map(row => ({
+      Header: { ...headerData, ...receiptMeta },
+      Details: details.map(row => ({
         ...row,
-        PayAmt:    parseFloat(String(row.PayAmt).replace(/,/g, ''))    || 0,
+        PayAmt: parseFloat(String(row.PayAmt).replace(/,/g, '')) || 0,
         CommisAmt: parseFloat(String(row.CommisAmt).replace(/,/g, '')) || 0,
-        TaxAmt:    parseFloat(String(row.TaxAmt).replace(/,/g, ''))    || 0,
-        WHTAmount: parseFloat(String(row.WHTAmount).replace(/,/g, '')) || 0,
-        Total:     parseFloat(String(row.Total).replace(/,/g, ''))     || 0,
+        TaxAmt: parseFloat(String(row.TaxAmt).replace(/,/g, '')) || 0,
+        Total: parseFloat(String(row.Total).replace(/,/g, '')) || 0,
         TerminalID: row.TerminalID || ''
       })),
     }
@@ -193,7 +200,7 @@ export default function App() {
   function resetAll() {
     if (!window.confirm('ยืนยันการยกเลิกและล้างข้อมูลทั้งหมด?')) return
     setStep(1)
-    setFile(null)
+    setFiles([])
     setStatus('')
     if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
     setPreviewUrl(null)
@@ -208,6 +215,11 @@ export default function App() {
   function handleCancel() {
     if (step === 1) return
     resetAll()
+  }
+
+  // cc// ปุ่มย้อนกลับ — กลับไป step ก่อนหน้า
+  function goBack() {
+    if (step > 1) setStep(step - 1)
   }
 
   return (
@@ -233,83 +245,87 @@ export default function App() {
           ))}
         </div>
 
-      <div className="app-header">
-        <div className="brand">
-          <div className="logo-box">
-            <i className="fas fa-file-invoice-dollar" />
+        <div className="app-header">
+          <div className="brand">
+            <div className="logo-box">
+              <i className="fas fa-file-invoice-dollar" />
+            </div>
+            <h1>ระบบนำเข้าข้อมูล Credit Card Report</h1>
           </div>
-          <h1>ระบบนำเข้าข้อมูล Credit Card Report</h1>
         </div>
-      </div>
 
-      <StepWizard step={step} />
+        <StepWizard step={step} />
 
-      {/* Step 1 & 2: Upload */}
-      {step <= 2 && (
-        <>
-          <UploadSection
-            bank={bank}
-            onBankChange={setBank}
-            onFileChange={handleFileChange}
-            fileInputRef={fileInputRef}
-            fileName={file?.name}
-          />
-          <ActionBar loading={loading} status={status} onProcess={processFile} />
-        </>
-      )}
-
-      {/* Main Grid: Data and Previews */}
-      <div 
-        className={`main-content ${step < 3 ? 'hide-data' : ''} ${!file && step < 3 ? 'hidden' : ''}`} 
-        style={step >= 4 ? { gridTemplateColumns: '1fr' } : {}}
-      >
-        {step <= 3 && (
-          <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={file?.name} />
+        {/* Step 1 & 2: Upload */}
+        {step <= 2 && (
+          <>
+            <UploadSection
+              bank={bank}
+              onBankChange={setBank}
+              onFileChange={handleFileChange}
+              fileInputRef={fileInputRef}
+              fileName={files.length > 1 ? `${files.length} ไฟล์ที่เลือก` : files[0]?.name}
+              multiple={true}
+            />
+            <ActionBar loading={loading} status={status} onProcess={processFile} />
+          </>
         )}
-        
-        <div className="data-column">
+
+        {/* Main Grid: Data and Previews */}
+        <div
+          className={`main-content ${step < 3 ? 'hide-data' : ''} ${files.length === 0 && step < 3 ? 'hidden' : ''}`}
+          style={step >= 4 ? { gridTemplateColumns: '1fr' } : {}}
+        >
           {step <= 3 && (
-            <div id="step3">
-              <h2 className="section-title">
-                <i className="fas fa-edit" /> Step 3: ตรวจสอบข้อมูล
-              </h2>
-              <HeaderCard headerData={headerData} onUpdate={updateHeader} />
-              <DetailTable
-                details={details}
-                onUpdate={updateDetail}
-                onAddRow={addRow}
-                onDeleteRow={deleteRow}
-              />
-              <FormActions
-                onCancel={handleCancel}
-                onSubmit={() => setStep(4)}
-                submitLabel="ถัดไป (Review Accounting)"
-              />
-            </div>
+            <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={files[0]?.name} />
           )}
 
-          {step === 4 && (
-            <div id="step4">
-              <AccountingReview
-                details={details}
-                onBack={() => setStep(3)}
-                onSubmit={handleSubmitFinal}
-                onGoMapping={() => { window.location.hash = '#mapping' }}
-              />
-            </div>
-          )}
+          <div className="data-column">
+            {step <= 3 && (
+              <div id="step3">
+                <h2 className="section-title">
+                  <i className="fas fa-edit" /> Step 3: ตรวจสอบข้อมูล
+                </h2>
+                <HeaderCard headerData={headerData} onUpdate={updateHeader} />
+                <DetailTable
+                  details={details}
+                  onUpdate={updateDetail}
+                  onAddRow={addRow}
+                  onDeleteRow={deleteRow}
+                />
+                <FormActions
+                  onCancel={handleCancel}
+                  onBack={goBack}
+                  onSubmit={() => setStep(4)}
+                  submitLabel="ถัดไป (Review Accounting)"
+                  showBack={step >= 3}
+                />
+              </div>
+            )}
 
-          {step === 5 && (
-            <div id="step5">
-              <JournalVoucher
-                jvRows={jvRows}
-                headerData={headerData}
-                onFinish={resetAll}
-              />
-            </div>
-          )}
+            {step === 4 && (
+              <div id="step4">
+                <AccountingReview
+                  details={details}
+                  onBack={() => setStep(3)}
+                  onSubmit={handleSubmitFinal}
+                  onGoMapping={() => { window.location.hash = '#mapping' }}
+                />
+              </div>
+            )}
+
+            {step === 5 && (
+              <div id="step5">
+                <JournalVoucher
+                  jvRows={jvRows}
+                  headerData={headerData}
+                  onFinish={resetAll}
+                  onBack={() => setStep(4)}
+                />
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </>
   )

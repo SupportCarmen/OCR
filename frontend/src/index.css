@@ -779,6 +779,61 @@ input[type="text"].detail-input:focus { border-color: var(--blue); background: v
 
 .btn-group { display: flex; align-items: center; gap: 0.6rem; }
 
+/* ─── TOTAL SUMMARY CARD ─── */
+.total-summary-card {
+    border-top: 3px solid var(--blue);
+}
+
+.total-summary-card .card-title {
+    background: var(--blue-light);
+    border-bottom-color: var(--blue-mid);
+}
+
+.total-summary-card .card-title i {
+    background: var(--blue);
+    color: white;
+}
+
+.total-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1.25rem;
+}
+
+.total-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+}
+
+.total-summary-item:hover {
+    border-color: var(--blue-mid);
+    background: var(--blue-light);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.total-summary-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-3);
+}
+
+.total-summary-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    color: var(--blue);
+    letter-spacing: -0.02em;
+}
+
 @media (max-width: 768px) {
     body { padding: 1.25rem 1rem 4rem; }
     .app-header { flex-wrap: wrap; gap: 0.75rem; }
@@ -786,4 +841,5 @@ input[type="text"].detail-input:focus { border-color: var(--blue); background: v
     .form-actions { flex-direction: column; }
     .btn-cancel, .btn-submit { width: 100%; justify-content: center; }
     .btn-add-row { margin: 0.75rem 1rem; width: calc(100% - 2rem); }
+    .total-summary-grid { grid-template-columns: 1fr 1fr; }
 }
