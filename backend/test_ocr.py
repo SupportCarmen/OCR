@@ -48,19 +48,23 @@ async def test_file(filepath: str, bank_type: str = None):
         "file": filename,
         "bank_type": bank,
         # Header
-        "bank_name":       extracted.bank_name,
-        "doc_name":        extracted.doc_name,
-        "company_name":    extracted.company_name,
-        "company_tax_id":  extracted.company_tax_id,
-        "company_address": extracted.company_address,
-        "account_no":      extracted.account_no,
-        "doc_date":        extracted.doc_date,
-        "doc_no":          extracted.doc_no,
-        "merchant_name":   extracted.merchant_name,
-        "merchant_id":     extracted.merchant_id,
-        "wht_rate":        extracted.wht_rate,
-        "wht_amount":      extracted.wht_amount,
-        "net_amount":      extracted.net_amount,
+        "bank_name":        extracted.bank_name,
+        "doc_name":         extracted.doc_name,
+        "company_name":     extracted.company_name,
+        "company_tax_id":   extracted.company_tax_id,
+        "company_address":  extracted.company_address,
+        "account_no":       extracted.account_no,
+        "doc_date":         extracted.doc_date,
+        "doc_no":           extracted.doc_no,
+        "merchant_name":    extracted.merchant_name,
+        "merchant_id":      extracted.merchant_id,
+        "wht_rate":         extracted.wht_rate,
+        "wht_amount":       extracted.wht_amount,
+        "net_amount":       extracted.net_amount,
+        # --- NEW: bank's own info ---
+        "bank_companyname": extracted.bank_companyname,
+        "back_tax_id":      extracted.back_tax_id,
+        "bank_address":     extracted.bank_address,
         # Detail rows
         "details": [d.model_dump() for d in extracted.details],
     }
@@ -94,17 +98,18 @@ async def main():
         for fp in sorted(files):
             await test_file(fp)
     else:
-        # Default: test first file found
-        files = sorted([
-            f for f in os.listdir(UPLOAD_DIR)
-            if os.path.isfile(os.path.join(UPLOAD_DIR, f))
-        ])
-        if not files:
-            print("No files in uploads/")
-            return
-        print(f"Files available: {files}")
-        print(f"Testing first file: {files[0]}")
-        await test_file(os.path.join(UPLOAD_DIR, files[0]))
+        # Default: test one representative file per bank
+        one_per_bank = {
+            "BBL":   "BBLETAXACQ_002205903289_20260321_26079-0001954_T03.pdf",
+            "KBANK": "Kbank20251231 (3).pdf",
+            "SCB":   "SCB_credit card commission.pdf",
+        }
+        for bank_type, fname in one_per_bank.items():
+            fp = os.path.join(UPLOAD_DIR, fname)
+            if os.path.exists(fp):
+                await test_file(fp, bank_type)
+            else:
+                print(f"⚠️  Not found: {fname}")
 
 
 if __name__ == "__main__":

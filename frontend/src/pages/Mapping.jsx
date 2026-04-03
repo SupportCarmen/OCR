@@ -76,6 +76,24 @@ function CustomSearchSelect({ value, onChange, options, placeholder }) {
 }
 
 
+const BANK_INFO = {
+  'Bangkok Bank (BBL)': {
+    name: 'ธนาคารกรุงเทพ จำกัด (มหาชน)',
+    taxId: '0107536000374',
+    address: '333 ถนนสีลม เขตบางรัก กรุงเทพฯ 10500',
+  },
+  'Kasikornbank (KBANK)': {
+    name: 'บมจ. ธนาคารกสิกรไทย',
+    taxId: '0107536000315',
+    address: '400/22 ถนนพหลโยธิน แขวงสามเสนใน เขตพญาไท กรุงเทพมหานคร 10400',
+  },
+  'Siam Commercial Bank (SCB)': {
+    name: 'ธนาคารไทยพาณิชย์ จํากัด (มหาชน)',
+    taxId: '0107536000102',
+    address: '9 ถนนรัชดาภิเษก เขตจตุจักร กรุงเทพฯ 10900',
+  },
+};
+
 const MASTER_FILE_PREFIXES = [
   { code: 'PFX-01', name: 'Invoice' },
   { code: 'PFX-02', name: 'Receipt' },
@@ -89,6 +107,12 @@ const PAYMENT_TYPES = [
   'AMEX', 'LCS-MCA', 'QR-MCA', 'VSPPCO', 'VSCCCO', 'TPN', 'THSTD-P', 'QR-JCB', 'QR-UPI',
   'VSA-SCB-P', 'MCA-SCB-P'
 ];
+
+const OCR_BANK_MAP = {
+  BBL:   'Bangkok Bank (BBL)',
+  KBANK: 'Kasikornbank (KBANK)',
+  SCB:   'Siam Commercial Bank (SCB)',
+};
 
 export default function Mapping() {
   const [masterAccounts, setMasterAccounts] = useState([]);
@@ -115,6 +139,9 @@ export default function Mapping() {
     });
     return initialState;
   });
+
+  const [customPaymentTypes, setCustomPaymentTypes] = useState([]);
+  const [newCustomType, setNewCustomType] = useState('');
 
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({ show: false, title: '', message: '', type: 'info' });
@@ -148,32 +175,59 @@ export default function Mapping() {
   useEffect(() => {
     loadInitialData();
 
+    // OCR state — bank detected during scan + company info extracted from document
+    let ocrBank = '';
+    let ocrCompany = {};
+    try {
+      const ocrState = JSON.parse(localStorage.getItem('ocr_wizard_state') || '{}');
+      ocrBank = OCR_BANK_MAP[ocrState.bank] || '';
+
+      // Company info written by App.jsx applyExtractedData (bank_companyname, back_tax_id, bank_address)
+      const ocrConfig = JSON.parse(localStorage.getItem('accountingConfig') || '{}');
+      ocrCompany = ocrConfig.company || {};
+    } catch(e) {}
+
     const config = localStorage.getItem('accountingConfig');
     if (config) {
       try {
         const parsed = JSON.parse(config);
-        setBank(parsed.bank || '');
+        // Prefer previously saved bank; fall back to OCR-detected bank
+        setBank(parsed.bank || ocrBank);
         setFilePrefix(parsed.filePrefix || '');
         setFileSource(parsed.fileSource || '');
         if (parsed.company) {
           setCompany(prev => ({ ...prev, ...parsed.company }));
+        } else if (Object.keys(ocrCompany).length) {
+          // No saved config yet — seed from OCR data
+          setCompany(prev => ({ ...prev, ...ocrCompany }));
         }
         if (parsed.mappings) {
           setMappings(prev => ({ ...prev, ...parsed.mappings }));
         }
       } catch(e) {}
+    } else if (ocrBank) {
+      // No accountingConfig at all — at least pre-select bank from OCR
+      setBank(ocrBank);
+      if (Object.keys(ocrCompany).length) {
+        setCompany(prev => ({ ...prev, ...ocrCompany }));
+      }
     }
 
     const amountState = localStorage.getItem('accountMappingAmount');
     if (amountState) {
       try {
         const parsedAmount = JSON.parse(amountState);
+        const savedCustomTypes = parsedAmount.__customTypes || [];
+        setCustomPaymentTypes(savedCustomTypes);
         setPaymentAmount(prev => {
           const newState = { ...prev };
           Object.keys(parsedAmount).forEach(k => {
-            newState[k] = parsedAmount[k];
+            if (k !== '__customTypes') newState[k] = parsedAmount[k];
           });
           PAYMENT_TYPES.forEach(type => {
+            if (!newState[type]) newState[type] = { dept: '', acc: '' };
+          });
+          savedCustomTypes.forEach(type => {
             if (!newState[type]) newState[type] = { dept: '', acc: '' };
           });
           return newState;
@@ -211,8 +265,25 @@ export default function Mapping() {
   };
 
   const saveAmountSelection = () => {
-    localStorage.setItem('accountMappingAmount', JSON.stringify(paymentAmount));
+    localStorage.setItem('accountMappingAmount', JSON.stringify({ ...paymentAmount, __customTypes: customPaymentTypes }));
     setIsAmountModalOpen(false);
+  };
+
+  const handleAddCustomType = () => {
+    const trimmed = newCustomType.trim().toUpperCase();
+    if (!trimmed || PAYMENT_TYPES.includes(trimmed) || customPaymentTypes.includes(trimmed)) return;
+    setCustomPaymentTypes(prev => [...prev, trimmed]);
+    setPaymentAmount(prev => ({ ...prev, [trimmed]: { dept: '', acc: '' } }));
+    setNewCustomType('');
+  };
+
+  const handleRemoveCustomType = (type) => {
+    setCustomPaymentTypes(prev => prev.filter(t => t !== type));
+    setPaymentAmount(prev => {
+      const next = { ...prev };
+      delete next[type];
+      return next;
+    });
   };
 
   // Helper for input binding
@@ -221,40 +292,27 @@ export default function Mapping() {
   };
 
   const handleMappingChange = (type, field, value) => {
-    let newNature = mappings[type]?.nature || '';
-    if (field === 'acc') {
-      const found = masterAccounts.find(a => a.code === value);
-      if (found) newNature = found.nature;
-    }
-
     setMappings(prev => ({
       ...prev,
       [type]: {
         ...prev[type],
-        [field]: value,
-        nature: field === 'acc' ? newNature : prev[type]?.nature
+        [field]: value
       }
     }));
   };
 
   const handlePaymentMappingChange = (type, field, value) => {
-    let newNature = paymentAmount[type]?.nature || '';
-    if (field === 'acc') {
-      const found = masterAccounts.find(a => a.code === value);
-      if (found) newNature = found.nature;
-    }
-
     setPaymentAmount(prev => ({
       ...prev,
       [type]: {
         ...prev[type],
-        [field]: value,
-        nature: field === 'acc' ? newNature : prev[type]?.nature
+        [field]: value
       }
     }));
   };
 
-  const amountMappedCount = Object.values(paymentAmount).filter(m => m.dept && m.acc).length;
+  const allPaymentTypes = [...PAYMENT_TYPES, ...customPaymentTypes];
+  const amountMappedCount = allPaymentTypes.filter(t => paymentAmount[t]?.dept && paymentAmount[t]?.acc).length;
 
   return (
     <>
@@ -278,7 +336,14 @@ export default function Mapping() {
       <div className="section">
         <div className="form-grid">
           <label>Bank</label>
-          <select value={bank} onChange={(e) => setBank(e.target.value)} className="search-select-trigger" style={{ width: '100%' }}>
+          <select value={bank} onChange={(e) => {
+            const selected = e.target.value;
+            setBank(selected);
+            if (BANK_INFO[selected]) {
+              const info = BANK_INFO[selected];
+              setCompany(prev => ({ ...prev, name: info.name, taxId: info.taxId, address: info.address }));
+            }
+          }} className="search-select-trigger" style={{ width: '100%' }}>
             <option value="">เลือกธนาคาร...</option>
             <option value="Bangkok Bank (BBL)">Bangkok Bank (BBL)</option>
             <option value="Kasikornbank (KBANK)">Kasikornbank (KBANK)</option>
@@ -333,8 +398,8 @@ export default function Mapping() {
           <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--blue)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
           <div style={{ gridColumn: 'span 2' }}>
             <div id="amountMappingStatus" style={{ fontSize: '0.85rem', padding: '0.7rem 1rem', borderRadius: '4px', border: '1px dashed var(--gray-300)', color: amountMappedCount > 0 ? 'var(--teal)' : 'var(--gray-500)', background: amountMappedCount > 0 ? 'var(--teal-light)' : 'var(--gray-50)', borderColor: amountMappedCount > 0 ? 'var(--teal)' : 'var(--gray-300)' }}>
-               {amountMappedCount > 0 
-                  ? <><i className="fas fa-check-circle"></i> ตั้งค่าแล้ว {amountMappedCount}/{PAYMENT_TYPES.length} รายการ</>
+               {amountMappedCount > 0
+                  ? <><i className="fas fa-check-circle"></i> ตั้งค่าแล้ว {amountMappedCount}/{allPaymentTypes.length} รายการ</>
                   : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Amount เพื่อตั้งค่าแยกตาม Payment Type</>
                }
             </div>
@@ -343,20 +408,9 @@ export default function Mapping() {
           {/* Other mappings loop */}
           {['commission', 'tax', 'net'].map((key) => {
             const labelMap = { commission: 'Commission', tax: 'Tax Amount', net: 'Net Amount' };
-            const nature = mappings[key].nature;
-            let natureLabel = "Credit";
-            let natureClass = "type-credit";
-            let natureStyle = { color: '#d97706', background: '#fef3c7', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' };
-
-            if (!nature) {
-              natureLabel = "No Acc";
-              natureClass = "type-empty";
-              natureStyle = { color: 'var(--gray-500)', background: 'var(--gray-200)', ...natureStyle };
-            } else if (nature.toLowerCase() === 'debit') {
-              natureLabel = "Debit";
-              natureClass = "type-debit";
-              natureStyle = { color: 'var(--blue)', background: 'var(--blue-light)', ...natureStyle };
-            }
+            const natureLabel = "Credit";
+            const natureClass = "type-credit";
+            const natureStyle = { color: '#d97706', background: '#fef3c7', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' };
 
             return (
               <React.Fragment key={key}>
@@ -425,32 +479,53 @@ export default function Mapping() {
                 <div>Department Code</div>
                 <div>Account Code</div>
               </div>
-              {PAYMENT_TYPES.map(type => {
+              {allPaymentTypes.map(type => {
                 const pAmt = paymentAmount[type] || { dept: '', acc: '' };
-                const nature = pAmt.nature;
-                let natColor = nature?.toLowerCase() === 'debit' ? 'var(--blue)' : (nature?.toLowerCase() === 'credit' ? '#d97706' : 'var(--gray-500)');
+                const isCustom = !PAYMENT_TYPES.includes(type);
                 return (
                 <div key={type} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr', gap: '1rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ background: 'var(--blue-light)', color: 'var(--blue)', padding: '0.4rem 0.5rem', borderRadius: '4px', border: '1px solid var(--blue-mid)', fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ background: isCustom ? '#f0fdf4' : 'var(--blue-light)', color: isCustom ? '#16a34a' : 'var(--blue)', padding: '0.4rem 0.5rem', borderRadius: '4px', border: `1px solid ${isCustom ? '#86efac' : 'var(--blue-mid)'}`, fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', flex: 1 }}>
                       {type}
                     </div>
-                    {nature && <span style={{fontSize: '0.7rem', color: natColor, fontWeight: 'bold'}}>{nature}</span>}
+                    {isCustom && (
+                      <button onClick={() => handleRemoveCustomType(type)} title="ลบ" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.9rem', padding: '0.2rem', lineHeight: 1 }}>
+                        <i className="fas fa-times-circle"></i>
+                      </button>
+                    )}
                   </div>
-                  <CustomSearchSelect 
-                    value={pAmt.dept} 
-                    onChange={(val) => handlePaymentMappingChange(type, 'dept', val)} 
-                    options={masterDepartments} 
-                    placeholder="Dept..." 
+                  <CustomSearchSelect
+                    value={pAmt.dept}
+                    onChange={(val) => handlePaymentMappingChange(type, 'dept', val)}
+                    options={masterDepartments}
+                    placeholder="Dept..."
                   />
-                  <CustomSearchSelect 
-                    value={pAmt.acc} 
-                    onChange={(val) => handlePaymentMappingChange(type, 'acc', val)} 
-                    options={masterAccounts} 
-                    placeholder="Acc..." 
+                  <CustomSearchSelect
+                    value={pAmt.acc}
+                    onChange={(val) => handlePaymentMappingChange(type, 'acc', val)}
+                    options={masterAccounts}
+                    placeholder="Acc..."
                   />
                 </div>
-              )})}
+                );
+              })}
+              {/* Add custom type row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr', gap: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed var(--border)', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <input
+                    type="text"
+                    value={newCustomType}
+                    onChange={(e) => setNewCustomType(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCustomType()}
+                    placeholder="Custom type..."
+                    style={{ flex: 1, padding: '0.4rem 0.5rem', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.85rem', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', outline: 'none' }}
+                  />
+                  <button onClick={handleAddCustomType} title="เพิ่ม" style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.4rem 0.7rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    <i className="fas fa-plus"></i> Add
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-4)', gridColumn: 'span 2' }}>เพิ่ม Payment Type ที่กำหนดเอง</div>
+              </div>
             </div>
             <div className="mapping-modal-footer" style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
               <button className="btn-cancel" onClick={() => setIsAmountModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'var(--gray-300)', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ยกเลิก</button>

@@ -81,6 +81,9 @@ class Receipt(Base):
     wht_rate = Column(String(20), nullable=True)
     wht_amount = Column(Numeric(15, 2), nullable=True)
     net_amount = Column(Numeric(15, 2), nullable=True)
+    bank_companyname = Column(String(255), nullable=True)   # bank's own legal company name
+    back_tax_id = Column(String(50), nullable=True)         # bank's own tax ID
+    bank_address = Column(Text, nullable=True)              # bank's own address
 
     # Submission tracking
     submitted_at = Column(DateTime, nullable=True)        # NULL = not yet submitted
@@ -140,6 +143,9 @@ class ReceiptSchema(BaseModel):
     wht_rate: Optional[str] = None
     wht_amount: Optional[float] = None
     net_amount: Optional[float] = None
+    bank_companyname: Optional[str] = None
+    back_tax_id: Optional[str] = None
+    bank_address: Optional[str] = None
     submitted_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     details: List[ReceiptDetailSchema] = []
@@ -197,4 +203,7 @@ class ExtractedReceiptData(BaseModel):
     wht_rate: Optional[str] = Field(None, description="อัตราภาษีหัก ณ ที่จ่าย % เช่น '3.00'")
     wht_amount: Optional[str] = Field(None, description="ภาษีหัก ณ ที่จ่าย รวมทั้งเอกสาร (บาท)")
     net_amount: Optional[str] = Field(None, description="ยอดเงินสุทธิรวมทั้งเอกสาร (NET AMOUNT) หลังหัก WHT")
+    bank_companyname: Optional[str] = Field(None, description="ชื่อนิติบุคคลของธนาคาร (เช่น ธนาคารกรุงเทพ จำกัด (มหาชน))")
+    back_tax_id: Optional[str] = Field(None, description="เลขประจำตัวผู้เสียภาษีของธนาคาร")
+    bank_address: Optional[str] = Field(None, description="ที่อยู่ของธนาคาร (ที่อยู่สำนักงานใหญ่ที่พิมพ์บนเอกสาร)")
     details: List[ExtractedDetailRow] = Field(default_factory=list, description="รายการ card/payment type rows")

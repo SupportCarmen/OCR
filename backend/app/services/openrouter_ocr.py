@@ -47,6 +47,14 @@ CRITICAL: Each payment/card type row = ONE separate JSON object inside the "deta
 Do NOT merge multiple rows into one object.
 
 Header fields to extract:
+- bank_companyname : ชื่อนิติบุคคลของธนาคาร (ผู้ออกเอกสาร) ที่พิมพ์บนเอกสาร เช่น
+                     "ธนาคารกรุงเทพ จำกัด (มหาชน)" / "บมจ. ธนาคารกสิกรไทย" / "ธนาคารไทยพาณิชย์ จํากัด (มหาชน)"
+                     ให้ดึงจากหัวเอกสารหรือส่วน header ของธนาคาร ไม่ใช่ชื่อร้านค้า
+- back_tax_id      : เลขประจำตัวผู้เสียภาษีของ**ธนาคาร** (ผู้ออกเอกสาร) ตัวเลขล้วน เช่น "0107536000374"
+                     ไม่ใช่ Tax ID ของร้านค้า — ให้ดูในส่วน header หรือ footer ของธนาคาร
+- bank_address     : ที่อยู่ของ**ธนาคาร** ที่พิมพ์บนเอกสาร (สำนักงานใหญ่) เช่น
+                     "333 ถนนสีลม เขตบางรัก กรุงเทพฯ 10500"
+                     ให้ดึงจาก header/footer ของธนาคาร ไม่ใช่ที่อยู่ร้านค้า
 - bank_name        : ชื่อธนาคารภาษาไทยเต็มๆ เท่านั้น — ใช้ค่าที่กำหนดตายตัวตามธนาคาร:
                      SCB   → "ธนาคารไทยพาณิชย์"
                      BBL   → "ธนาคารกรุงเทพ"
@@ -78,6 +86,9 @@ Detail row fields (one object per card/payment type row):
 
 Example — document with 2 payment rows:
 {
+  "bank_companyname": "ธนาคารกรุงเทพ จำกัด (มหาชน)",
+  "back_tax_id":      "0107536000374",
+  "bank_address":     "333 ถนนสีลม เขตบางรัก กรุงเทพฯ 10500",
   "bank_name":       "ธนาคารกรุงเทพ",
   "doc_name":        "ใบเสร็จรับเงิน/ใบกำกับภาษี",
   "company_name":    "บริษัท COMPANY NAME จำกัด",

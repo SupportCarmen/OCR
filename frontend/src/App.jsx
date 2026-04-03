@@ -13,6 +13,20 @@ import CustomModal from './components/CustomModal'
 import AccountingReview from './components/AccountingReview'
 import JournalVoucher from './components/JournalVoucher'
 
+const BANK_THAI_NAMES = {
+  BBL: 'ธนาคารกรุงเทพ',
+  KBANK: 'ธนาคารกสิกรไทย',
+  SCB: 'ธนาคารไทยพาณิชย์',
+}
+
+function detectBankFromCompanyName(backCompanyname) {
+  if (!backCompanyname) return null
+  if (backCompanyname.includes('กรุงเทพ')) return 'BBL'
+  if (backCompanyname.includes('กสิกร')) return 'KBANK'
+  if (backCompanyname.includes('ไทยพาณิชย์')) return 'SCB'
+  return null
+}
+
 export default function App() {
   const initialState = (() => {
     try {
@@ -93,6 +107,41 @@ export default function App() {
     setStep(1)
   }
 
+  function applyExtractedData(ext) {
+    setHeaderData({
+      DateProcessed: new Date().toLocaleDateString('en-GB'),
+      BankName: ext.bank_name || '',
+      DocName: ext.doc_name || '',
+      CompanyName: ext.company_name || '',
+      DocDate: ext.doc_date || '',
+      DocNo: ext.doc_no || '',
+      MerchantName: ext.merchant_name || '',
+      MerchantId: ext.merchant_id || '',
+    })
+    setReceiptMeta({
+      CompanyTaxId: ext.company_tax_id || '',
+      CompanyAddress: ext.company_address || '',
+      AccountNo: ext.account_no || '',
+      WhtRate: ext.wht_rate || '',
+      WhtAmount: ext.wht_amount != null ? parseFloat(ext.wht_amount) || null : null,
+      NetAmount: ext.net_amount != null ? parseFloat(ext.net_amount) || null : null,
+    })
+    setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
+
+    if (ext.bank_companyname || ext.back_tax_id || ext.bank_address) {
+      try {
+        const existing = JSON.parse(localStorage.getItem('accountingConfig') || '{}')
+        existing.company = {
+          ...existing.company,
+          ...(ext.bank_companyname && { name: ext.bank_companyname }),
+          ...(ext.back_tax_id      && { taxId: ext.back_tax_id }),
+          ...(ext.bank_address     && { address: ext.bank_address }),
+        }
+        localStorage.setItem('accountingConfig', JSON.stringify(existing))
+      } catch (e) {}
+    }
+  }
+
   // cc// ประมวลผลทุกไฟล์ที่เลือก — detail rows เพิ่มตามจำนวน PDF/ไฟล์
   async function processFile() {
     if (!bank) {
@@ -119,31 +168,52 @@ export default function App() {
     setStep(2)
     setStatus('AI กำลังอ่านข้อมูลจากเอกสาร...')
     try {
-      // ประมวลผลไฟล์แรกเพื่อดึง Header
       const ext = await extractFromFile(files[0], bank)
-      // cc// ลบ Prefix และ Source ออกจาก headerData ตามที่ user ต้องการ
-      setHeaderData({
-        DateProcessed: new Date().toLocaleDateString('en-GB'),
-        BankName: ext.bank_name || '',
-        DocName: ext.doc_name || '',
-        CompanyName: ext.company_name || '',
-        DocDate: ext.doc_date || '',
-        DocNo: ext.doc_no || '',
-        MerchantName: ext.merchant_name || '',
-        MerchantId: ext.merchant_id || '',
-      })
-      setReceiptMeta({
-        CompanyTaxId: ext.company_tax_id || '',
-        CompanyAddress: ext.company_address || '',
-        AccountNo: ext.account_no || '',
-        WhtRate: ext.wht_rate || '',
-        WhtAmount: ext.wht_amount != null ? parseFloat(ext.wht_amount) || null : null,
-        NetAmount: ext.net_amount != null ? parseFloat(ext.net_amount) || null : null,
-      })
-      setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
-      setStatus('อ่านข้อมูลสำเร็จ ✓')
-      setStep(3)
-      showToast(`อ่านข้อมูลสำเร็จ ${files.length} ไฟล์ — กรุณาตรวจสอบและแก้ไข`, 'success')
+      applyExtractedData(ext)
+
+      const detectedBank = detectBankFromCompanyName(ext.bank_companyname)
+      if (detectedBank && detectedBank !== bank) {
+        setStatus('อ่านข้อมูลสำเร็จ ✓')
+        setStep(3)
+        showModal({
+          title: 'ตรวจพบธนาคารไม่ตรงกัน',
+          message: `เอกสารนี้น่าจะเป็นของ ${BANK_THAI_NAMES[detectedBank]}\nแต่เลือกธนาคาร: ${BANK_THAI_NAMES[bank]}\n\nต้องการประมวลผลใหม่ด้วย ${BANK_THAI_NAMES[detectedBank]} หรือไม่?`,
+          type: 'warning',
+          confirmText: `ประมวลผลด้วย ${detectedBank}`,
+          cancelText: 'ใช้ผลลัพธ์ปัจจุบัน',
+          onConfirm: async () => {
+            closeModal()
+            setBank(detectedBank)
+            setLoading(true)
+            setStep(2)
+            setStatus('AI กำลังอ่านข้อมูลใหม่...')
+            try {
+              const ext2 = await extractFromFile(files[0], detectedBank)
+              applyExtractedData(ext2)
+              setStatus('อ่านข้อมูลสำเร็จ ✓')
+              setStep(3)
+              showToast(`ประมวลผลใหม่ด้วย ${BANK_THAI_NAMES[detectedBank]} สำเร็จ`, 'success')
+            } catch (err) {
+              setStatus(`❌ ${err.message}`)
+              showModal({
+                title: 'เกิดข้อผิดพลาด',
+                message: `ไม่สามารถอ่านข้อมูลได้: ${err.message}`,
+                type: 'error',
+                confirmText: 'ปิด',
+                onConfirm: closeModal
+              })
+              setStep(1)
+            } finally {
+              setLoading(false)
+            }
+          },
+          onCancel: closeModal,
+        })
+      } else {
+        setStatus('อ่านข้อมูลสำเร็จ ✓')
+        setStep(3)
+        showToast(`อ่านข้อมูลสำเร็จ ${files.length} ไฟล์ — กรุณาตรวจสอบและแก้ไข`, 'success')
+      }
     } catch (err) {
       setStatus(`❌ ${err.message}`)
       showModal({

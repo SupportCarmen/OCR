@@ -52,6 +52,8 @@ export async function extractFromFile(file, bankType) {
     wht_rate: receipt.wht_rate || '',
     wht_amount: receipt.wht_amount || '',
     net_amount: receipt.net_amount || '',
+    // bank identity fields (used for mismatch detection)
+    bank_companyname: receipt.bank_companyname || '',
     // all detail rows
     details,
   }
