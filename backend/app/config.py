@@ -11,7 +11,8 @@ class Settings(BaseSettings):
 
     # OpenRouter API
     openrouter_api_key: str = ""
-    openrouter_model: str = "google/gemini-2.0-flash-001"
+    openrouter_ocr_model: str = "google/gemini-2.5-flash-lite"
+    openrouter_suggestion_model: str = "google/gemini-2.0-flash-lite"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # OCR engine label (informational — actual engine is the OpenRouter vision LLM)

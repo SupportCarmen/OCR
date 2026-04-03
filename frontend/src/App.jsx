@@ -128,14 +128,25 @@ export default function App() {
     })
     setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
 
-    if (ext.bank_companyname || ext.back_tax_id || ext.bank_address) {
+    if (ext.bank_companyname || ext.bank_tax_id || ext.bank_address || ext.branch_no) {
       try {
         const existing = JSON.parse(localStorage.getItem('accountingConfig') || '{}')
         existing.company = {
           ...existing.company,
           ...(ext.bank_companyname && { name: ext.bank_companyname }),
-          ...(ext.back_tax_id      && { taxId: ext.back_tax_id }),
+          ...((ext.bank_tax_id || ext.back_tax_id) && { taxId: ext.bank_tax_id || ext.back_tax_id }),
           ...(ext.bank_address     && { address: ext.bank_address }),
+          ...(ext.branch_no        && { branch: ext.branch_no }),
+        }
+        // Sync bank into accountingConfig so Mapping.jsx always reads the correct bank
+        const detectedBankCode = detectBankFromCompanyName(ext.bank_companyname)
+        const BANK_CODE_TO_NAME = {
+          BBL: 'Bangkok Bank (BBL)',
+          KBANK: 'Kasikornbank (KBANK)',
+          SCB: 'Siam Commercial Bank (SCB)',
+        }
+        if (detectedBankCode && BANK_CODE_TO_NAME[detectedBankCode]) {
+          existing.bank = BANK_CODE_TO_NAME[detectedBankCode]
         }
         localStorage.setItem('accountingConfig', JSON.stringify(existing))
       } catch (e) {}

@@ -12,8 +12,8 @@ from typing import Optional, List
 from enum import Enum
 import uuid
 
-from pydantic import BaseModel, Field
-from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, Numeric
+from pydantic import BaseModel, Field, AliasChoices
+from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -82,8 +82,9 @@ class Receipt(Base):
     wht_amount = Column(Numeric(15, 2), nullable=True)
     net_amount = Column(Numeric(15, 2), nullable=True)
     bank_companyname = Column(String(255), nullable=True)   # bank's own legal company name
-    back_tax_id = Column(String(50), nullable=True)         # bank's own tax ID
+    bank_tax_id = Column(String(50), nullable=True)         # bank's own tax ID
     bank_address = Column(Text, nullable=True)              # bank's own address
+    branch_no = Column(String(50), nullable=True)           # bank's own branch number
 
     # Submission tracking
     submitted_at = Column(DateTime, nullable=True)        # NULL = not yet submitted
@@ -108,6 +109,21 @@ class ReceiptDetail(Base):
     total = Column(Numeric(15, 2), nullable=True)
 
     receipt = relationship("Receipt", back_populates="details")
+
+
+class MappingHistory(Base):
+    """Confirmed account mapping history — one row per (bank_name, field_type)."""
+    __tablename__ = "mapping_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bank_name = Column(String(100), nullable=False, index=True)
+    field_type = Column(String(100), nullable=False)   # 'commission' | 'tax' | 'net' | payment type
+    dept_code = Column(String(100), nullable=True)
+    acc_code = Column(String(100), nullable=True)
+    confirmed_count = Column(Integer, default=1)
+    updated_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("bank_name", "field_type", name="uq_mapping_bank_field"),)
 
 
 # ═══════════════════════════════════════════════════
@@ -144,7 +160,7 @@ class ReceiptSchema(BaseModel):
     wht_amount: Optional[float] = None
     net_amount: Optional[float] = None
     bank_companyname: Optional[str] = None
-    back_tax_id: Optional[str] = None
+    bank_tax_id: Optional[str] = None
     bank_address: Optional[str] = None
     submitted_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -204,6 +220,7 @@ class ExtractedReceiptData(BaseModel):
     wht_amount: Optional[str] = Field(None, description="ภาษีหัก ณ ที่จ่าย รวมทั้งเอกสาร (บาท)")
     net_amount: Optional[str] = Field(None, description="ยอดเงินสุทธิรวมทั้งเอกสาร (NET AMOUNT) หลังหัก WHT")
     bank_companyname: Optional[str] = Field(None, description="ชื่อนิติบุคคลของธนาคาร (เช่น ธนาคารกรุงเทพ จำกัด (มหาชน))")
-    back_tax_id: Optional[str] = Field(None, description="เลขประจำตัวผู้เสียภาษีของธนาคาร")
+    bank_tax_id: Optional[str] = Field(None, description="เลขประจำตัวผู้เสียภาษีของธนาคาร", validation_alias=AliasChoices("bank_tax_id", "back_tax_id"))
     bank_address: Optional[str] = Field(None, description="ที่อยู่ของธนาคาร (ที่อยู่สำนักงานใหญ่ที่พิมพ์บนเอกสาร)")
+    branch_no: Optional[str] = Field(None, description="รหัสสาขาของธนาคาร (ถ้ามี)")
     details: List[ExtractedDetailRow] = Field(default_factory=list, description="รายการ card/payment type rows")

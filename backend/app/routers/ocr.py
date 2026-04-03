@@ -356,9 +356,10 @@ async def debug_last_llm_response():
 @router.get("/health")
 async def health_check():
     return {
-        "status": "healthy",
+        "health": "healthy",
         "ocr_engine": settings.ocr_engine,
-        "openrouter_model": settings.openrouter_model,
+        "openrouter_ocr_model": settings.openrouter_ocr_model,
+        "openrouter_suggestion_model": settings.openrouter_suggestion_model,
         "openrouter_configured": bool(settings.openrouter_api_key),
         "timestamp": datetime.utcnow().isoformat(),
     }

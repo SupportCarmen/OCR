@@ -43,13 +43,31 @@ _NEW_RECEIPT_COLUMNS = [
 ]
 
 async def migrate_db():
-    """Add new columns to existing receipts table (safe, idempotent)."""
+    """Add new columns to existing tables (safe, idempotent)."""
     async with engine.begin() as conn:
+        # receipts table columns
         for col, col_type in _NEW_RECEIPT_COLUMNS:
             try:
                 await conn.execute(text(f"ALTER TABLE receipts ADD COLUMN {col} {col_type}"))
             except Exception:
                 pass  # Column already exists — skip
+
+        # mapping_history table
+        try:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS mapping_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bank_name VARCHAR(100) NOT NULL,
+                    field_type VARCHAR(100) NOT NULL,
+                    dept_code VARCHAR(100),
+                    acc_code VARCHAR(100),
+                    confirmed_count INTEGER DEFAULT 1,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(bank_name, field_type)
+                )
+            """))
+        except Exception:
+            pass
 
 
 async def get_db() -> AsyncSession:

@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.database import init_db, migrate_db
 from app.routers.ocr import router as ocr_router
+from app.routers.mapping import router as mapping_router
 
 
 # ── Logging Setup ──
@@ -34,7 +35,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     logger.info("🚀 Starting AI OCR Bank Receipt Backend...")
-    logger.info(f"   OCR Engine : {settings.ocr_engine} ({settings.openrouter_model})")
+    logger.info(f"   OCR Model  : {settings.openrouter_ocr_model}")
+    logger.info(f"   Sugg Model : {settings.openrouter_suggestion_model}")
     logger.info(f"   OpenRouter : {'✅ Configured' if settings.openrouter_api_key else '❌ Not set'}")
     logger.info(f"   Upload Dir : {settings.upload_dir}")
     logger.info(f"   Database   : {settings.database_url}")
@@ -49,6 +51,7 @@ async def lifespan(app: FastAPI):
 
 
 # ── FastAPI App ──
+# Backend Version: 1.0.4 - Mapping Fix Debug V4
 app = FastAPI(
     title="AI OCR Bank Receipt Backend",
     description=(
@@ -87,6 +90,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 # ── Register Routers ──
 app.include_router(ocr_router)
+app.include_router(mapping_router)
 
 
 # ── Root endpoint ──

@@ -63,8 +63,9 @@ async def test_file(filepath: str, bank_type: str = None):
         "net_amount":       extracted.net_amount,
         # --- NEW: bank's own info ---
         "bank_companyname": extracted.bank_companyname,
-        "back_tax_id":      extracted.back_tax_id,
+        "bank_tax_id":      extracted.bank_tax_id,
         "bank_address":     extracted.bank_address,
+        "branch_no":        extracted.branch_no,
         # Detail rows
         "details": [d.model_dump() for d in extracted.details],
     }

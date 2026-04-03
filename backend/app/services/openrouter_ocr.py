@@ -50,11 +50,12 @@ Header fields to extract:
 - bank_companyname : ชื่อนิติบุคคลของธนาคาร (ผู้ออกเอกสาร) ที่พิมพ์บนเอกสาร เช่น
                      "ธนาคารกรุงเทพ จำกัด (มหาชน)" / "บมจ. ธนาคารกสิกรไทย" / "ธนาคารไทยพาณิชย์ จํากัด (มหาชน)"
                      ให้ดึงจากหัวเอกสารหรือส่วน header ของธนาคาร ไม่ใช่ชื่อร้านค้า
-- back_tax_id      : เลขประจำตัวผู้เสียภาษีของ**ธนาคาร** (ผู้ออกเอกสาร) ตัวเลขล้วน เช่น "0107536000374"
+- bank_tax_id      : เลขประจำตัวผู้เสียภาษีของ**ธนาคาร** (ผู้ออกเอกสาร) ตัวเลขล้วน เช่น "0107536000374"
                      ไม่ใช่ Tax ID ของร้านค้า — ให้ดูในส่วน header หรือ footer ของธนาคาร
 - bank_address     : ที่อยู่ของ**ธนาคาร** ที่พิมพ์บนเอกสาร (สำนักงานใหญ่) เช่น
                      "333 ถนนสีลม เขตบางรัก กรุงเทพฯ 10500"
                      ให้ดึงจาก header/footer ของธนาคาร ไม่ใช่ที่อยู่ร้านค้า
+- branch_no        : รหัสสาขาของธนาคาร (ถ้ามีระบุในเอกสาร)
 - bank_name        : ชื่อธนาคารภาษาไทยเต็มๆ เท่านั้น — ใช้ค่าที่กำหนดตายตัวตามธนาคาร:
                      SCB   → "ธนาคารไทยพาณิชย์"
                      BBL   → "ธนาคารกรุงเทพ"
@@ -87,8 +88,9 @@ Detail row fields (one object per card/payment type row):
 Example — document with 2 payment rows:
 {
   "bank_companyname": "ธนาคารกรุงเทพ จำกัด (มหาชน)",
-  "back_tax_id":      "0107536000374",
+  "bank_tax_id":      "0107536000374",
   "bank_address":     "333 ถนนสีลม เขตบางรัก กรุงเทพฯ 10500",
+  "branch_no":        "0000",
   "bank_name":       "ธนาคารกรุงเทพ",
   "doc_name":        "ใบเสร็จรับเงิน/ใบกำกับภาษี",
   "company_name":    "บริษัท COMPANY NAME จำกัด",
@@ -269,10 +271,10 @@ async def extract_from_image(
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{b64_image}"
 
-    logger.info(f"Calling OpenRouter model={settings.openrouter_model} bank={bank_type or 'generic'}")
+    logger.info(f"Calling OpenRouter model={settings.openrouter_ocr_model} bank={bank_type or 'generic'}")
 
     response = await client.chat.completions.create(
-        model=settings.openrouter_model,
+        model=settings.openrouter_ocr_model,
         messages=[
             {
                 "role": "system",
@@ -300,7 +302,14 @@ async def extract_from_image(
         max_tokens=8192,
     )
 
-    result_text = response.choices[0].message.content.strip()
+    raw_content = response.choices[0].message.content if (response.choices and response.choices[0].message) else None
+    if raw_content is None:
+        raise ValueError("LLM returned None content — model may have hit token limit or safety filter")
+    
+    result_text = raw_content.strip()
+    if not result_text:
+        raise ValueError("LLM returned empty string from vision model")
+
     logger.info(f"Raw LLM response:\n{result_text[:1000]}")
     print(f"\n{'='*60}\nRAW LLM RESPONSE:\n{result_text}\n{'='*60}\n", flush=True)
 
@@ -311,9 +320,11 @@ async def extract_from_image(
     # Strip markdown code fences if model wraps response
     if result_text.startswith("```"):
         lines = result_text.split("\n")
-        # Remove first line (```json or ```) and last line (```)
-        result_text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-        result_text = result_text.strip()
+        if len(lines) > 1:
+            last_line = lines[-1].strip()
+            # Remove first line (```json or ```) and last line (```)
+            result_text = "\n".join(lines[1:-1] if last_line == "```" else lines[1:])
+            result_text = result_text.strip()
 
     data: dict = json.loads(result_text)
 

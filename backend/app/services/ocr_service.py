@@ -118,8 +118,9 @@ async def process_single_file(
             wht_amount=_parse_amount(extracted.wht_amount),
             net_amount=_parse_amount(extracted.net_amount),
             bank_companyname=extracted.bank_companyname,
-            back_tax_id=extracted.back_tax_id,
+            bank_tax_id=extracted.bank_tax_id,
             bank_address=extracted.bank_address,
+            branch_no=extracted.branch_no,
         )
         db.add(receipt)
         await db.flush()
