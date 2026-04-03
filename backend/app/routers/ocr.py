@@ -9,11 +9,12 @@ from decimal import Decimal
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 import httpx
+import uuid
 
 from app.database import get_db
 from app.config import settings
@@ -32,35 +33,38 @@ from app.utils.image_processing import is_valid_image
 
 # ── Pydantic schemas for submit endpoint ────────────
 class SubmitDetailItem(BaseModel):
-    Transaction: Optional[str] = None
-    PayAmt: Optional[float] = 0
-    CommisAmt: Optional[float] = 0
-    TaxAmt: Optional[float] = 0
-    WHTAmount: Optional[float] = 0
-    Total: Optional[float] = 0
+    model_config = ConfigDict(extra='ignore', populate_by_name=True)
+    Transaction: Optional[str] = Field(None, alias="transaction")
+    PayAmt:      Optional[float] = Field(0,    alias="pay_amt")
+    CommisAmt:   Optional[float] = Field(0,    alias="commis_amt")
+    TaxAmt:      Optional[float] = Field(0,    alias="tax_amt")
+    WHTAmount:   Optional[float] = Field(0,    alias="wht_amount")
+    Total:       Optional[float] = Field(0,    alias="total")
 
 class SubmitHeader(BaseModel):
-    DateProcessed: Optional[str] = None
-    BankName: Optional[str] = None
-    DocName: Optional[str] = None
-    CompanyName: Optional[str] = None
-    CompanyTaxId: Optional[str] = None
-    CompanyAddress: Optional[str] = None
-    AccountNo: Optional[str] = None
-    DocDate: Optional[str] = None
-    DocNo: Optional[str] = None
-    MerchantName: Optional[str] = None
-    MerchantId: Optional[str] = None
-    WhtRate: Optional[str] = None
-    WhtAmount: Optional[float] = None
-    NetAmount: Optional[float] = None
+    model_config = ConfigDict(extra='ignore', populate_by_name=True)
+    DateProcessed:  Optional[str] = Field(None, alias="date_processed")
+    BankName:       Optional[str] = Field(None, alias="bank_name")
+    DocName:        Optional[str] = Field(None, alias="doc_name")
+    CompanyName:    Optional[str] = Field(None, alias="company_name")
+    CompanyTaxId:   Optional[str] = Field(None, alias="company_tax_id")
+    CompanyAddress: Optional[str] = Field(None, alias="company_address")
+    AccountNo:      Optional[str] = Field(None, alias="account_no")
+    DocDate:        Optional[str] = Field(None, alias="doc_date")
+    DocNo:          Optional[str] = Field(None, alias="doc_no")
+    MerchantName:   Optional[str] = Field(None, alias="merchant_name")
+    MerchantId:     Optional[str] = Field(None, alias="merchant_id")
+    WhtRate:        Optional[str] = Field(None, alias="wht_rate")
+    WhtAmount:      Optional[float] = Field(None, alias="wht_amount")
+    NetAmount:      Optional[float] = Field(None, alias="net_amount")
 
 class SubmitPayload(BaseModel):
-    BankType: Optional[str] = None
-    Overwrite: bool = False
-    OriginalFilename: Optional[str] = None
-    Header: SubmitHeader
-    Details: List[SubmitDetailItem] = []
+    model_config = ConfigDict(extra='ignore', populate_by_name=True)
+    BankType:         Optional[str] = Field(None, alias="bank_type")
+    Overwrite:        bool = False
+    OriginalFilename: Optional[str] = Field(None, alias="original_filename")
+    Header:           SubmitHeader
+    Details:          List[SubmitDetailItem] = []
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/ocr", tags=["OCR"])
@@ -276,10 +280,11 @@ async def submit_receipt_stateless(
     await db.flush()
 
     # 3. Create Receipt (Header)
+    bt = str(payload.BankType or "").upper()
     receipt = Receipt(
         task_id=task.id,
         bank_name=payload.Header.BankName,
-        bank_type=payload.BankType if payload.BankType in ("BBL", "KBANK", "SCB") else None,
+        bank_type=bt if bt in ("BBL", "KBANK", "SCB") else None,
         doc_name=payload.Header.DocName,
         company_name=payload.Header.CompanyName,
         company_tax_id=payload.Header.CompanyTaxId,

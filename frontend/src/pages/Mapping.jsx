@@ -182,6 +182,7 @@ export default function Mapping() {
   const [newCustomType, setNewCustomType] = useState('');
 
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
+  const [activeScan, setActiveScan] = useState({ paymentTypes: new Set(), commission: false, tax: false, net: false });
   const [modalConfig, setModalConfig] = useState({ show: false, title: '', message: '', type: 'info' });
 
   // AI / History suggestion state
@@ -238,7 +239,7 @@ export default function Mapping() {
       console.log(`[Mapping] Fetching AI suggestions for: ${stillNeedsAI.join(', ')}`);
       const aiResult = await suggestMapping({
         bank_name: bankName,
-        accounts: accounts.map(a => ({ code: a.code, name: a.name })),
+        accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.nature })),
         departments: departments.map(d => ({ code: d.code, name: d.name })),
       });
 
@@ -295,7 +296,7 @@ export default function Mapping() {
         const result = await suggestPaymentTypes({
           bank_name: bankName,
           payment_types: needsAI,
-          accounts: accounts.map(a => ({ code: a.code, name: a.name })),
+          accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.nature })),
           departments: departments.map(d => ({ code: d.code, name: d.name })),
         });
         Object.entries(result.suggestions || {}).forEach(([t, val]) => {
@@ -354,6 +355,21 @@ export default function Mapping() {
     try {
       const ocrState = JSON.parse(localStorage.getItem('ocr_wizard_state') || '{}');
       ocrBank = OCR_BANK_MAP[ocrState.bank] || '';
+
+      // Update active scan info — Identify what's in the current document
+      if (ocrState.details && Array.isArray(ocrState.details)) {
+        const types = new Set();
+        let comm = false, tx = false, n = false;
+        const toNum = (v) => parseFloat(String(v ?? '').replace(/,/g, '')) || 0;
+        
+        ocrState.details.forEach(d => {
+          if (d.Transaction) types.add(d.Transaction);
+          if (toNum(d.CommisAmt) > 0) comm = true;
+          if (toNum(d.TaxAmt) > 0) tx = true;
+          if (toNum(d.Total) > 0) n = true;
+        });
+        setActiveScan({ paymentTypes: types, commission: comm, tax: tx, net: n });
+      }
 
       // Company info written by App.jsx applyExtractedData (bank_companyname, bank_tax_id, bank_address, branch_no)
       const ocrConfig = JSON.parse(localStorage.getItem('accountingConfig') || '{}');
@@ -520,6 +536,7 @@ export default function Mapping() {
   };
 
   const allPaymentTypes = [...PAYMENT_TYPES, ...customPaymentTypes];
+  const requiredMissingCount = [...activeScan.paymentTypes].filter(t => !paymentAmount[t]?.dept || !paymentAmount[t]?.acc).length;
   const amountMappedCount = allPaymentTypes.filter(t => paymentAmount[t]?.dept && paymentAmount[t]?.acc).length;
 
   return (
@@ -606,12 +623,28 @@ export default function Mapping() {
             {/* Amount */}
             <div className="mapping-type type-debit" style={{ color: 'var(--blue)', background: 'var(--blue-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Debit</div>
             <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--blue)', textDecoration: 'underline' }} onClick={() => { setIsAmountModalOpen(true); autoSuggestPaymentTypes(bank, masterAccounts, masterDepartments); }}>Amount (Click to Map)</div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <div id="amountMappingStatus" style={{ fontSize: '0.85rem', padding: '0.7rem 1rem', borderRadius: '4px', border: '1px dashed var(--gray-300)', color: amountMappedCount > 0 ? 'var(--teal)' : 'var(--gray-500)', background: amountMappedCount > 0 ? 'var(--teal-light)' : 'var(--gray-50)', borderColor: amountMappedCount > 0 ? 'var(--teal)' : 'var(--gray-300)' }}>
-                {amountMappedCount > 0
-                  ? <><i className="fas fa-check-circle"></i> ตั้งค่าแล้ว {amountMappedCount}/{allPaymentTypes.length} รายการ</>
-                  : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Amount เพื่อตั้งค่าแยกตาม Payment Type</>
-                }
+             <div style={{ gridColumn: 'span 2' }}>
+              <div id="amountMappingStatus" style={{
+                fontSize: '0.85rem',
+                padding: '0.7rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: requiredMissingCount > 0 ? '#dc2626' : 'var(--teal)',
+                background: requiredMissingCount > 0 ? '#fff1f2' : 'var(--teal-light)',
+                borderColor: requiredMissingCount > 0 ? '#fca5a5' : 'var(--teal)'
+              }}>
+                <div>
+                  {requiredMissingCount > 0
+                    ? <><i className="fas fa-exclamation-triangle" style={{ color: '#dc2626' }}></i> <strong>พบ {activeScan.paymentTypes.size} รายการในเอกสาร</strong> (ค้าง Mapping <strong>{requiredMissingCount}</strong> รายการ)</>
+                    : amountMappedCount > 0
+                      ? <><i className="fas fa-check-circle"></i> ตั้งค่าแล้ว {amountMappedCount}/{allPaymentTypes.length} รายการ (เรียบร้อย)</>
+                      : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Amount เพื่อตั้งค่าแยกตาม Payment Type</>
+                  }
+                </div>
+                {requiredMissingCount > 0 && <span style={{ fontSize: '0.75rem', background: '#dc2626', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>Required for this scan</span>}
               </div>
             </div>
 
@@ -650,8 +683,13 @@ export default function Mapping() {
               return (
                 <React.Fragment key={key}>
                   <div className="mapping-type type-credit" style={natureStyle}>Credit</div>
-                  <div className="mapping-label" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                   <div className="mapping-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span>{labelMap[key]}</span>
+                    {activeScan[key] && (!mappings[key].dept || !mappings[key].acc) && (
+                      <span title="จำเป็นสำหรับเอกสารชุดนี้" style={{ color: '#ef4444', fontSize: '0.8rem', background: '#fff1f2', padding: '1px 5px', borderRadius: '4px', border: '1px solid #fecaca', fontWeight: 'bold' }}>
+                        <i className="fas fa-exclamation-circle"></i> MISSING
+                      </span>
+                    )}
                   </div>
                   <div>
                     <CustomSearchSelect
@@ -709,13 +747,25 @@ export default function Mapping() {
         <div className="mapping-modal" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setIsAmountModalOpen(false)}>
           <div className="mapping-modal-overlay" style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}></div>
           <div className="mapping-modal-content" style={{ position: 'relative', zIndex: 1, backgroundColor: '#fff', width: '90%', maxWidth: '800px', borderRadius: '8px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
-            <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>เลือก Payment Types สำหรับ Amount</span>
-              {paymentSuggestLoading && (
-                <span style={{ fontSize: '0.8rem', color: 'var(--blue)', fontWeight: 400, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <i className="fas fa-spinner fa-spin"></i> AI กำลังแนะนำ...
+             <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <span>เลือก Payment Types สำหรับ Amount</span>
+                {activeScan.paymentTypes.size > 0 && (
+                  <span style={{ fontSize: '0.8rem', color: '#dc2626', background: '#fff', padding: '4px 12px', borderRadius: '20px', border: '1px solid #fca5a5', fontWeight: 700 }}>
+                    <i className="fas fa-file-invoice"></i> เอกสารชุดนี้ต้องมี: {activeScan.paymentTypes.size} รายการ
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {paymentSuggestLoading && (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--blue)', fontWeight: 400, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <i className="fas fa-spinner fa-spin"></i> AI กำลังแนะนำ...
+                  </span>
+                )}
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-3)', fontWeight: 500 }}>
+                  ({amountMappedCount}/{allPaymentTypes.length} mapped)
                 </span>
-              )}
+              </div>
             </div>
             <div className="mapping-modal-body" style={{ padding: '1rem', overflowY: 'auto' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr', gap: '1rem', fontWeight: 'bold', marginBottom: '1rem', paddingRight: '0.5rem' }}>
@@ -723,10 +773,51 @@ export default function Mapping() {
                 <div>Department Code</div>
                 <div>Account Code</div>
               </div>
-              {allPaymentTypes.map(type => {
+               {/* ── Required for Scan ── */}
+              {activeScan.paymentTypes.size > 0 && (
+                <>
+                  <div style={{ padding: '0.5rem', background: '#fef2f2', color: '#991b1b', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', marginBottom: '0.75rem', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <i className="fas fa-exclamation-circle"></i> รายการที่พบในเอกสารปัจจุบัน (Required for this scan)
+                  </div>
+                  {[...activeScan.paymentTypes].map(type => {
+                    const pAmt = paymentAmount[type] || { dept: '', acc: '' };
+                    const isCustom = !PAYMENT_TYPES.includes(type);
+                    const suggestion = paymentSuggestions[type] || null;
+                    const isPending = !pAmt.dept || !pAmt.acc;
+
+                    // Resolve option objects for topChoice
+                    const deptFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
+                    const deptTopChoice = suggestion?.dept ? { code: suggestion.dept, name: deptFromMaster?.name || '(AI)', name2: deptFromMaster?.name2, source: suggestion.source } : null;
+                    const accFromMaster = suggestion?.acc ? masterAccounts.find(a => a.code === suggestion.acc) : null;
+                    const accTopChoice = suggestion?.acc ? { code: suggestion.acc, name: accFromMaster?.name || '(AI)', name2: accFromMaster?.name2, source: suggestion.source } : null;
+
+                    return (
+                      <div key={`req-${type}`} style={{
+                        display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr', gap: '1rem', marginBottom: '0.5rem', alignItems: 'center', padding: '0.4rem', borderRadius: '8px', 
+                        background: isPending ? '#fff1f2' : '#f0fdf4', border: `1px solid ${isPending ? '#fecaca' : '#bbf7d0'}`
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <div style={{ background: isPending ? '#dc2626' : '#16a34a', color: '#fff', padding: '0.4rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', flex: 1 }}>{type}</div>
+                          {isPending && <i className="fas fa-exclamation-triangle" style={{ color: '#dc2626' }} title="MISSING MAPPING"></i>}
+                        </div>
+                        <CustomSearchSelect value={pAmt.dept} onChange={(val) => handlePaymentMappingChange(type, 'dept', val)} options={masterDepartments} placeholder="Dept..." topChoice={deptTopChoice} />
+                        <CustomSearchSelect value={pAmt.acc} onChange={(val) => handlePaymentMappingChange(type, 'acc', val)} options={masterAccounts} placeholder="Acc..." topChoice={accTopChoice} />
+                      </div>
+                    );
+                  })}
+                  <div style={{ margin: '1.5rem 0 1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-400)' }}>
+                    ตัวเลือกอื่นๆ ทั้งหมด (All other types)
+                  </div>
+                </>
+              )}
+
+              {allPaymentTypes
+                .filter(t => !activeScan.paymentTypes.has(t))
+                .map(type => {
                 const pAmt = paymentAmount[type] || { dept: '', acc: '' };
                 const isCustom = !PAYMENT_TYPES.includes(type);
                 const suggestion = paymentSuggestions[type] || null;
+                const isPending = !pAmt.dept || !pAmt.acc;
 
                 // Resolve robust option objects for topChoice (even if not in master)
                 const deptFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
@@ -750,9 +841,34 @@ export default function Mapping() {
                   : null;
 
                 return (
-                  <div key={type} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr', gap: '1rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                  <div key={type} style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr',
+                    gap: '1rem',
+                    marginBottom: '0.5rem',
+                    alignItems: 'center',
+                    padding: '0.4rem',
+                    borderRadius: '8px',
+                    background: 'transparent',
+                    border: '1px solid transparent',
+                    transition: 'all 0.2s'
+                  }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <div style={{ background: isCustom ? '#f0fdf4' : 'var(--blue-light)', color: isCustom ? '#16a34a' : 'var(--blue)', padding: '0.4rem 0.5rem', borderRadius: '4px', border: `1px solid ${isCustom ? '#86efac' : 'var(--blue-mid)'}`, fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', flex: 1 }}>
+                      <div style={{
+                        background: isCustom ? '#f0fdf4' : 'var(--blue-light)',
+                        color: isCustom ? '#16a34a' : 'var(--blue)',
+                        padding: '0.4rem 0.5rem',
+                        borderRadius: '4px',
+                        border: `1px solid ${isCustom ? '#86efac' : 'var(--blue-mid)'}`,
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}>
                         {type}
                       </div>
                       {isCustom && (

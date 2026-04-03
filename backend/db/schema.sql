@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS receipts (
     wht_rate        VARCHAR(20)     NULL        COMMENT 'อัตราภาษีหัก ณ ที่จ่าย เช่น 3.00',
     wht_amount      DECIMAL(15,2)   NULL        COMMENT 'ภาษีหัก ณ ที่จ่าย รวมทั้งเอกสาร (บาท)',
     net_amount      DECIMAL(15,2)   NULL        COMMENT 'ยอดเงินสุทธิรวมทั้งเอกสาร หลังหัก WHT',
+    bank_companyname VARCHAR(255)   NULL        COMMENT 'ชื่อนิติบุคคลของธนาคาร',
+    bank_tax_id     VARCHAR(50)     NULL        COMMENT 'เลขประจำตัวผู้เสียภาษีธนาคาร',
+    bank_address    TEXT            NULL        COMMENT 'ที่อยู่ธนาคาร',
+    branch_no       VARCHAR(50)     NULL        COMMENT 'รหัสสาขาธนาคาร',
 
     -- Submission tracking
     submitted_at    DATETIME        NULL        COMMENT 'NULL = not yet submitted',
@@ -91,4 +95,23 @@ CREATE TABLE IF NOT EXISTS receipt_details (
         FOREIGN KEY (receipt_id) REFERENCES receipts(id)
         ON DELETE CASCADE,
     INDEX idx_receipt_details_receipt_id (receipt_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- mapping_history — account mapping history (bank_name, field_type)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS mapping_history (
+    id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    bank_name       VARCHAR(100)    NOT NULL,
+    field_type      VARCHAR(100)    NOT NULL,
+    dept_code       VARCHAR(100)    NULL,
+    acc_code        VARCHAR(100)    NULL,
+    confirmed_count INT UNSIGNED    DEFAULT 1,
+    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_mapping_bank_field (bank_name, field_type),
+    INDEX idx_mapping_history_bank (bank_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

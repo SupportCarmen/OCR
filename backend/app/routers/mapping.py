@@ -31,6 +31,7 @@ router = APIRouter(prefix="/api/v1/mapping", tags=["Mapping"])
 class CodeOption(BaseModel):
     code: str
     name: str
+    type: Optional[str] = None
 
 
 class SuggestRequest(BaseModel):
@@ -95,26 +96,31 @@ async def suggest_mapping(req: SuggestRequest):
 
         logger.info(f"--- [DEBUG] Entering suggest_mapping for {req.bank_name} ---")
         
-        dept_lines = "\n".join(f"  {d.code} — {d.name}" for d in req.departments[:80])
-        acc_lines  = "\n".join(f"  {a.code} — {a.name}" for a in req.accounts[:200])
+        dept_lines = "\n".join(f"  {d.code} — {d.name}" for d in req.departments[:100])
+        acc_lines  = "\n".join(f"  {a.code} — {a.name}" for a in req.accounts[:800])
         types_list = "\n".join(f"  - {t}" for t in FIXED_SUGGEST_TYPES)
 
-        prompt = f"""You are an accounting assistant for a Thai company receiving credit card settlement reports from {req.bank_name}.
+        prompt = f"""You are an expert accounting assistant for a Thai company. You are mapping bank transaction fields to internal Account Codes (Master Chart of Accounts).
 
-Suggest the best Department Code and Account Code for each accounting field below:
+Suggest the best Department Code and Account Code for each field from {req.bank_name}.
 
 Fields to suggest:
 {types_list}
 
-Field descriptions:
-- "Commission" — Commission/fee charged by the bank (ค่าธรรมเนียมธนาคาร). Typically an EXPENSE account.
-- "Tax Amount" — VAT on the commission fee (ภาษีมูลค่าเพิ่มบนค่าธรรมเนียม). Typically a TAX EXPENSE or VAT account.
-- "Net Amount" — Net amount received from bank after deducting commission (ยอดรับสุทธิจากธนาคาร). Typically an ASSET or RECEIVABLE account.
+Matching Rules (IMPORTANT):
+1. **Commission** (ค่าธรรมเนียม): 
+   - Search for names containing: "credit card commission", "commission credit card", "เครดิตการ์ดคอมมิชชั่น", "ค่าคอมมิชชั่นเครดิตการ์ด", "Bank Charge", "ค่าธรรมเนียมธนาคาร".
 
-Available Department Codes (choose from this list only):
+2. **Tax Amount** (ภาษีบนค่าธรรมเนียม): 
+   - Search for names containing: "output tax undue", "ภาษีขายรอตัด", "ภาษีขายยังไม่ถึงกำหนด", "output vat undue", "sale tax undue".
+
+3. **Net Amount** (ยอดรับสุทธิ): 
+   - Search for names containing: "C/A", "S/A", "Bank", "ธนาคาร", "กระแสรายวัน", "ออมทรัพย์".
+
+Available Department Codes:
 {dept_lines if dept_lines else "  (none available)"}
 
-Available Account Codes (choose from this list only):
+Available Account Codes (Search through all {len(req.accounts)} codes below):
 {acc_lines if acc_lines else "  (none available)"}
 
 Return ONLY a valid JSON object — no markdown, no explanation:

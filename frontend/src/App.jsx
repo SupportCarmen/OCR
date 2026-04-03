@@ -260,15 +260,29 @@ export default function App() {
       BankType: bank,
       Overwrite: overwrite,
       OriginalFilename: files[0]?.name,
-      ImportDate: new Date().toISOString().split('T')[0],
-      Header: { ...headerData, ...receiptMeta },
+      Header: {
+        DateProcessed: headerData.DateProcessed || '',
+        BankName: headerData.BankName || '',
+        DocName: headerData.DocName || '',
+        CompanyName: headerData.CompanyName || '',
+        CompanyTaxId: receiptMeta.CompanyTaxId || '',
+        CompanyAddress: receiptMeta.CompanyAddress || '',
+        AccountNo: receiptMeta.AccountNo || '',
+        DocDate: headerData.DocDate || '',
+        DocNo: headerData.DocNo || '',
+        MerchantName: headerData.MerchantName || '',
+        MerchantId: headerData.MerchantId || '',
+        WhtRate: receiptMeta.WhtRate || '',
+        WhtAmount: receiptMeta.WhtAmount || null,
+        NetAmount: receiptMeta.NetAmount || null,
+      },
       Details: details.map(row => ({
-        ...row,
-        PayAmt: parseFloat(String(row.PayAmt).replace(/,/g, '')) || 0,
-        CommisAmt: parseFloat(String(row.CommisAmt).replace(/,/g, '')) || 0,
-        TaxAmt: parseFloat(String(row.TaxAmt).replace(/,/g, '')) || 0,
-        Total: parseFloat(String(row.Total).replace(/,/g, '')) || 0,
-        TerminalID: row.TerminalID || ''
+        Transaction: row.Transaction || row.transaction || '',
+        PayAmt:      parseFloat(String(row.PayAmt || row.pay_amt || 0).replace(/,/g, '')) || 0,
+        CommisAmt:   parseFloat(String(row.CommisAmt || row.commis_amt || 0).replace(/,/g, '')) || 0,
+        TaxAmt:      parseFloat(String(row.TaxAmt || row.tax_amt || 0).replace(/,/g, '')) || 0,
+        Total:       parseFloat(String(row.Total || row.total || 0).replace(/,/g, '')) || 0,
+        WHTAmount:   parseFloat(String(row.WHTAmount || row.wht_amount || 0).replace(/,/g, '')) || 0,
       })),
     }
     try {
@@ -276,7 +290,16 @@ export default function App() {
       await submitToLocal(payload)
       submittedDocNos.current.add(docNo)
       showToast('อัปโหลดข้อมูลสำเร็จ', 'success')
-      setStep(5)
+      showModal({
+        title: 'บันทึกสำเร็จ!',
+        message: `เอกสารหมายเลข ${docNo} ได้ถูกบันทึกลงฐานข้อมูลเรียบร้อยแล้ว`,
+        type: 'success',
+        confirmText: 'ดูรายการรายวัน (JV)',
+        onConfirm: () => {
+          closeModal()
+          setStep(5)
+        }
+      })
     } catch (err) {
       if (err.code === 'DUPLICATE_DOC_NO') {
         showModal({
