@@ -1,6 +1,6 @@
 const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'
 
-export default function JournalVoucher({ jvRows, headerData, onFinish, onBack }) {
+export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSource, onFinish, onBack }) {
   const totalDr = jvRows.reduce((s, r) => s + r.debit,  0)
   const totalCr = jvRows.reduce((s, r) => s + r.credit, 0)
 
@@ -23,7 +23,7 @@ export default function JournalVoucher({ jvRows, headerData, onFinish, onBack })
           <div className="jv-meta-grid">
             <div className="jv-meta-item">
               <div className="jv-meta-label">Prefix</div>
-              <div className="jv-meta-value">TX</div>
+              <div className="jv-meta-value">{filePrefix || '—'}</div>
             </div>
             <div className="jv-meta-item">
               <div className="jv-meta-label">Voucher No.</div>
@@ -35,7 +35,7 @@ export default function JournalVoucher({ jvRows, headerData, onFinish, onBack })
             </div>
             <div className="jv-meta-item">
               <div className="jv-meta-label">Source</div>
-              <div className="jv-meta-value" style={{ color: 'var(--success)' }}>TaxR</div>
+              <div className="jv-meta-value" style={{ color: 'var(--success)' }}>{fileSource || '—'}</div>
             </div>
             <div className="jv-meta-item" style={{ gridColumn: 'span 4' }}>
               <div className="jv-meta-label">Description</div>

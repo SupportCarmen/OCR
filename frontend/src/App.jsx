@@ -49,6 +49,8 @@ export default function App() {
   const [jvRows, setJvRows] = useState([])
   const [modal, setModal] = useState({ show: false })
   const [toasts, setToasts] = useState([])
+  const [filePrefix, setFilePrefix] = useState('')
+  const [fileSource, setFileSource] = useState('')
 
   const fileInputRef = useRef(null)
   const submittedDocNos = useRef(new Set())
@@ -69,6 +71,15 @@ export default function App() {
       if (previewUrl) URL.revokeObjectURL(previewUrl.split('#')[0])
     }
   }, [previewUrl])
+
+  // cc// โหลด filePrefix และ fileSource จาก localStorage (accountingConfig)
+  useEffect(() => {
+    try {
+      const config = JSON.parse(localStorage.getItem('accountingConfig') || '{}')
+      setFilePrefix(config.filePrefix || '')
+      setFileSource(config.fileSource || '')
+    } catch (e) {}
+  }, [])
 
   // cc// บันทึกสถานะล่าสุดลลง localStorage (Auto-Save)
   useEffect(() => {
@@ -454,6 +465,8 @@ export default function App() {
                 <JournalVoucher
                   jvRows={jvRows}
                   headerData={headerData}
+                  filePrefix={filePrefix}
+                  fileSource={fileSource}
                   onFinish={resetAll}
                   onBack={() => setStep(4)}
                 />
