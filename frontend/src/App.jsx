@@ -73,13 +73,14 @@ export default function App() {
   }, [previewUrl])
 
   // cc// โหลด filePrefix และ fileSource จาก localStorage (accountingConfig)
+  // Update whenever we move to step 5 (JournalVoucher) to get latest values from Mapping page
   useEffect(() => {
     try {
       const config = JSON.parse(localStorage.getItem('accountingConfig') || '{}')
       setFilePrefix(config.filePrefix || '')
       setFileSource(config.fileSource || '')
     } catch (e) {}
-  }, [])
+  }, [step])
 
   // cc// บันทึกสถานะล่าสุดลลง localStorage (Auto-Save)
   useEffect(() => {

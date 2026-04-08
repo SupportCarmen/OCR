@@ -16,6 +16,8 @@
 | 1.3 | 02 Apr 2026 | Intern Team | Separated Sequence Diagrams by individual API endpoints |
 | 1.4 | 02 Apr 2026 | Intern Team | Final Polish: Detailed API Specs, JSON Samples, and Non-Functional Requirements |
 | 1.5 | 08 Apr 2026 | Intern Team | Major update: AI Mapping Suggestion, 5-step wizard, Mapping Router, JournalVoucher, updated DB schema & env vars |
+| 1.6 | 08 Apr 2026 | Intern Team | Complete API inventory (add /export, /debug-llm, /health); detailed DB schema with all fields; environment variables section |
+| 1.7 | 08 Apr 2026 | Intern Team | Add GET /api/v1/ocr/carmen/gl-prefix endpoint for GL Prefix master data |
 
 ---
 
@@ -346,6 +348,26 @@ sequenceDiagram
 
 ---
 
+### 5.3a API 3a: Get GL Prefix from Carmen
+
+**วัตถุประสงค์**: ดึงข้อมูล GL Prefix (หลักเกณฑ์การตั้งชื่อบัญชี) จาก Carmen สำหรับสนับสนุน Account Code suggestion
+
+**Method**: GET | **Endpoint**: `/api/v1/ocr/carmen/gl-prefix`
+
+**JSON Response**:
+```json
+{
+  "status": "success",
+  "Data": [
+    { "GlPrefix": "1000", "Description": "ASSETS", "Description2": "สินทรัพย์" },
+    { "GlPrefix": "2000", "Description": "LIABILITIES", "Description2": "หนี้สิน" },
+    { "GlPrefix": "3000", "Description": "EQUITY", "Description2": "ทุน" }
+  ]
+}
+```
+
+---
+
 ### 5.4 API 4a: AI Suggest Mapping (3 Fixed Fields)
 
 **วัตถุประสงค์**: ให้ AI แนะนำรหัสบัญชีสำหรับ Commission, Tax Amount, Net Amount โดยอ้างอิงรายการบัญชีจาก Carmen
@@ -486,20 +508,267 @@ sequenceDiagram
 
 ---
 
+### 5.8 API 6: List OCR Tasks (Paginated)
+
+**วัตถุประสงค์**: ดึงรายการ OCR tasks ทั้งหมดพร้อมข้อมูล pagination
+
+**Method**: GET | **Endpoint**: `/api/v1/ocr/tasks`
+
+**Query Parameters**:
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `skip` | Integer | 0 | จำนวน records ที่ข้าม |
+| `limit` | Integer | 50 | จำนวน records ที่ต้องการ |
+
+**JSON Response**:
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "original_filename": "receipt_001.jpg",
+      "status": "completed",
+      "created_at": "2026-04-08T10:30:00Z"
+    }
+  ],
+  "total": 100,
+  "skip": 0,
+  "limit": 50
+}
+```
+
+---
+
+### 5.9 API 7: Get Single Task Detail
+
+**วัตถุประสงค์**: ดึงข้อมูลเอกสารแบบละเอียด (task + receipt + details)
+
+**Method**: GET | **Endpoint**: `/api/v1/ocr/tasks/{id}`
+
+**JSON Response**:
+```json
+{
+  "task_id": 42,
+  "original_filename": "receipt_001.jpg",
+  "status": "completed",
+  "receipt": {
+    "id": 42,
+    "bank_name": "SCB",
+    "bank_type": "SCB",
+    "doc_no": "SCB-2026-00123",
+    "doc_date": "2026-04-08",
+    "company_name": "บริษัท ตัวอย่าง จำกัด",
+    "company_tax_id": "0105555000001",
+    "merchant_name": "EXAMPLE CO LTD",
+    "merchant_id": "123456789",
+    "wht_rate": "1",
+    "wht_amount": "100.00",
+    "net_amount": "9900.00",
+    "submitted_at": "2026-04-08T10:30:00Z"
+  },
+  "details": [
+    { "id": 1, "transaction": "VISA", "pay_amt": "5000.00", "commis_amt": "75.00", "tax_amt": "5.25", "total": "4919.75" }
+  ]
+}
+```
+
+---
+
+### 5.10 API 8: Mark Receipt as Submitted
+
+**วัตถุประสงค์**: อัปเดตสถานะของใบเสร็จเป็น "submitted" (ใช้ callback หรือ manual mark)
+
+**Method**: PATCH | **Endpoint**: `/api/v1/ocr/receipts/{id}/submit`
+
+**JSON Response**:
+```json
+{
+  "ok": true,
+  "receipt_id": 42,
+  "submitted_at": "2026-04-08T10:35:00Z"
+}
+```
+
+---
+
+### 5.11 API 9: Export to CSV
+
+**วัตถุประสงค์**: ส่งออกข้อมูล receipts ทั้งหมด (submitted only) เป็นไฟล์ CSV
+
+**Method**: GET | **Endpoint**: `/api/v1/ocr/export`
+
+**Response**: Binary CSV file (content-type: `text/csv`)
+
+---
+
+### 5.12 API 10: Debug LLM Response
+
+**วัตถุประสงค์**: ดู raw JSON response จากครั้งสุดท้ายที่เรียก Vision LLM (สำหรับ troubleshooting)
+
+**Method**: GET | **Endpoint**: `/api/v1/ocr/debug-llm`
+
+**JSON Response**:
+```json
+{
+  "last_llm_response": {
+    "bank_name": "SCB",
+    "bank_companyname": "ธนาคารไทยพาณิชย์ จำกัด (มหาชน)",
+    "details": [...]
+  },
+  "timestamp": "2026-04-08T10:30:00Z"
+}
+```
+
+---
+
+### 5.13 API 11: Health Check
+
+**วัตถุประสงค์**: ตรวจสอบสถานะ API และฐานข้อมูล
+
+**Method**: GET | **Endpoint**: `/api/v1/ocr/health`
+
+**JSON Response (healthy)**:
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "timestamp": "2026-04-08T10:30:00Z"
+}
+```
+
+---
+
 ## 6. โครงสร้างฐานข้อมูล (Database Schema)
 
 ระบบใช้ **MySQL/MariaDB** ผ่าน `aiomysql` (async) โดยมี 4 ตาราง:
 
-| ตาราง | คำอธิบาย | คอลัมน์หลัก |
-| :--- | :--- | :--- |
-| `ocr_tasks` | Metadata ของการประมวลผลแต่ละไฟล์ | id, original_filename, status (pending/processing/completed/failed), created_at |
-| `receipts` | ข้อมูล Header ของเอกสาร (1 รายการต่อ task) | bank_name, bank_type, doc_no, doc_date, company_name, company_tax_id, merchant_name, merchant_id, wht_rate, wht_amount, net_amount, bank_companyname, bank_tax_id, bank_address, branch_no, submitted_at |
-| `receipt_details` | รายการย่อยของการชำระเงิน (หลายรายการต่อ receipt) | transaction, pay_amt, commis_amt, tax_amt, wht_amount, total |
-| `mapping_history` | ประวัติการแมปรหัสบัญชีแยกตามธนาคาร | bank_name, field_type, dept_code, acc_code, confirmed_count |
+### 6.1 Table: `ocr_tasks`
+
+**ความหมาย**: Metadata ของการประมวลผลแต่ละไฟล์
+
+| Column | Type | Key | Null | Default | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INT | PK | NO | AUTO_INCREMENT | Task ID |
+| `original_filename` | VARCHAR(255) | | NO | | ชื่อไฟล์ที่อัปโหลด |
+| `status` | ENUM('pending','processing','completed','failed') | | NO | pending | สถานะการประมวลผล |
+| `created_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาสร้าง |
 
 ---
 
-## 7. ข้อกำหนดอื่นๆ (Non-Functional Requirements)
+### 6.2 Table: `receipts`
+
+**ความหมาย**: ข้อมูล Header ของเอกสาร (1 รายการต่อ task)
+
+| Column | Type | Key | Null | Default | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INT | PK | NO | AUTO_INCREMENT | Receipt ID |
+| `task_id` | INT | FK | YES | | Reference ไปยัง ocr_tasks |
+| `bank_name` | VARCHAR(50) | | NO | | ชื่อธนาคาร (BBL, KBANK, SCB) |
+| `bank_type` | VARCHAR(50) | | NO | | ประเภทธนาคาร |
+| `doc_no` | VARCHAR(100) | IDX | NO | | เลขที่เอกสาร (unique per submission) |
+| `doc_date` | DATE | | NO | | วันที่เอกสาร |
+| `doc_name` | VARCHAR(255) | | YES | | ชื่อเอกสาร |
+| `company_name` | VARCHAR(255) | | YES | | ชื่อบริษัท |
+| `company_tax_id` | VARCHAR(50) | | YES | | เลขประจำตัวผู้เสียภาษี |
+| `company_address` | TEXT | | YES | | ที่อยู่บริษัท |
+| `merchant_name` | VARCHAR(255) | | YES | | ชื่อผู้ค้า |
+| `merchant_id` | VARCHAR(100) | | YES | | ID ผู้ค้า |
+| `account_no` | VARCHAR(100) | | YES | | เลขบัญชี |
+| `bank_companyname` | VARCHAR(255) | | YES | | ชื่อบริษัท (จากธนาคาร) |
+| `bank_tax_id` | VARCHAR(50) | | YES | | เลขประจำตัว (จากธนาคาร) |
+| `bank_address` | VARCHAR(255) | | YES | | ที่อยู่ (จากธนาคาร) |
+| `branch_no` | VARCHAR(50) | | YES | | หมายเลขสาขา |
+| `wht_rate` | DECIMAL(5,2) | | YES | 0 | อัตราหักภาษี ณ ที่จ่าย (%) |
+| `wht_amount` | DECIMAL(15,2) | | YES | 0 | จำนวนเงินหักภาษี |
+| `net_amount` | DECIMAL(15,2) | | YES | 0 | จำนวนเงินสุทธิ |
+| `submitted_at` | TIMESTAMP | IDX | YES | NULL | เวลา submit (NULL = ยังไม่ submit) |
+| `created_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาสร้าง |
+| `updated_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาแก้ไขล่าสุด |
+
+---
+
+### 6.3 Table: `receipt_details`
+
+**ความหมาย**: รายการย่อยของการชำระเงิน (หลายรายการต่อ receipt)
+
+| Column | Type | Key | Null | Default | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INT | PK | NO | AUTO_INCREMENT | Detail ID |
+| `receipt_id` | INT | FK | NO | | Reference ไปยัง receipts |
+| `transaction` | VARCHAR(100) | | YES | | ประเภทการชำระเงิน (VISA, MCA, QR, ฯลฯ) |
+| `pay_amt` | DECIMAL(15,2) | | YES | 0 | จำนวนเงินชำระ |
+| `commis_amt` | DECIMAL(15,2) | | YES | 0 | จำนวนคณะกรรมการ |
+| `tax_amt` | DECIMAL(15,2) | | YES | 0 | จำนวนภาษี |
+| `wht_amount` | DECIMAL(15,2) | | YES | 0 | จำนวนเงินหักภาษี |
+| `total` | DECIMAL(15,2) | | YES | 0 | รวมทั้งสิ้น |
+| `created_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาสร้าง |
+
+---
+
+### 6.4 Table: `mapping_history`
+
+**ความหมาย**: ประวัติการแมปรหัสบัญชีแยกตามธนาคารและประเภทฟิลด์
+
+| Column | Type | Key | Null | Default | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INT | PK | NO | AUTO_INCREMENT | History ID |
+| `bank_name` | VARCHAR(50) | IDX | NO | | ชื่อธนาคาร |
+| `field_type` | VARCHAR(100) | | NO | | ประเภทฟิลด์ (Commission, Tax Amount, Net Amount, VSA-P, ฯลฯ) |
+| `dept_code` | VARCHAR(50) | | YES | | รหัสแผนก (Department Code) |
+| `acc_code` | VARCHAR(50) | | YES | | รหัสบัญชี (Account Code) |
+| `confirmed_count` | INT | | NO | 1 | จำนวนครั้งที่ยืนยัน (เพิ่มครั้งละ 1 เมื่อ save) |
+| `created_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาสร้าง |
+| `updated_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาแก้ไขล่าสุด |
+
+---
+
+## 7. การตั้งค่าสภาพแวดล้อม (Environment Configuration)
+
+ไฟล์ `.env` จะต้องอยู่ใน `backend/` directory และไม่ควร commit ไปยัง git
+
+### 7.1 Backend `.env` Variables
+
+```env
+# OpenRouter API Configuration
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_OCR_MODEL=google/gemini-2.5-flash-lite
+OPENROUTER_SUGGESTION_MODEL=google/gemini-2.0-flash-lite
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+# Database Configuration
+DATABASE_URL=mysql+aiomysql://root:password@localhost:3306/ocr_db
+
+# File Upload Configuration
+MAX_FILE_SIZE_MB=20
+UPLOAD_DIR=./uploads
+EXPORT_DIR=./exports
+
+# API Configuration
+APP_PORT=8010
+
+# Carmen ERP Integration
+CARMEN_AUTHORIZATION=Bearer <token>
+CARMEN_BASE_URL=https://carmen.example.com
+```
+
+| Variable | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `OPENROUTER_API_KEY` | Yes | - | API key สำหรับ OpenRouter Vision LLM |
+| `OPENROUTER_OCR_MODEL` | No | google/gemini-2.5-flash-lite | Model สำหรับ OCR extraction |
+| `OPENROUTER_SUGGESTION_MODEL` | No | google/gemini-2.0-flash-lite | Model สำหรับ AI suggestion |
+| `OPENROUTER_BASE_URL` | No | [https://openrouter.ai/api/v1](https://openrouter.ai/api/v1) | Base URL ของ OpenRouter |
+| `DATABASE_URL` | Yes | - | Connection string ไปยัง MySQL/MariaDB |
+| `MAX_FILE_SIZE_MB` | No | 20 | ขนาดไฟล์สูงสุด (MB) |
+| `UPLOAD_DIR` | No | ./uploads | โฟลเดอร์เก็บไฟล์อัปโหลด |
+| `EXPORT_DIR` | No | ./exports | โฟลเดอร์เก็บไฟล์ส่งออก (CSV) |
+| `APP_PORT` | No | 8010 | Port ของ FastAPI server |
+| `CARMEN_AUTHORIZATION` | Yes | - | Bearer token สำหรับ Carmen API |
+| `CARMEN_BASE_URL` | Yes | - | Base URL ของ Carmen ERP |
+
+---
+
+## 8. ข้อกำหนดอื่นๆ (Non-Functional Requirements)
 
 1. **Authentication**: การเชื่อมต่อ Carmen API ต้องผ่าน `Authorization` header ของแบคเอนด์เท่านั้น ห้าม frontend เรียกตรง
 2. **Duplicate Prevention**: ระบบต้องตรวจสอบ `doc_no` ซ้ำก่อน submit ทุกครั้ง โดยเปรียบเทียบเฉพาะ receipt ที่มี `submitted_at IS NOT NULL`
@@ -510,3 +779,91 @@ sequenceDiagram
 7. **Safe Migration**: `migrate_db()` ต้องทำงาน idempotent — ไม่เกิด error เมื่อ column มีอยู่แล้ว
 8. **Color Image Processing**: ห้ามแปลงภาพเป็น grayscale ก่อนส่ง Vision LLM เพราะลดความแม่นยำในการอ่าน
 9. **File Size Limit**: ไฟล์ต้องมีขนาดไม่เกิน 20 MB ต่อไฟล์; รองรับ JPG, PNG, BMP, WebP, GIF, PDF
+
+---
+
+## 9. ธนาคารและไฟล์ที่รองรับ (Supported Banks & File Types)
+
+### 9.1 ธนาคารที่รองรับ
+
+| Bank Code | Bank Name | BankType Enum |
+| :--- | :--- | :--- |
+| `BBL` | ธนาคารกรุงเทพ | BBL |
+| `KBANK` | ธนาคารกสิกรไทย | KBANK |
+| `SCB` | ธนาคารไทยพาณิชย์ | SCB |
+
+แต่ละธนาคารมี **bank-specific extraction prompts** ใน `backend/app/services/openrouter_ocr.py` เพื่อปรับปรุงความแม่นยำ
+
+### 9.2 ประเภทไฟล์ที่รองรับ
+
+**รูปภาพ**:
+
+- JPEG (`.jpg`, `.jpeg`)
+- PNG (`.png`)
+- BMP (`.bmp`)
+- WebP (`.webp`)
+- GIF (`.gif`)
+
+**เอกสาร**:
+
+- PDF (`.pdf`) — แสดงผ่าน iframe preview
+
+**ข้อจำกัด**:
+
+- ขนาดไฟล์สูงสุด: **20 MB** ต่อไฟล์
+- การประมวลผล: เก็บภาพไว้ใน `UPLOAD_DIR` ชั่วคราว (delete หลังจากประมวลผล)
+
+### 9.3 Image Processing Requirements
+
+- **Preprocessing**: Pillow resize (keep aspect ratio) + **retain color** (no grayscale conversion)
+- **Reason**: Vision LLM reads color better; grayscale reduces accuracy
+- **Base64 encoding**: ส่งไปยัง OpenRouter เป็น base64 string ใน single vision LLM call
+
+---
+
+## 10. Front-end Technologies & Dependencies
+
+### 10.1 React 5-Step Wizard
+
+| Step | Component | Purpose |
+| :--- | :--- | :--- |
+| 1 | `UploadSection` | เลือกธนาคาร + อัปโหลดไฟล์ |
+| 2 | `DocumentPreview` | แสดงสถานะการประมวลผล |
+| 3 | `HeaderCard` + `DetailTable` | ตรวจสอบและแก้ไขข้อมูล |
+| 4 | `AccountingReview` | แสดง Journal Entry + mapping alerts |
+| 5 | `JournalVoucher` | สรุป JV + ยืนยันบันทึก |
+
+### 10.2 Key Frontend Files
+
+| File | Role |
+| :--- | :--- |
+| `frontend/src/App.jsx` | Root component — 5-step state management |
+| `frontend/src/lib/ocrApi.js` | `extractFromFile()` → POST /api/v1/ocr/extract |
+| `frontend/src/lib/carmenApi.js` | Carmen proxy + mapping API calls |
+| `frontend/src/constants/index.js` | BANKS, DETAIL_COLUMNS, HEADER_LABELS, DETAIL_LABELS, EMPTY_DETAIL_ROW |
+| `frontend/src/pages/Mapping.jsx` | Account mapping configuration page |
+| `frontend/src/components/*.jsx` | Reusable UI components |
+
+### 10.3 Storage & Persistence
+
+- **localStorage keys**:
+  - `accountingConfig`: account code + department mappings
+  - `accountMappingAmount`: mapping for 3 fixed fields (Commission, Tax, Net)
+  - `currentStep`: current wizard step (auto-recovery on refresh)
+
+---
+
+## 11. Key Design Decisions (Design Rationale)
+
+| Decision | Reason |
+| :--- | :--- |
+| **Stateless extraction** | `/extract` returns JSON immediately without DB write — allows frontend review/edit before confirm |
+| **Single Vision LLM call** | Image + structured JSON in one call — faster, cheaper than multi-step OCR |
+| **Bank-specific prompts** | Each bank has tailored extraction rules → better accuracy |
+| **Color images preserved** | Vision LLM reads color better than grayscale |
+| **Duplicate check on submitted only** | Allows editing before submit; duplicate check only applies to finalized (submitted_at NOT NULL) receipts |
+| **Overwrite support** | Hard delete old record + re-insert on Overwrite=true (atomic operation) |
+| **AI-first mapping** | Mapping page auto-triggers AI suggest on bank selection; history is loaded but AI always runs |
+| **localStorage caching** | Avoid re-fetching master data every step; user can modify offline |
+| **Carmen proxy in backend** | Avoid frontend CORS issues; centralize authorization |
+| **Safe migrations** | `migrate_db()` idempotent — runs on startup, adds missing columns safely |

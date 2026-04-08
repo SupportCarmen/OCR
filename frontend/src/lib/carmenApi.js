@@ -66,6 +66,17 @@ export async function fetchDepartments() {
 }
 
 /**
+ * Fetch GL Prefixes from proxy API
+ * @returns {Promise<object[]>} Array of GL prefixes
+ */
+export async function fetchGLPrefixes() {
+  const res = await fetch('/api/v1/ocr/carmen/gl-prefix')
+  if (!res.ok) throw new Error(`Failed to fetch GL prefixes (${res.status})`)
+  const json = await res.json()
+  return json.Data || []
+}
+
+/**
  * Ask LLM to suggest dept/acc codes for Commission, Tax Amount, Net Amount (fixed types).
  * @param {{ bank_name: string, accounts: {code,name}[], departments: {code,name}[] }} payload
  * @returns {Promise<{ suggestions: { Commission, "Tax Amount", "Net Amount" }, source: string }>}

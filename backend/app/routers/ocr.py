@@ -397,10 +397,29 @@ async def proxy_account_codes():
 async def proxy_departments():
     if not settings.carmen_authorization:
         raise HTTPException(status_code=500, detail="carmen_authorization not configured")
-        
+
     url = "https://dev.carmen4.com/Carmen.API/api/interface/department"
     headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
-    
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+        return resp.json()
+
+
+# ═══════════════════════════════════════════════════
+# GET /api/v1/ocr/carmen/gl-prefix
+# ═══════════════════════════════════════════════════
+
+@router.get("/carmen/gl-prefix")
+async def proxy_gl_prefix():
+    if not settings.carmen_authorization:
+        raise HTTPException(status_code=500, detail="carmen_authorization not configured")
+
+    url = "https://dev.carmen4.com/Carmen.API/api/interface/glPrefix"
+    headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
+
     async with httpx.AsyncClient() as client:
         resp = await client.get(url, headers=headers)
         if resp.status_code != 200:
