@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     export_dir: str = "./exports"
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./ocr_database.db"
+    database_url: str = "mysql+aiomysql://root:123456@localhost:3306/ocr_db"
     
     # Carmen API
     carmen_authorization: str = ""
