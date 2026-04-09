@@ -9,6 +9,7 @@ Endpoints:
 
 import json
 import logging
+import traceback
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends
@@ -35,7 +36,6 @@ class CodeOption(BaseModel):
 
 
 class SuggestRequest(BaseModel):
-    bank_name: str
     accounts: List[CodeOption]
     departments: List[CodeOption]
 
@@ -45,15 +45,7 @@ class FieldMapping(BaseModel):
     acc: Optional[str] = None
 
 
-class SuggestResponse(BaseModel):
-    commission: FieldMapping
-    tax: FieldMapping
-    net: FieldMapping
-    source: str  # 'ai' | 'history' | 'partial_ai'
-
-
 class SuggestPaymentTypesRequest(BaseModel):
-    bank_name: str
     payment_types: List[str]
     accounts: List[CodeOption]
     departments: List[CodeOption]
@@ -69,22 +61,6 @@ class SaveHistoryRequest(BaseModel):
 FIXED_SUGGEST_TYPES = ["Commission", "Tax Amount", "Net Amount"]
 
 
-def _validate_codes(
-    suggestion: dict,
-    valid_acc: set,
-    valid_dept: set,
-) -> dict:
-    """Zero out any suggested code that doesn't exist in the master lists."""
-    for field in ("commission", "tax", "net"):
-        row = suggestion.get(field, {})
-        if row.get("dept") and row["dept"] not in valid_dept:
-            row["dept"] = None
-        if row.get("acc") and row["acc"] not in valid_acc:
-            row["acc"] = None
-        suggestion[field] = row
-    return suggestion
-
-
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/suggest")
@@ -92,17 +68,17 @@ async def suggest_mapping(req: SuggestRequest):
     """Call LLM to suggest dept/acc codes for Commission, Tax Amount, and Net Amount (fixed types)."""
     try:
         if not settings.openrouter_api_key:
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
+            return {"suggestions": {}, "source": "ai"}
 
-        logger.info(f"--- [DEBUG] Entering suggest_mapping for {req.bank_name} ---")
-        
+        logger.info("suggest_mapping: starting")
+
         dept_lines = "\n".join(f"  {d.code} — {d.name}" for d in req.departments[:100])
         acc_lines  = "\n".join(f"  {a.code} — {a.name}" for a in req.accounts[:800])
         types_list = "\n".join(f"  - {t}" for t in FIXED_SUGGEST_TYPES)
 
         prompt = f"""You are an expert accounting assistant for a Thai company. You are mapping bank transaction fields to internal Account Codes (Master Chart of Accounts).
 
-Suggest the best Department Code and Account Code for each field from {req.bank_name}.
+Suggest the best Department Code and Account Code for each field.
 
 Fields to suggest:
 {types_list}
@@ -141,7 +117,6 @@ Rules:
                 api_key=settings.openrouter_api_key,
                 base_url=settings.openrouter_base_url,
             )
-            logger.info(f"--- [DEBUG] Calling LLM API for {req.bank_name} ---")
             response = await client.chat.completions.create(
                 model=settings.openrouter_suggestion_model,
                 messages=[{"role": "user", "content": prompt}],
@@ -149,21 +124,21 @@ Rules:
                 max_tokens=2048,
             )
         except Exception as e:
-            logger.error(f"LLM API call failed for mapping suggestion (Bank: {req.bank_name}): {e}")
-            return {"suggestions": {}, "source": "ai", "error": str(e), "debug_v4": True}
+            logger.error(f"LLM API call failed for mapping suggestion: {e}")
+            return {"suggestions": {}, "source": "ai", "error": str(e)}
 
         content = None
         if response and response.choices and len(response.choices) > 0 and response.choices[0].message:
             content = response.choices[0].message.content
-            
+
         if content is None:
-            logger.warning(f"LLM returned None content for bank={req.bank_name}")
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
-        
+            logger.warning("suggest_mapping: LLM returned None content")
+            return {"suggestions": {}, "source": "ai"}
+
         raw = str(content).strip()
         if not raw:
-            logger.warning(f"LLM returned empty string for bank={req.bank_name}")
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
+            logger.warning("suggest_mapping: LLM returned empty string")
+            return {"suggestions": {}, "source": "ai"}
 
         logger.info(f"LLM mapping suggestion raw: {raw[:200]}")
 
@@ -180,8 +155,8 @@ Rules:
         try:
             data: dict = json.loads(raw)
         except json.JSONDecodeError as e:
-            logger.warning(f"LLM returned invalid JSON for mapping suggestion: {e} | raw={raw[:300]}")
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
+            logger.warning(f"suggest_mapping: invalid JSON from LLM: {e} | raw={raw[:300]}")
+            return {"suggestions": {}, "source": "ai"}
 
         valid_acc  = {a.code for a in req.accounts}
         valid_dept = {d.code for d in req.departments}
@@ -193,12 +168,11 @@ Rules:
             acc  = mapping.get("acc")  if mapping.get("acc")  in valid_acc  else None
             suggestions[ptype] = {"dept": dept, "acc": acc}
 
-        logger.info(f"--- [DEBUG] suggest_mapping for {req.bank_name} SUCCESS ---")
-        return {"suggestions": suggestions, "source": "ai", "debug_v4": True}
+        logger.info("suggest_mapping: completed successfully")
+        return {"suggestions": suggestions, "source": "ai"}
     except Exception as exc:
-        import traceback
-        logger.error(f"--- [FATAL ERROR] suggest_mapping crashed: {exc} ---\n{traceback.format_exc()}")
-        return {"suggestions": {}, "source": "ai", "fatal_error": str(exc), "debug_v4": True}
+        logger.error(f"suggest_mapping: unexpected error: {exc}\n{traceback.format_exc()}")
+        return {"suggestions": {}, "source": "ai", "fatal_error": str(exc)}
 
 
 @router.post("/suggest-payment-types")
@@ -206,15 +180,15 @@ async def suggest_payment_types(req: SuggestPaymentTypesRequest):
     """Call LLM to suggest dept/acc codes for a list of payment types."""
     try:
         if not settings.openrouter_api_key or not req.payment_types:
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
+            return {"suggestions": {}, "source": "ai"}
 
-        logger.info(f"--- [DEBUG] Entering suggest_payment_types for {req.bank_name} ---")
+        logger.info("suggest_payment_types: starting")
 
         dept_lines = "\n".join(f"  {d.code} — {d.name}" for d in req.departments[:80])
         acc_lines  = "\n".join(f"  {a.code} — {a.name}" for a in req.accounts[:200])
         types_list = "\n".join(f"  - {t}" for t in req.payment_types)
 
-        prompt = f"""You are an accounting assistant for a Thai company receiving credit card settlement reports from {req.bank_name}.
+        prompt = f"""You are an accounting assistant for a Thai company receiving credit card settlement reports.
 
 Each payment type below is a card payment channel in the bank's settlement report. Suggest the best Department Code and Account Code for each.
 
@@ -250,7 +224,6 @@ Rules:
                 api_key=settings.openrouter_api_key,
                 base_url=settings.openrouter_base_url,
             )
-            logger.info(f"--- [DEBUG] Calling LLM API for payment types {req.bank_name} ---")
             response = await client.chat.completions.create(
                 model=settings.openrouter_suggestion_model,
                 messages=[{"role": "user", "content": prompt}],
@@ -259,20 +232,20 @@ Rules:
             )
         except Exception as e:
             logger.error(f"LLM API call failed for payment type suggestions: {e}")
-            return {"suggestions": {}, "source": "ai", "error": str(e), "debug_v4": True}
+            return {"suggestions": {}, "source": "ai", "error": str(e)}
 
         content = None
         if response and response.choices and len(response.choices) > 0 and response.choices[0].message:
             content = response.choices[0].message.content
 
         if content is None:
-            logger.warning(f"LLM returned None content for payment types, bank={req.bank_name}")
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
-        
+            logger.warning("suggest_payment_types: LLM returned None content")
+            return {"suggestions": {}, "source": "ai"}
+
         raw = str(content).strip()
         if not raw:
-            logger.warning(f"LLM returned empty string for payment types, bank={req.bank_name}")
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
+            logger.warning("suggest_payment_types: LLM returned empty string")
+            return {"suggestions": {}, "source": "ai"}
 
         logger.info(f"LLM payment type suggestion raw: {raw[:200]}")
 
@@ -289,8 +262,8 @@ Rules:
         try:
             data: dict = json.loads(raw)
         except json.JSONDecodeError as e:
-            logger.warning(f"LLM returned invalid JSON for payment type suggestion: {e} | raw={raw[:300]}")
-            return {"suggestions": {}, "source": "ai", "debug_v4": True}
+            logger.warning(f"suggest_payment_types: invalid JSON from LLM: {e} | raw={raw[:300]}")
+            return {"suggestions": {}, "source": "ai"}
 
         valid_acc  = {a.code for a in req.accounts}
         valid_dept = {d.code for d in req.departments}
@@ -303,12 +276,11 @@ Rules:
             acc  = mapping.get("acc")  if mapping.get("acc")  in valid_acc  else None
             suggestions[ptype] = {"dept": dept, "acc": acc}
 
-        logger.info(f"--- [DEBUG] suggest_payment_types for {req.bank_name} SUCCESS ---")
-        return {"suggestions": suggestions, "source": "ai", "debug_v4": True}
+        logger.info("suggest_payment_types: completed successfully")
+        return {"suggestions": suggestions, "source": "ai"}
     except Exception as exc:
-        import traceback
-        logger.error(f"--- [FATAL ERROR] suggest_payment_types crashed: {exc} ---\n{traceback.format_exc()}")
-        return {"suggestions": {}, "source": "ai", "fatal_error": str(exc), "debug_v4": True}
+        logger.error(f"suggest_payment_types: unexpected error: {exc}\n{traceback.format_exc()}")
+        return {"suggestions": {}, "source": "ai", "fatal_error": str(exc)}
 
 
 @router.get("/history")

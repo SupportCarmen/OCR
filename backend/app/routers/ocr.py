@@ -11,7 +11,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 import httpx
 import uuid
@@ -19,7 +19,6 @@ import uuid
 from app.database import get_db
 from app.config import settings
 from app.models import (
-    OCRUploadResponse,
     TaskStatus,
     BankType,
     OCRTask,
@@ -78,7 +77,6 @@ router = APIRouter(prefix="/api/v1/ocr", tags=["OCR"])
 async def extract_receipt(
     files: List[UploadFile] = File(..., description="รูปใบเสร็จ (JPG, PNG, PDF)"),
     bank_type: Optional[BankType] = Query(None, description="ประเภทธนาคาร BBL/KBANK/SCB"),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Stateless extraction:
@@ -226,8 +224,8 @@ async def mark_receipt_submitted(receipt_id: str, db: AsyncSession = Depends(get
 
 
 # ═══════════════════════════════════════════════════
-# POST /api/v1/ocr/receipts/{receipt_id}/submit-local
-# Save edited data to local DB and mark as submitted
+# POST /api/v1/ocr/submit
+# Save confirmed data to local DB and mark as submitted
 # ═══════════════════════════════════════════════════
 
 @router.post("/submit")
@@ -271,7 +269,7 @@ async def submit_receipt_stateless(
     task = OCRTask(
         id=task_id,
         original_filename=payload.OriginalFilename or "uploaded_file",
-        file_path="STATLESS_MODE", # No physical file saved
+        file_path="STATELESS_MODE", # No physical file saved
         status=TaskStatus.COMPLETED,
         ocr_engine=settings.ocr_engine,
         completed_at=datetime.utcnow()
@@ -415,7 +413,7 @@ async def proxy_departments():
 @router.get("/carmen/gl-prefix")
 async def proxy_gl_prefix():
     if not settings.carmen_authorization:
-        raise HTTPException(status_code=500, detail="carmen_authorization not configured")
+        return {"Data": [], "Status": "not_configured"}
 
     url = "https://dev.carmen4.com/Carmen.API/api/interface/glPrefix"
     headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
@@ -423,6 +421,6 @@ async def proxy_gl_prefix():
     async with httpx.AsyncClient() as client:
         resp = await client.get(url, headers=headers)
         if resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+            return {"Data": [], "Status": f"upstream_{resp.status_code}"}
         return resp.json()
 

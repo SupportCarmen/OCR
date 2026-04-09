@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import CustomModal from './CustomModal'
 
 function toNum(v) {
   return parseFloat(String(v ?? '').replace(/,/g, '')) || 0
@@ -42,6 +43,7 @@ const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) :
 
 export default function AccountingReview({ details, onBack, onSubmit, onGoMapping }) {
   const [config, setConfig] = useState(null)
+  const [warningModal, setWarningModal] = useState(false)
 
   const loadConfig = () => {
     try {
@@ -62,7 +64,7 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
   useEffect(() => {
     loadConfig()
 
-    // cc// ฟังเหตุการณ์การเปลี่ยนแปลง localStorage จาก tab อื่น (Auto-Sync)
+    // ฟังเหตุการณ์การเปลี่ยนแปลง localStorage จาก tab อื่น (Auto-Sync)
     const handleStorageChange = (e) => {
       if (e.key === 'accountingConfig' || e.key === 'accountMappingAmount') {
         loadConfig()
@@ -74,9 +76,23 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
   }, [])
 
   const rows = config ? buildRows(details, config) : []
-  const hasMissing = rows.some(r => !r.dept || !r.acc)
   const totalDr = rows.reduce((s, r) => s + r.debit,  0)
   const totalCr = rows.reduce((s, r) => s + r.credit, 0)
+
+  // Check unmapped fields directly from config (not dependent on row amounts)
+  const unmappedFields = []
+  if (config) {
+    if (!config.filePrefix) unmappedFields.push('File Prefix')
+    const m = config.mappings || {}
+    if (!m.commission?.acc) unmappedFields.push('Commission')
+    if (!m.tax?.acc) unmappedFields.push('Tax Amount')
+    if (!m.net?.acc) unmappedFields.push('Net Amount')
+    const detailTypes = [...new Set(details.map(d => d.Transaction).filter(Boolean))]
+    detailTypes.forEach(pt => {
+      if (!config.paymentAmount?.[pt]?.acc) unmappedFields.push(pt)
+    })
+  }
+  const hasMissing = !config || unmappedFields.length > 0
 
   return (
     <div>
@@ -86,11 +102,13 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
 
       {hasMissing && (
         <div className="mapping-alert">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
             <i className="fas fa-exclamation-triangle" />
-            <span>พบรายการที่ยังไม่ตั้งรหัสบัญชี กรุณาตรวจสอบแผนกและรหัสบัญชีให้ครบถ้วน</span>
+            <span>
+              ยังไม่ได้ตั้งรหัสบัญชีสำหรับ: <strong>{unmappedFields.join(', ')}</strong>
+            </span>
           </div>
-          <button className="btn-cancel" style={{ padding: '0.4rem 0.8rem', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }} onClick={onGoMapping}>
+          <button className="btn-cancel" style={{ padding: '0.4rem 0.8rem', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', whiteSpace: 'nowrap' }} onClick={onGoMapping}>
             แก้ไข Mapping
           </button>
         </div>
@@ -171,11 +189,22 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
           <button className="btn-cancel" onClick={loadConfig}>
             <i className="fas fa-sync-alt" /> Refresh
           </button>
-          <button className="btn-submit" disabled={hasMissing || rows.length === 0} onClick={() => onSubmit(rows)}>
+          <button className="btn-submit" disabled={rows.length === 0} onClick={() => hasMissing ? setWarningModal(true) : onSubmit(rows)}>
             <i className="fas fa-cloud-upload-alt" /> ยืนยันและส่งข้อมูล
           </button>
         </div>
       </div>
+
+      <CustomModal
+        show={warningModal}
+        type="warning"
+        title="ยังไม่ได้ตั้งรหัสบัญชีครบ"
+        message={`กรุณาตั้งรหัสบัญชีให้ครบก่อนยืนยัน:\n${unmappedFields.join(', ')}`}
+        confirmText="ไปตั้งค่า Mapping"
+        cancelText="ปิด"
+        onConfirm={() => { setWarningModal(false); onGoMapping(); }}
+        onCancel={() => setWarningModal(false)}
+      />
     </div>
   )
 }

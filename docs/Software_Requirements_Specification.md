@@ -1,7 +1,7 @@
 # Requirement Specification: Bank Receipt OCR & Import System Integration
 
 **Project:** Bank Receipt OCR & Import System (API Integration)  
-**Date:** 8 April 2026  
+**Date:** 9 April 2026  
 **Author:** Intern Team
 
 ---
@@ -18,6 +18,7 @@
 | 1.5 | 08 Apr 2026 | Intern Team | Major update: AI Mapping Suggestion, 5-step wizard, Mapping Router, JournalVoucher, updated DB schema & env vars |
 | 1.6 | 08 Apr 2026 | Intern Team | Complete API inventory (add /export, /debug-llm, /health); detailed DB schema with all fields; environment variables section |
 | 1.7 | 08 Apr 2026 | Intern Team | Add GET /api/v1/ocr/carmen/gl-prefix endpoint for GL Prefix master data |
+| 1.8 | 09 Apr 2026 | Intern Team | Fix GL Prefix response field name (PrefixName); /extract now accepts multiple files; remove bank_name from /suggest requests; add missing localStorage keys (ocr_wizard_state, filePrefix, fileSource) |
 
 ---
 
@@ -134,14 +135,16 @@ sequenceDiagram
     participant API as API Service (FastAPI)
     participant LLM as OpenRouter (Vision LLM)
 
-    User->>API: POST /api/v1/ocr/extract (file, bank_type)
+    User->>API: POST /api/v1/ocr/extract (files[], bank_type)
     activate API
-    API->>API: Image Preprocessing (Pillow — resize, keep color)
-    API->>LLM: POST with base64 image + bank-specific prompt
-    activate LLM
-    LLM-->>API: JSON Structured Data (ExtractedReceiptData)
-    deactivate LLM
-    API-->>User: 200 OK (header fields + details array)
+    loop for each file
+        API->>API: Image Preprocessing (Pillow — resize, keep color)
+        API->>LLM: POST with base64 image + bank-specific prompt
+        activate LLM
+        LLM-->>API: JSON Structured Data (ExtractedReceiptData)
+        deactivate LLM
+    end
+    API-->>User: 200 OK (array of ExtractedReceiptData)
     deactivate API
 ```
 
@@ -255,7 +258,7 @@ sequenceDiagram
 1. **Step 1 — Upload**: เจ้าหน้าที่เลือกธนาคาร (BBL/KBANK/SCB) และอัปโหลดไฟล์ภาพหรือ PDF
 2. **Step 2 — Processing**: ระบบส่งไฟล์ให้ Vision LLM ประมวลผลและแสดงสถานะการอ่าน
 3. **Step 3 — Verification**: เจ้าหน้าที่ตรวจสอบและแก้ไขข้อมูล Header (ชื่อเอกสาร, วันที่, เลขที่เอกสาร ฯลฯ) และรายการย่อย (Details)
-4. **Step 4 — Accounting Review**: ระบบโหลด Account Mapping จาก localStorage และแสดง Journal Entry (Debit/Credit) พร้อมแจ้งเตือนหาก mapping ไม่ครบ
+4. **Step 4 — Accounting Review**: ระบบโหลด Account Mapping จาก localStorage และแสดง Journal Entry (Debit/Credit) พร้อมแจ้งเตือนหาก mapping ไม่ครบ (รวมถึง File Prefix)
 5. **Step 5 — Journal Voucher**: แสดง JV สรุปรายการบัญชีทั้งหมด เจ้าหน้าที่ยืนยันก่อนบันทึกลงระบบ
 
 ### 4.2 กระบวนการตั้งค่า Account Mapping
@@ -280,32 +283,34 @@ sequenceDiagram
 
 | Parameter | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `file` | Binary (multipart) | Yes | ไฟล์ภาพหรือ PDF (max 20MB) |
+| `files` | Binary[] (multipart) | Yes | ไฟล์ภาพหรือ PDF หนึ่งไฟล์ขึ้นไป (max 20MB ต่อไฟล์) |
 | `bank_type` | String (query) | Yes | รหัสธนาคาร: `BBL`, `KBANK`, `SCB` |
 
-**JSON Response**:
+**JSON Response** (Array — หนึ่ง object ต่อไฟล์):
 ```json
-{
-  "bank_name": "SCB",
-  "bank_companyname": "ธนาคารไทยพาณิชย์ จำกัด (มหาชน)",
-  "bank_tax_id": "0107536000791",
-  "bank_address": "9 ถนนรัชดาภิเษก แขวงลาดยาว",
-  "branch_no": "0001",
-  "doc_name": "รายงานสรุปยอดขาย",
-  "doc_no": "SCB-2026-00123",
-  "doc_date": "08/04/2026",
-  "company_name": "บริษัท ตัวอย่าง จำกัด",
-  "company_tax_id": "0105555000001",
-  "merchant_name": "EXAMPLE CO LTD",
-  "merchant_id": "123456789",
-  "wht_rate": "1",
-  "wht_amount": "100.00",
-  "net_amount": "9900.00",
-  "details": [
-    { "transaction": "VISA", "pay_amt": "5000.00", "commis_amt": "75.00", "tax_amt": "5.25", "total": "4919.75" },
-    { "transaction": "MASTERCARD", "pay_amt": "5000.00", "commis_amt": "75.00", "tax_amt": "5.25", "total": "4919.75" }
-  ]
-}
+[
+  {
+    "bank_name": "SCB",
+    "bank_companyname": "ธนาคารไทยพาณิชย์ จำกัด (มหาชน)",
+    "bank_tax_id": "0107536000791",
+    "bank_address": "9 ถนนรัชดาภิเษก แขวงลาดยาว",
+    "branch_no": "0001",
+    "doc_name": "รายงานสรุปยอดขาย",
+    "doc_no": "SCB-2026-00123",
+    "doc_date": "08/04/2026",
+    "company_name": "บริษัท ตัวอย่าง จำกัด",
+    "company_tax_id": "0105555000001",
+    "merchant_name": "EXAMPLE CO LTD",
+    "merchant_id": "123456789",
+    "wht_rate": "1",
+    "wht_amount": "100.00",
+    "net_amount": "9900.00",
+    "details": [
+      { "transaction": "VISA", "pay_amt": "5000.00", "commis_amt": "75.00", "tax_amt": "5.25", "total": "4919.75" },
+      { "transaction": "MASTERCARD", "pay_amt": "5000.00", "commis_amt": "75.00", "tax_amt": "5.25", "total": "4919.75" }
+    ]
+  }
+]
 ```
 
 ---
@@ -359,9 +364,9 @@ sequenceDiagram
 {
   "status": "success",
   "Data": [
-    { "GlPrefix": "1000", "Description": "ASSETS", "Description2": "สินทรัพย์" },
-    { "GlPrefix": "2000", "Description": "LIABILITIES", "Description2": "หนี้สิน" },
-    { "GlPrefix": "3000", "Description": "EQUITY", "Description2": "ทุน" }
+    { "PrefixName": "1000", "Description": "ASSETS", "Description2": "สินทรัพย์" },
+    { "PrefixName": "2000", "Description": "LIABILITIES", "Description2": "หนี้สิน" },
+    { "PrefixName": "3000", "Description": "EQUITY", "Description2": "ทุน" }
   ]
 }
 ```
@@ -377,9 +382,8 @@ sequenceDiagram
 **JSON Request**:
 ```json
 {
-  "bank_name": "SCB",
-  "accounts": [{ "AccCode": "113200", "Description": "BANK RECEIVABLE", "Nature": "DEBIT" }],
-  "departments": [{ "DeptCode": "100", "Description": "ACCOUNTING" }]
+  "accounts": [{ "code": "113200", "name": "BANK RECEIVABLE", "type": "DEBIT" }],
+  "departments": [{ "code": "100", "name": "ACCOUNTING" }]
 }
 ```
 
@@ -406,10 +410,9 @@ sequenceDiagram
 **JSON Request**:
 ```json
 {
-  "bank_name": "SCB",
   "payment_types": ["VSA-DCC-P", "MCA-INT-P", "QR-VSA", "QR-MCA"],
-  "accounts": [...],
-  "departments": [...]
+  "accounts": [{ "code": "113200", "name": "BANK RECEIVABLE", "type": "DEBIT" }],
+  "departments": [{ "code": "100", "name": "ACCOUNTING" }]
 }
 ```
 
@@ -847,9 +850,10 @@ CARMEN_BASE_URL=https://carmen.example.com
 ### 10.3 Storage & Persistence
 
 - **localStorage keys**:
-  - `accountingConfig`: account code + department mappings
-  - `accountMappingAmount`: mapping for 3 fixed fields (Commission, Tax, Net)
+  - `accountingConfig`: account code + department mappings — รวม field `filePrefix` (GL file prefix สำหรับ JV) และ `fileSource` (ชื่อแหล่งที่มา)
+  - `accountMappingAmount`: mapping สำหรับแต่ละ payment type (Visa, MCA, QR, ฯลฯ)
   - `currentStep`: current wizard step (auto-recovery on refresh)
+  - `ocr_wizard_state`: state ของ OCR wizard — bank ที่เลือก, details ที่สแกนได้ (ใช้โดย Mapping page เพื่อตรวจสอบ active scan)
 
 ---
 

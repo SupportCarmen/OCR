@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { fetchAccountCodes, fetchDepartments, fetchGLPrefixes, suggestMapping, fetchMappingHistory, saveMappingHistory, suggestPaymentTypes } from '../lib/carmenApi';
+import { fetchAccountCodes, fetchDepartments, fetchGLPrefixes, suggestMapping, saveMappingHistory, suggestPaymentTypes } from '../lib/carmenApi';
 import CustomModal from '../components/CustomModal';
 import './Mapping.css';
 
 // ─── CUSTOM SEARCH SELECT ───
 // topChoice: { code, name, name2?, source: 'ai'|'history' } | null
-function CustomSearchSelect({ value, onChange, options, placeholder, topChoice }) {
+function CustomSearchSelect({ value, onChange, options, placeholder, topChoice, suggestedValue }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -52,15 +52,24 @@ function CustomSearchSelect({ value, onChange, options, placeholder, topChoice }
     ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
     : { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-magic' };
 
+  const selectedOption = value ? options.find(o => o.code === value) : null;
+  const selectedDesc = selectedOption
+    ? [selectedOption.name, selectedOption.name2].filter(Boolean).join(' · ')
+    : null;
+
+  const isAISuggested = !isOpen && !!suggestedValue;
+  const displayValue = isOpen ? searchTerm : (isAISuggested ? suggestedValue : value || '');
+
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
       <input
         type="text"
         placeholder={placeholder}
-        value={isOpen ? searchTerm : value || ''}
+        value={displayValue}
         onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
         onChange={(e) => setSearchTerm(e.target.value)}
-        style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid var(--border)', borderBottomColor: isOpen ? 'var(--blue)' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace" }}
+        title={isAISuggested ? `AI แนะนำ: ${suggestedValue}` : value && selectedDesc ? `${value} — ${selectedDesc}` : ''}
+        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--blue)' : isAISuggested ? '#c4b5fd' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
       />
       {isOpen && (
         <div style={{
@@ -189,8 +198,8 @@ export default function Mapping() {
   const [paymentSuggestLoading, setPaymentSuggestLoading] = useState(false);
 
   // Auto-suggest: history first, then AI — only when fields are empty
-  const autoSuggest = async (bankName, accounts, departments, force = false) => {
-    if (!bankName || !accounts.length) return;
+  const autoSuggest = async (accounts, departments) => {
+    if (!accounts.length) return;
 
     // Only fetch for fields that don't have mappings yet
     const fieldsToFetch = ['commission', 'tax', 'net'].filter(f =>
@@ -198,7 +207,6 @@ export default function Mapping() {
     );
 
     if (fieldsToFetch.length === 0) {
-      console.log(`[Mapping] All fields already mapped for bank: ${bankName}`);
       setModalConfig({
         show: true,
         title: '✓ ทำการ Mapping หมดแล้ว',
@@ -208,54 +216,18 @@ export default function Mapping() {
       return;
     }
 
-    console.log(`[Mapping] Auto-suggesting for bank: ${bankName}... Fields to fetch: ${fieldsToFetch.join(', ')}`);
     setSuggestLoading(true);
-    let hist = {};
     let fromAI = {};
 
     try {
-      const histData = await fetchMappingHistory(bankName);
-      hist = histData.history || {};
-      console.log('[Mapping] History loaded:', hist);
-    } catch (_) { }
-
-    // --- Temp: History disabled to test AI ---
-    const fromHistory = {};
-    // fieldsToFetch.forEach(f => {
-    //   if (hist[f]?.dept || hist[f]?.acc) {
-    //     fromHistory[f] = { dept: hist[f].dept || '', acc: hist[f].acc || '' };
-    //   }
-    // });
-
-    // if (Object.keys(fromHistory).length > 0) {
-    //   setMainSuggestions(prev => {
-    //     const next = { ...prev };
-    //     Object.entries(fromHistory).forEach(([k, v]) => {
-    //       next[k] = { ...v, source: 'history' };
-    //     });
-    //     return next;
-    //   });
-    //   setSuggestionMeta(prev => {
-    //     const next = { ...prev };
-    //     Object.keys(fromHistory).forEach(k => { next[k] = 'history'; });
-    //     return next;
-    //   });
-    // }
-
-    const stillNeedsAI = fieldsToFetch;
-    console.log('[Mapping] Testing AI: Bypassing history.');
-
-    try {
-      console.log(`[Mapping] Fetching AI suggestions for: ${stillNeedsAI.join(', ')}`);
       const aiResult = await suggestMapping({
-        bank_name: bankName,
         accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.nature })),
         departments: departments.map(d => ({ code: d.code, name: d.name })),
       });
 
       const suggestKeyMap = { commission: 'Commission', tax: 'Tax Amount', net: 'Net Amount' };
       console.log('[Mapping] AI Result suggestions:', aiResult.suggestions);
-      stillNeedsAI.forEach(f => {
+      fieldsToFetch.forEach(f => {
         const s = (aiResult.suggestions || {})[suggestKeyMap[f]] || {};
         console.log(`[Mapping] Processing ${f} (key="${suggestKeyMap[f]}")`, s);
         if (s.dept || s.acc) {
@@ -264,19 +236,7 @@ export default function Mapping() {
       });
       console.log('[Mapping] fromAI after processing:', fromAI);
       if (Object.keys(fromAI).length > 0) {
-        // Auto-fill the suggested values immediately
-        setMappings(prev => {
-          const next = { ...prev };
-          Object.entries(fromAI).forEach(([k, v]) => {
-            next[k] = {
-              dept: v.dept || '',
-              acc: v.acc || ''
-            };
-          });
-          return next;
-        });
-
-        // Store the AI suggestions for badge display and confirm/reject functionality
+        // Store suggestions for pre-fill display only — values committed when user confirms
         setMainSuggestions(prev => {
           const next = { ...prev };
           Object.entries(fromAI).forEach(([k, v]) => {
@@ -284,16 +244,14 @@ export default function Mapping() {
             next[k] = {
               dept: v.dept || existing.dept || '',
               acc: v.acc || existing.acc || '',
-              source: existing.source === 'history' ? 'history' : 'ai'
+              source: 'ai'
             };
           });
           return next;
         });
         setSuggestionMeta(prev => {
           const next = { ...prev };
-          Object.keys(fromAI).forEach(k => {
-            if (!fromHistory[k]) next[k] = 'ai';
-          });
+          Object.keys(fromAI).forEach(k => { next[k] = 'ai'; });
           return next;
         });
       }
@@ -306,60 +264,42 @@ export default function Mapping() {
 
   const confirmMainSuggestion = (key) => {
     console.log(`[Mapping] User confirmed suggestion for ${key}`);
-    // Values are already auto-filled, just hide the badge/buttons
-    setMainSuggestions(prev => ({
-      ...prev,
-      [key]: null
-    }));
-    setSuggestionMeta(prev => ({
-      ...prev,
-      [key]: null
-    }));
+    const suggestion = mainSuggestions[key];
+    if (suggestion) {
+      setMappings(prev => ({
+        ...prev,
+        [key]: { dept: suggestion.dept || '', acc: suggestion.acc || '' }
+      }));
+    }
+    setMainSuggestions(prev => ({ ...prev, [key]: null }));
+    setSuggestionMeta(prev => ({ ...prev, [key]: null }));
   };
 
   const rejectMainSuggestion = (key) => {
     console.log(`[Mapping] User rejected suggestion for ${key}`);
-    // Clear the auto-filled values
-    setMappings(prev => ({
-      ...prev,
-      [key]: { dept: '', acc: '' }
-    }));
-    // Hide the badge/buttons
-    setMainSuggestions(prev => ({
-      ...prev,
-      [key]: null
-    }));
-    setSuggestionMeta(prev => ({
-      ...prev,
-      [key]: null
-    }));
+    setMainSuggestions(prev => ({ ...prev, [key]: null }));
+    setSuggestionMeta(prev => ({ ...prev, [key]: null }));
   };
 
   const confirmPaymentSuggestion = (type) => {
     console.log(`[Mapping] User confirmed suggestion for payment type: ${type}`);
-    // Values are already auto-filled, just hide the badge/buttons
-    setPaymentSuggestions(prev => ({
-      ...prev,
-      [type]: null
-    }));
+    const suggestion = paymentSuggestions[type];
+    if (suggestion) {
+      setPaymentAmount(prev => ({
+        ...prev,
+        [type]: { dept: suggestion.dept || '', acc: suggestion.acc || '' }
+      }));
+    }
+    setPaymentSuggestions(prev => ({ ...prev, [type]: null }));
   };
 
   const rejectPaymentSuggestion = (type) => {
     console.log(`[Mapping] User rejected suggestion for payment type: ${type}`);
-    // Clear the auto-filled values
-    setPaymentAmount(prev => ({
-      ...prev,
-      [type]: { dept: '', acc: '' }
-    }));
-    // Hide the badge/buttons
-    setPaymentSuggestions(prev => ({
-      ...prev,
-      [type]: null
-    }));
+    setPaymentSuggestions(prev => ({ ...prev, [type]: null }));
   };
 
-  const autoSuggestPaymentTypes = async (bankName, accounts, departments, specificTypes = null) => {
-    if (!bankName || !accounts.length) return;
+  const autoSuggestPaymentTypes = async (accounts, departments, specificTypes = null) => {
+    if (!accounts.length) return;
     setPaymentSuggestLoading(true);
 
     const allTypes = specificTypes || [...PAYMENT_TYPES, ...customPaymentTypes];
@@ -383,39 +323,22 @@ export default function Mapping() {
 
     const newSuggestions = {};
 
-    // --- Temp: History disabled to test AI ---
-    if (needsAI.length > 0) {
-      try {
-        const result = await suggestPaymentTypes({
-          bank_name: bankName,
-          payment_types: needsAI,
-          accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.nature })),
-          departments: departments.map(d => ({ code: d.code, name: d.name })),
-        });
-        Object.entries(result.suggestions || {}).forEach(([t, val]) => {
-          if (val.dept || val.acc) {
-            newSuggestions[t] = { dept: val.dept || null, acc: val.acc || null, source: 'ai' };
-          }
-        });
-      } catch (err) {
-        console.error('AI payment type suggest failed:', err);
-      }
-    }
-
-    // Auto-fill the suggested payment type values immediately
-    if (Object.keys(newSuggestions).length > 0) {
-      setPaymentAmount(prev => {
-        const next = { ...prev };
-        Object.entries(newSuggestions).forEach(([t, val]) => {
-          next[t] = {
-            dept: val.dept || '',
-            acc: val.acc || ''
-          };
-        });
-        return next;
+    try {
+      const result = await suggestPaymentTypes({
+        payment_types: needsAI,
+        accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.nature })),
+        departments: departments.map(d => ({ code: d.code, name: d.name })),
       });
+      Object.entries(result.suggestions || {}).forEach(([t, val]) => {
+        if (val.dept || val.acc) {
+          newSuggestions[t] = { dept: val.dept || null, acc: val.acc || null, source: 'ai' };
+        }
+      });
+    } catch (err) {
+      console.error('AI payment type suggest failed:', err);
     }
 
+    // Store suggestions for pre-fill display only — values committed when user confirms
     setPaymentSuggestions(prev => ({ ...prev, ...newSuggestions }));
     setPaymentSuggestLoading(false);
   };
@@ -423,10 +346,9 @@ export default function Mapping() {
   const loadInitialData = async () => {
     setLoadingOpts(true);
     try {
-      const [accResult, deptResult, prefixResult] = await Promise.all([
+      const [accResult, deptResult] = await Promise.all([
         fetchAccountCodes(),
         fetchDepartments(),
-        fetchGLPrefixes()
       ]);
 
       const mappedAcc = accResult
@@ -437,27 +359,25 @@ export default function Mapping() {
         .filter(d => d.DeptCode && d.DeptCode !== 'CodeDep')
         .map(d => ({ code: d.DeptCode, name: d.Description, name2: d.Description2 }));
 
-      const mappedPrefixes = prefixResult
-        .filter(p => p.PrefixName)
-        .map(p => ({ code: p.PrefixName, name: p.Description }));
-
       setMasterAccounts(mappedAcc);
       setMasterDepartments(mappedDept);
-      setMasterGLPrefixes(mappedPrefixes);
     } catch (err) {
       console.error("Failed to load carmen dictionary:", err);
     } finally {
       setLoadingOpts(false);
     }
-  };
 
-  // Removed: Trigger autoSuggest on bank change
-  // Now user must click "Apply Suggestion" button manually
-  // useEffect(() => {
-  //   if (bank && masterAccounts.length && masterDepartments.length) {
-  //     autoSuggest(bank, masterAccounts, masterDepartments);
-  //   }
-  // }, [bank, masterAccounts.length, masterDepartments.length]);
+    // GL prefixes are optional — load separately so failures don't block the main data
+    try {
+      const prefixResult = await fetchGLPrefixes();
+      const mappedPrefixes = prefixResult
+        .filter(p => p.PrefixName)
+        .map(p => ({ code: p.PrefixName, name: p.Description }));
+      setMasterGLPrefixes(mappedPrefixes);
+    } catch (err) {
+      console.warn("GL prefix load failed (non-critical):", err);
+    }
+  };
 
   // Load from LocalStorage and APIs on mount
   useEffect(() => {
@@ -585,7 +505,7 @@ export default function Mapping() {
     if (shouldClose && window.opener) {
       window.close();
     } else {
-      // cc// ถ้าไม่ใช่หน้าต่างแยก ให้กกลับไปหน้าหลัก (ตัว App จะโหลด Step ล่าสุดมาเอง)
+      // ถ้าไม่ใช่หน้าต่างแยก ให้กลับไปหน้าหลัก (ตัว App จะโหลด Step ล่าสุดมาเอง)
       window.location.hash = '';
       if (!shouldClose) {
         setModalConfig({
@@ -611,8 +531,8 @@ export default function Mapping() {
     setNewCustomType('');
 
     // Trigger suggestion for the newly added custom type
-    if (bank && masterAccounts.length && masterDepartments.length) {
-      autoSuggestPaymentTypes(bank, masterAccounts, masterDepartments, [trimmed]);
+    if (masterAccounts.length && masterDepartments.length) {
+      autoSuggestPaymentTypes(masterAccounts, masterDepartments, [trimmed]);
     }
   };
 
@@ -639,27 +559,6 @@ export default function Mapping() {
     setSuggestionMeta(prev => ({ ...prev, [type]: null }));
   };
 
-  // Auto-apply all suggestions from paymentSuggestions to paymentAmount
-  useEffect(() => {
-    if (Object.keys(paymentSuggestions).length > 0 && !paymentSuggestLoading) {
-      setPaymentAmount(prev => {
-        let updated = false;
-        const next = { ...prev };
-        Object.entries(paymentSuggestions).forEach(([type, suggestion]) => {
-          if (suggestion && (!prev[type]?.dept || !prev[type]?.acc)) {
-            if (suggestion.dept || suggestion.acc) {
-              next[type] = {
-                dept: suggestion.dept || prev[type]?.dept || '',
-                acc: suggestion.acc || prev[type]?.acc || ''
-              };
-              updated = true;
-            }
-          }
-        });
-        return updated ? next : prev;
-      });
-    }
-  }, [paymentSuggestions, paymentSuggestLoading]);
 
   const handlePaymentMappingChange = (type, field, value) => {
     setPaymentAmount(prev => ({
@@ -745,11 +644,12 @@ export default function Mapping() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <span>ACCOUNT CODE MAPPING {loadingOpts && <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: 'var(--blue)' }}><i className="fas fa-spinner fa-spin"></i> กำลังโหลดรหัสบัญชี...</span>}</span>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
               <button
-                onClick={() => bank && masterAccounts.length && masterDepartments.length && autoSuggest(bank, masterAccounts, masterDepartments)}
-                disabled={!bank || loadingOpts || suggestLoading}
-                style={{ padding: '0.4rem 0.8rem', background: suggestLoading ? '#f0f0f0' : 'var(--blue)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: suggestLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 500 }}
+                onClick={() => autoSuggest(masterAccounts, masterDepartments)}
+                disabled={masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading}
+                title={masterAccounts.length === 0 ? 'Loading account codes...' : masterDepartments.length === 0 ? 'Loading departments...' : suggestLoading ? 'Suggesting...' : 'Click to get AI suggestions'}
+                style={{ padding: '0.4rem 0.8rem', background: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? '#f0f0f0' : 'var(--blue)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? '#999' : 'white', fontWeight: 500 }}
               >
                 <i className={`fas fa-magic ${suggestLoading ? 'fa-spin' : ''}`}></i> AI Suggest
               </button>
@@ -759,16 +659,17 @@ export default function Mapping() {
             </div>
           </div>
 
-          <div className="mapping-container" style={{ display: 'grid', gridTemplateColumns: '95px 150px 1fr 1fr', gap: '1rem', alignItems: 'center' }}>
+          <div className="mapping-container" style={{ display: 'grid', gridTemplateColumns: '95px 150px 1fr 1fr auto', gap: '1rem', alignItems: 'center' }}>
             <div></div>
             <div></div>
             <div className="mapping-header" style={{ fontWeight: 600 }}>Department Code</div>
             <div className="mapping-header" style={{ fontWeight: 600 }}>Account Code</div>
+            <div></div>
 
             {/* Amount */}
             <div className="mapping-type type-debit" style={{ color: 'var(--blue)', background: 'var(--blue-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Debit</div>
             <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--blue)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
-             <div style={{ gridColumn: 'span 2' }}>
+             <div style={{ gridColumn: 'span 3' }}>
               <div id="amountMappingStatus" style={{
                 fontSize: '0.85rem',
                 padding: '0.7rem 1rem',
@@ -828,35 +729,12 @@ export default function Mapping() {
               return (
                 <React.Fragment key={key}>
                   <div className="mapping-type type-credit" style={natureStyle}>Credit</div>
-                  <div className="mapping-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div className="mapping-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span>{labelMap[key]}</span>
-                    {activeScan[key] && (!mappings[key].dept || !mappings[key].acc) && (
-                      <span title="จำเป็นสำหรับเอกสารชุดนี้" style={{ color: '#ef4444', fontSize: '0.8rem', background: '#fff1f2', padding: '1px 5px', borderRadius: '4px', border: '1px solid #fecaca', fontWeight: 'bold' }}>
-                        <i className="fas fa-exclamation-circle"></i> MISSING
-                      </span>
-                    )}
                     {badge && (
                       <span style={{ fontSize: '0.75rem', color: badge.color, background: badge.bg, padding: '3px 8px', borderRadius: '4px', border: `1px solid ${badge.border}`, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <i className={`fas ${badge.icon}`}></i> {badge.label}
                       </span>
-                    )}
-                    {badge && (
-                      <div style={{ display: 'flex', gap: '0.3rem' }}>
-                        <button
-                          onClick={() => confirmMainSuggestion(key)}
-                          title="ยอมรับค่าแนะนำ"
-                          style={{ padding: '3px 6px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                        >
-                          <i className="fas fa-check"></i>
-                        </button>
-                        <button
-                          onClick={() => rejectMainSuggestion(key)}
-                          title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                          style={{ padding: '3px 6px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      </div>
                     )}
                   </div>
                   <div>
@@ -866,6 +744,7 @@ export default function Mapping() {
                       options={masterDepartments}
                       placeholder="พิมพ์ Dept. Code..."
                       topChoice={deptTopChoice?.code ? deptTopChoice : null}
+                      suggestedValue={suggestion?.dept || null}
                     />
                   </div>
                   <div>
@@ -875,7 +754,28 @@ export default function Mapping() {
                       options={masterAccounts}
                       placeholder="พิมพ์ Account Code..."
                       topChoice={accTopChoice?.code ? accTopChoice : null}
+                      suggestedValue={suggestion?.acc || null}
                     />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.3rem' }}>
+                    {badge && (
+                      <>
+                        <button
+                          onClick={() => confirmMainSuggestion(key)}
+                          title="ยอมรับค่าแนะนำ"
+                          style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                        >
+                          <i className="fas fa-check"></i>
+                        </button>
+                        <button
+                          onClick={() => rejectMainSuggestion(key)}
+                          title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
+                          style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </React.Fragment>
               );
@@ -912,7 +812,7 @@ export default function Mapping() {
 
       {/* Amount Modal - rendered via Portal to escape container stacking context */}
       {isAmountModalOpen && ReactDOM.createPortal(
-        <div className="mapping-modal" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setIsAmountModalOpen(false)}>
+        <div className="mapping-modal" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setPaymentSuggestions({}); setIsAmountModalOpen(false); }}>
           <div className="mapping-modal-overlay" style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}></div>
           <div className="mapping-modal-content" style={{ position: 'relative', zIndex: 1, backgroundColor: '#fff', width: '90%', maxWidth: '800px', borderRadius: '8px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
              <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#f8fafc', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
@@ -926,8 +826,8 @@ export default function Mapping() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' }}>
                 <button
-                  onClick={() => bank && masterAccounts.length && masterDepartments.length && autoSuggestPaymentTypes(bank, masterAccounts, masterDepartments)}
-                  disabled={!bank || loadingOpts || paymentSuggestLoading}
+                  onClick={() => autoSuggestPaymentTypes(masterAccounts, masterDepartments)}
+                  disabled={loadingOpts || paymentSuggestLoading}
                   style={{ padding: '0.4rem 0.8rem', background: paymentSuggestLoading ? '#f0f0f0' : 'var(--blue)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: paymentSuggestLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 500 }}
                 >
                   <i className={`fas fa-magic ${paymentSuggestLoading ? 'fa-spin' : ''}`}></i> AI Suggest
@@ -952,7 +852,6 @@ export default function Mapping() {
                   </div>
                   {[...activeScan.paymentTypes].map(type => {
                     const pAmt = paymentAmount[type] || { dept: '', acc: '' };
-                    const isCustom = !PAYMENT_TYPES.includes(type);
                     const suggestion = paymentSuggestions[type] || null;
                     const isPending = !pAmt.dept || !pAmt.acc;
 
@@ -971,21 +870,21 @@ export default function Mapping() {
                           <div style={{ background: isPending ? '#dc2626' : '#16a34a', color: '#fff', padding: '0.4rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', flex: 1 }}>{type}</div>
                           {isPending && <i className="fas fa-exclamation-triangle" style={{ color: '#dc2626' }} title="MISSING MAPPING"></i>}
                         </div>
-                        <CustomSearchSelect value={pAmt.dept} onChange={(val) => handlePaymentMappingChange(type, 'dept', val)} options={masterDepartments} placeholder="Dept..." topChoice={deptTopChoice} />
-                        <CustomSearchSelect value={pAmt.acc} onChange={(val) => handlePaymentMappingChange(type, 'acc', val)} options={masterAccounts} placeholder="Acc..." topChoice={accTopChoice} />
+                        <CustomSearchSelect value={pAmt.dept} onChange={(val) => handlePaymentMappingChange(type, 'dept', val)} options={masterDepartments} placeholder="Dept..." topChoice={deptTopChoice} suggestedValue={suggestion?.dept || null} />
+                        <CustomSearchSelect value={pAmt.acc} onChange={(val) => handlePaymentMappingChange(type, 'acc', val)} options={masterAccounts} placeholder="Acc..." topChoice={accTopChoice} suggestedValue={suggestion?.acc || null} />
                         {suggestion && (
                           <div style={{ display: 'flex', gap: '0.3rem' }}>
                             <button
                               onClick={() => confirmPaymentSuggestion(type)}
                               title="ยอมรับค่าแนะนำ"
-                              style={{ padding: '4px 8px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                             >
                               <i className="fas fa-check"></i>
                             </button>
                             <button
                               onClick={() => rejectPaymentSuggestion(type)}
                               title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                              style={{ padding: '4px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                             >
                               <i className="fas fa-times"></i>
                             </button>
@@ -1006,7 +905,6 @@ export default function Mapping() {
                 const pAmt = paymentAmount[type] || { dept: '', acc: '' };
                 const isCustom = !PAYMENT_TYPES.includes(type);
                 const suggestion = paymentSuggestions[type] || null;
-                const isPending = !pAmt.dept || !pAmt.acc;
 
                 // Resolve robust option objects for topChoice (even if not in master)
                 const deptFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
@@ -1072,6 +970,7 @@ export default function Mapping() {
                       options={masterDepartments}
                       placeholder="Dept..."
                       topChoice={deptTopChoice?.code ? deptTopChoice : null}
+                      suggestedValue={suggestion?.dept || null}
                     />
                     <CustomSearchSelect
                       value={pAmt.acc}
@@ -1079,20 +978,21 @@ export default function Mapping() {
                       options={masterAccounts}
                       placeholder="Acc..."
                       topChoice={accTopChoice?.code ? accTopChoice : null}
+                      suggestedValue={suggestion?.acc || null}
                     />
                     {suggestion && (
                       <div style={{ display: 'flex', gap: '0.3rem' }}>
                         <button
                           onClick={() => confirmPaymentSuggestion(type)}
                           title="ยอมรับค่าแนะนำ"
-                          style={{ padding: '4px 8px', background: '#16a34a', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                          style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                         >
                           <i className="fas fa-check"></i>
                         </button>
                         <button
                           onClick={() => rejectPaymentSuggestion(type)}
                           title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                          style={{ padding: '4px 8px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                          style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                         >
                           <i className="fas fa-times"></i>
                         </button>
@@ -1120,7 +1020,7 @@ export default function Mapping() {
               </div>
             </div>
             <div className="mapping-modal-footer" style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-              <button className="btn-cancel" onClick={() => setIsAmountModalOpen(false)} style={{ padding: '0.5rem 1rem', background: 'var(--gray-300)', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ยกเลิก</button>
+              <button className="btn-cancel" onClick={() => { setPaymentSuggestions({}); setIsAmountModalOpen(false); }} style={{ padding: '0.5rem 1rem', background: 'var(--gray-300)', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ยกเลิก</button>
               <button className="btn-confirm" onClick={saveAmountSelection} style={{ padding: '0.5rem 1rem', background: 'var(--blue)', color: '#fff', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ตกลง</button>
             </div>
           </div>
