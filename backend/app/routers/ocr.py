@@ -1,11 +1,15 @@
 """
-OCR API Routes.
+OCR API Routes — thin HTTP layer.
+
+Business logic lives in:
+  app/tools/extract.py  — OCR extraction
+  app/tools/submit.py   — receipt persistence
+  app/services/ocr_service.py — task/export helpers
+Carmen proxy endpoints live in app/routers/carmen.py.
 """
 
 import logging
 from typing import Optional, List
-from datetime import datetime
-from decimal import Decimal
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
@@ -13,8 +17,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-import httpx
-import uuid
 
 from app.database import get_db
 from app.config import settings
@@ -23,10 +25,11 @@ from app.models import (
     BankType,
     OCRTask,
     Receipt,
-    ReceiptDetail,
     ExtractedReceiptData,
 )
 from app.services import ocr_service
+from app.tools import submit as submit_tool
+from app.tools.submit import SubmitInput
 from app.utils.image_processing import is_valid_image
 
 
@@ -218,6 +221,7 @@ async def mark_receipt_submitted(receipt_id: str, db: AsyncSession = Depends(get
     receipt = result.scalar_one_or_none()
     if not receipt:
         raise HTTPException(status_code=404, detail=f"Receipt {receipt_id} not found")
+    from datetime import datetime
     receipt.submitted_at = datetime.utcnow()
     await db.commit()
     return {"ok": True, "submitted_at": receipt.submitted_at.isoformat()}
@@ -233,94 +237,47 @@ async def submit_receipt_stateless(
     payload: SubmitPayload,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Save user-confirmed data to DB for the first time.
-    Handles duplicate doc_no check and potential overwrite.
-    """
-    doc_no = payload.Header.DocNo
-    
-    # 1. Duplicate check (only among already submitted ones)
-    if doc_no:
-        dup_result = await db.execute(
-            select(Receipt).where(
-                Receipt.doc_no == doc_no,
-                Receipt.submitted_at.isnot(None),
-            )
-        )
-        existing_receipts = dup_result.scalars().all()
-        
-        if existing_receipts:
-            if not payload.Overwrite:
-                return {
-                    "ok": False,
-                    "error": "DUPLICATE_DOC_NO",
-                    "doc_no": doc_no,
-                    "detail": f"หมายเลข {doc_no} ถูกบันทึกไว้ในระบบแล้ว"
-                }
-            else:
-                # Overwrite mode: find and delete existing record before re-creating
-                # (Or update in place - but since we don't have a receipt_id yet, we just delete old and make new)
-                for old_r in existing_receipts:
-                    await db.delete(old_r)
-                await db.flush()
-
-    # 2. Create OCRTask (dummy task for record keeping)
-    task_id = str(uuid.uuid4())
-    task = OCRTask(
-        id=task_id,
+    """Save user-confirmed data to DB. Delegates all logic to submit_tool."""
+    inp = SubmitInput(
+        bank_type=payload.BankType,
+        overwrite=payload.Overwrite,
         original_filename=payload.OriginalFilename or "uploaded_file",
-        file_path="STATELESS_MODE", # No physical file saved
-        status=TaskStatus.COMPLETED,
-        ocr_engine=settings.ocr_engine,
-        completed_at=datetime.utcnow()
-    )
-    db.add(task)
-    await db.flush()
-
-    # 3. Create Receipt (Header)
-    bt = str(payload.BankType or "").upper()
-    receipt = Receipt(
-        task_id=task.id,
+        doc_no=payload.Header.DocNo,
+        doc_date=payload.Header.DocDate,
         bank_name=payload.Header.BankName,
-        bank_type=bt if bt in ("BBL", "KBANK", "SCB") else None,
         doc_name=payload.Header.DocName,
         company_name=payload.Header.CompanyName,
         company_tax_id=payload.Header.CompanyTaxId,
         company_address=payload.Header.CompanyAddress,
         account_no=payload.Header.AccountNo,
-        doc_date=payload.Header.DocDate,
-        doc_no=doc_no,
         merchant_name=payload.Header.MerchantName,
         merchant_id=payload.Header.MerchantId,
         wht_rate=payload.Header.WhtRate,
         wht_amount=payload.Header.WhtAmount,
         net_amount=payload.Header.NetAmount,
-        submitted_at=datetime.utcnow()
+        details=[
+            {
+                "transaction": d.Transaction,
+                "pay_amt":     d.PayAmt,
+                "commis_amt":  d.CommisAmt,
+                "tax_amt":     d.TaxAmt,
+                "wht_amount":  d.WHTAmount,
+                "total":       d.Total,
+            }
+            for d in payload.Details
+        ],
     )
-    db.add(receipt)
-    await db.flush()
 
-    # 4. Create ReceiptDetails
-    for item in payload.Details:
-        db.add(ReceiptDetail(
-            receipt_id=receipt.id,
-            transaction=item.Transaction,
-            pay_amt=Decimal(str(item.PayAmt or 0)),
-            commis_amt=Decimal(str(item.CommisAmt or 0)),
-            tax_amt=Decimal(str(item.TaxAmt or 0)),
-            wht_amount=Decimal(str(item.WHTAmount or 0)),
-            total=Decimal(str(item.Total or 0)),
-        ))
+    result = await submit_tool.run(inp, db)
 
-    await db.commit()
-    logger.info(f"Stateless submission completed for doc_no={doc_no}")
+    # Duplicate detected — surface to frontend as-is (not an HTTP error)
+    if not result.success and result.output and result.output.get("error") == "DUPLICATE_DOC_NO":
+        return {"ok": False, **result.output}
 
-    return {
-        "ok": True,
-        "receipt_id": receipt.id,
-        "doc_no": doc_no,
-        "submitted_at": receipt.submitted_at.isoformat(),
-    }
+    if not result.success:
+        raise HTTPException(status_code=500, detail=result.errors[0] if result.errors else "Submit failed")
+
+    return {"ok": True, **result.output}
 
 
 # ═══════════════════════════════════════════════════
@@ -358,6 +315,7 @@ async def debug_last_llm_response():
 
 @router.get("/health")
 async def health_check():
+    from datetime import datetime
     return {
         "health": "healthy",
         "ocr_engine": settings.ocr_engine,
@@ -366,61 +324,4 @@ async def health_check():
         "openrouter_configured": bool(settings.openrouter_api_key),
         "timestamp": datetime.utcnow().isoformat(),
     }
-
-
-# ═══════════════════════════════════════════════════
-# GET /api/v1/ocr/carmen/account-codes
-# ═══════════════════════════════════════════════════
-
-@router.get("/carmen/account-codes")
-async def proxy_account_codes():
-    if not settings.carmen_authorization:
-        raise HTTPException(status_code=500, detail="carmen_authorization not configured")
-        
-    url = "https://dev.carmen4.com/Carmen.API/api/interface/accountCode"
-    headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
-    
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(url, headers=headers)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        return resp.json()
-
-
-# ═══════════════════════════════════════════════════
-# GET /api/v1/ocr/carmen/departments
-# ═══════════════════════════════════════════════════
-
-@router.get("/carmen/departments")
-async def proxy_departments():
-    if not settings.carmen_authorization:
-        raise HTTPException(status_code=500, detail="carmen_authorization not configured")
-
-    url = "https://dev.carmen4.com/Carmen.API/api/interface/department"
-    headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(url, headers=headers)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        return resp.json()
-
-
-# ═══════════════════════════════════════════════════
-# GET /api/v1/ocr/carmen/gl-prefix
-# ═══════════════════════════════════════════════════
-
-@router.get("/carmen/gl-prefix")
-async def proxy_gl_prefix():
-    if not settings.carmen_authorization:
-        return {"Data": [], "Status": "not_configured"}
-
-    url = "https://dev.carmen4.com/Carmen.API/api/interface/glPrefix"
-    headers = {"Authorization": settings.carmen_authorization, "User-Agent": "FastAPI-Proxy"}
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(url, headers=headers)
-        if resp.status_code != 200:
-            return {"Data": [], "Status": f"upstream_{resp.status_code}"}
-        return resp.json()
 

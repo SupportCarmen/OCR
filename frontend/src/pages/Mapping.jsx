@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { fetchAccountCodes, fetchDepartments, fetchGLPrefixes, suggestMapping, saveMappingHistory, suggestPaymentTypes } from '../lib/carmenApi';
+import { fetchAccountCodes, fetchDepartments, fetchGLPrefixes } from '../lib/api/carmen';
+import { suggestMapping, suggestPaymentTypes, saveMappingHistory } from '../lib/api/mapping';
 import CustomModal from '../components/CustomModal';
 import './Mapping.css';
 
@@ -141,13 +142,6 @@ const BANK_INFO = {
   },
 };
 
-const PAYMENT_TYPES = [
-  'VSA-DCC-P', 'VSA-INT-P', 'VSA-P', 'VSA-AFF-P', 'VSA-DCC', 'VSA-INT', 'VSA', 'VSA-AFF',
-  'MCA-DCC-P', 'MCA-INT-P', 'MCA-P', 'MCA-AFF-P', 'MCA-DCC', 'MCA-INT', 'MCA', 'MCA-AFF',
-  'UP', 'JCB-P', 'JCB-AFF-P', 'JCB', 'JCB-AFF', 'MCE', 'LCS-VSA-P', 'LCS-VSA', 'QR-VSA',
-  'AMEX', 'LCS-MCA', 'QR-MCA', 'VSPPCO', 'VSCCCO', 'TPN', 'THSTD-P', 'QR-JCB', 'QR-UPI',
-  'VSA-SCB-P', 'MCA-SCB-P'
-];
 
 const OCR_BANK_MAP = {
   BBL: 'Bangkok Bank (BBL)',
@@ -164,6 +158,7 @@ export default function Mapping() {
   const [bank, setBank] = useState('');
   const [filePrefix, setFilePrefix] = useState('');
   const [fileSource, setFileSource] = useState('');
+  const [description, setDescription] = useState('');
 
   const [company, setCompany] = useState({ name: '', taxId: '', branch: '', address: '' });
 
@@ -174,13 +169,7 @@ export default function Mapping() {
     net: { dept: '', acc: '' }
   });
 
-  const [paymentAmount, setPaymentAmount] = useState(() => {
-    const initialState = {};
-    PAYMENT_TYPES.forEach(type => {
-      initialState[type] = { dept: '', acc: '' };
-    });
-    return initialState;
-  });
+  const [paymentAmount, setPaymentAmount] = useState({});
 
   const [customPaymentTypes, setCustomPaymentTypes] = useState([]);
   const [newCustomType, setNewCustomType] = useState('');
@@ -188,6 +177,8 @@ export default function Mapping() {
   const [isAmountModalOpen, setIsAmountModalOpen] = useState(false);
   const [activeScan, setActiveScan] = useState({ paymentTypes: new Set(), commission: false, tax: false, net: false });
   const [modalConfig, setModalConfig] = useState({ show: false, title: '', message: '', type: 'info' });
+  const [saving, setSaving] = useState(false);
+  const [acceptAllModal, setAcceptAllModal] = useState(false);
 
   // AI / History suggestion state
   const [suggestionMeta, setSuggestionMeta] = useState({ commission: null, tax: null, net: null }); // null | 'history' | 'ai'
@@ -221,7 +212,7 @@ export default function Mapping() {
 
     try {
       const aiResult = await suggestMapping({
-        accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.nature })),
+        accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.type })),
         departments: departments.map(d => ({ code: d.code, name: d.name })),
       });
 
@@ -298,11 +289,37 @@ export default function Mapping() {
     setPaymentSuggestions(prev => ({ ...prev, [type]: null }));
   };
 
+  const handleAcceptAll = () => {
+    // Accept all pending main suggestions (commission / tax / net)
+    setMappings(prev => {
+      const next = { ...prev };
+      ['commission', 'tax', 'net'].forEach(key => {
+        const s = mainSuggestions[key];
+        if (s) next[key] = { dept: s.dept || '', acc: s.acc || '' };
+      });
+      return next;
+    });
+    setMainSuggestions({ commission: null, tax: null, net: null });
+    setSuggestionMeta({ commission: null, tax: null, net: null });
+
+    // Accept all pending payment type suggestions
+    setPaymentAmount(prev => {
+      const next = { ...prev };
+      Object.entries(paymentSuggestions).forEach(([type, s]) => {
+        if (s) next[type] = { dept: s.dept || '', acc: s.acc || '' };
+      });
+      return next;
+    });
+    setPaymentSuggestions({});
+
+    setAcceptAllModal(false);
+  };
+
   const autoSuggestPaymentTypes = async (accounts, departments, specificTypes = null) => {
     if (!accounts.length) return;
     setPaymentSuggestLoading(true);
 
-    const allTypes = specificTypes || [...PAYMENT_TYPES, ...customPaymentTypes];
+    const allTypes = specificTypes || [...activeScan.paymentTypes, ...customPaymentTypes];
 
     // Only suggest for payment types that don't have mappings yet
     const needsAI = allTypes.filter(t =>
@@ -326,7 +343,7 @@ export default function Mapping() {
     try {
       const result = await suggestPaymentTypes({
         payment_types: needsAI,
-        accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.nature })),
+        accounts: accounts.map(a => ({ code: a.code, name: a.name, type: a.type })),
         departments: departments.map(d => ({ code: d.code, name: d.name })),
       });
       Object.entries(result.suggestions || {}).forEach(([t, val]) => {
@@ -353,7 +370,7 @@ export default function Mapping() {
 
       const mappedAcc = accResult
         .filter(a => a.AccCode && a.AccCode !== 'AccCode')
-        .map(a => ({ code: a.AccCode, name: a.Description, name2: a.Description2, nature: a.Nature }));
+        .map(a => ({ code: a.AccCode, name: a.Description, name2: a.Description2, nature: a.Nature, type: a.Type }));
 
       const mappedDept = deptResult
         .filter(d => d.DeptCode && d.DeptCode !== 'CodeDep')
@@ -428,6 +445,7 @@ export default function Mapping() {
         setBank(finalBank);
         setFilePrefix(parsed.filePrefix || '');
         setFileSource(parsed.fileSource || '');
+        setDescription(parsed.description || '');
         
         let companyData = { name: '', taxId: '', branch: '', address: '' };
         if (parsed.company) {
@@ -475,9 +493,6 @@ export default function Mapping() {
           Object.keys(parsedAmount).forEach(k => {
             if (k !== '__customTypes') newState[k] = parsedAmount[k];
           });
-          PAYMENT_TYPES.forEach(type => {
-            if (!newState[type]) newState[type] = { dept: '', acc: '' };
-          });
           savedCustomTypes.forEach(type => {
             if (!newState[type]) newState[type] = { dept: '', acc: '' };
           });
@@ -488,33 +503,48 @@ export default function Mapping() {
   }, []);
 
   const saveAllSettings = async (shouldClose = false) => {
-    const config = { bank, filePrefix, fileSource, company, mappings, paymentAmount };
-    localStorage.setItem('accountingConfig', JSON.stringify(config));
-
-    // Save all non-empty mappings to history
-    if (bank) {
-      const allMappings = { ...mappings };
-      Object.entries(paymentAmount).forEach(([type, val]) => {
-        if (val.dept || val.acc) allMappings[type] = val;
+    if (saving) return
+    if (missingCompanyFields.length > 0) {
+      setModalConfig({
+        show: true,
+        title: 'กรุณากรอกข้อมูลให้ครบ',
+        message: `กรุณากรอก ${missingCompanyFields.map(f => f.label).join(', ')} ก่อนบันทึก`,
+        type: 'error'
       });
-      try {
-        await saveMappingHistory({ bank_name: bank, mappings: allMappings });
-      } catch (_) { }
+      return;
     }
 
-    if (shouldClose && window.opener) {
-      window.close();
-    } else {
-      // ถ้าไม่ใช่หน้าต่างแยก ให้กลับไปหน้าหลัก (ตัว App จะโหลด Step ล่าสุดมาเอง)
-      window.location.hash = '';
-      if (!shouldClose) {
-        setModalConfig({
-          show: true,
-          title: 'บันทึกสำเร็จ',
-          message: 'บันทึกการตั้งค่า Account Mapping เรียบร้อยแล้ว',
-          type: 'success'
+    setSaving(true);
+    try {
+      const config = { bank, filePrefix, fileSource, description, company, mappings, paymentAmount };
+      localStorage.setItem('accountingConfig', JSON.stringify(config));
+
+      // Save all non-empty mappings to history
+      if (bank) {
+        const allMappings = { ...mappings };
+        Object.entries(paymentAmount).forEach(([type, val]) => {
+          if (val.dept || val.acc) allMappings[type] = val;
         });
+        try {
+          await saveMappingHistory({ bank_name: bank, mappings: allMappings });
+        } catch (_) { }
       }
+
+      if (shouldClose && window.opener) {
+        window.close();
+      } else {
+        window.location.hash = '';
+        if (!shouldClose) {
+          setModalConfig({
+            show: true,
+            title: 'บันทึกสำเร็จ',
+            message: 'บันทึกการตั้งค่า Account Mapping เรียบร้อยแล้ว',
+            type: 'success'
+          });
+        }
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -525,7 +555,7 @@ export default function Mapping() {
 
   const handleAddCustomType = () => {
     const trimmed = newCustomType.trim().toUpperCase();
-    if (!trimmed || PAYMENT_TYPES.includes(trimmed) || customPaymentTypes.includes(trimmed)) return;
+    if (!trimmed || activeScan.paymentTypes.has(trimmed) || customPaymentTypes.includes(trimmed)) return;
     setCustomPaymentTypes(prev => [...prev, trimmed]);
     setPaymentAmount(prev => ({ ...prev, [trimmed]: { dept: '', acc: '' } }));
     setNewCustomType('');
@@ -570,9 +600,17 @@ export default function Mapping() {
     }));
   };
 
-  const allPaymentTypes = [...PAYMENT_TYPES, ...customPaymentTypes];
+  const allPaymentTypes = [...activeScan.paymentTypes, ...customPaymentTypes.filter(t => !activeScan.paymentTypes.has(t))];
   const requiredMissingCount = [...activeScan.paymentTypes].filter(t => !paymentAmount[t]?.dept || !paymentAmount[t]?.acc).length;
   const amountMappedCount = allPaymentTypes.filter(t => paymentAmount[t]?.dept && paymentAmount[t]?.acc).length;
+
+  const companyRequiredFields = [
+    { key: 'name',    label: 'Company Name' },
+    { key: 'taxId',   label: 'Tax ID' },
+    { key: 'branch',  label: 'Branch No' },
+    { key: 'address', label: 'Address' },
+  ];
+  const missingCompanyFields = companyRequiredFields.filter(f => !company[f.key]?.trim());
 
   return (
     <>
@@ -582,6 +620,16 @@ export default function Mapping() {
         message={modalConfig.message}
         type={modalConfig.type}
         onConfirm={() => setModalConfig({ ...modalConfig, show: false })}
+      />
+      <CustomModal
+        show={acceptAllModal}
+        title="ยืนยัน Accept All"
+        message="AI อาจแนะนำรหัสบัญชีผิดพลาดได้ คุณได้ตรวจสอบรายการทั้งหมดแล้วใช่ไหม?"
+        type="warning"
+        confirmText="ยืนยัน ยอมรับทั้งหมด"
+        cancelText="ยกเลิก"
+        onConfirm={handleAcceptAll}
+        onCancel={() => setAcceptAllModal(false)}
       />
       <div className="container" style={{ margin: '2rem auto', maxWidth: '800px' }}>
         <h1><i className="fas fa-project-diagram"></i> Account Mapping Configuration</h1>
@@ -620,21 +668,42 @@ export default function Mapping() {
 
             <label>File Source</label>
             <input type="text" placeholder="ระบุแหล่งที่มาไฟล์ (เช่น Email, Drive)" value={fileSource} onChange={(e) => setFileSource(e.target.value)} />
+
+            <label>Description</label>
+            <input type="text" placeholder="รายละเอียดเพิ่มเติม" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
         </div>
 
         {/* Company Information */}
         <div className="section">
-          <div className="section-title">COMPANY INFORMATION</div>
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            COMPANY INFORMATION
+            {missingCompanyFields.length > 0 && (
+              <span style={{ fontSize: '0.75rem', background: '#dc2626', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                <i className="fas fa-exclamation-circle"></i> ข้อมูลไม่ครบ {missingCompanyFields.length} รายการ
+              </span>
+            )}
+          </div>
           <div className="form-grid">
-            <label>Company Name</label>
-            <input type="text" placeholder="ระบุชื่อบริษัท" value={company.name} onChange={(e) => handleCompanyChange(e, 'name')} />
-            <label>Tax ID</label>
-            <input type="text" placeholder="ระบุเลขประจำตัวผู้เสียภาษี" value={company.taxId} onChange={(e) => handleCompanyChange(e, 'taxId')} />
-            <label>Branch No</label>
-            <input type="text" placeholder="ระบุรหัสสาขา" value={company.branch} onChange={(e) => handleCompanyChange(e, 'branch')} />
-            <label>Address</label>
-            <input type="text" placeholder="ระบุที่อยู่" value={company.address} onChange={(e) => handleCompanyChange(e, 'address')} />
+            {companyRequiredFields.map(({ key, label }) => {
+              const missing = !company[key]?.trim();
+              const placeholderMap = { name: 'ระบุชื่อบริษัท', taxId: 'ระบุเลขประจำตัวผู้เสียภาษี', branch: 'ระบุรหัสสาขา', address: 'ระบุที่อยู่' };
+              return (
+                <>
+                  <label key={`lbl-${key}`} style={missing ? { color: '#dc2626', fontWeight: 600 } : {}}>
+                    {label} {missing && <span style={{ color: '#dc2626' }}>*</span>}
+                  </label>
+                  <input
+                    key={`inp-${key}`}
+                    type="text"
+                    placeholder={placeholderMap[key]}
+                    value={company[key]}
+                    onChange={(e) => handleCompanyChange(e, key)}
+                    style={missing ? { borderColor: '#dc2626', background: '#fff1f2' } : {}}
+                  />
+                </>
+              );
+            })}
           </div>
         </div>
 
@@ -645,6 +714,14 @@ export default function Mapping() {
               <span>ACCOUNT CODE MAPPING {loadingOpts && <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: 'var(--blue)' }}><i className="fas fa-spinner fa-spin"></i> กำลังโหลดรหัสบัญชี...</span>}</span>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+              {(Object.values(mainSuggestions).some(s => s) || Object.values(paymentSuggestions).some(s => s)) && (
+                <button
+                  onClick={() => setAcceptAllModal(true)}
+                  style={{ padding: '0.4rem 0.8rem', background: '#d97706', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 500 }}
+                >
+                  <i className="fas fa-check-double"></i> Accept All
+                </button>
+              )}
               <button
                 onClick={() => autoSuggest(masterAccounts, masterDepartments)}
                 disabled={masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading}
@@ -667,7 +744,7 @@ export default function Mapping() {
             <div></div>
 
             {/* Amount */}
-            <div className="mapping-type type-debit" style={{ color: 'var(--blue)', background: 'var(--blue-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Debit</div>
+            <div className="mapping-type type-credit" style={{ color: 'var(--blue)', background: 'var(--blue-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Credit</div>
             <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--blue)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
              <div style={{ gridColumn: 'span 3' }}>
               <div id="amountMappingStatus" style={{
@@ -728,7 +805,7 @@ export default function Mapping() {
 
               return (
                 <React.Fragment key={key}>
-                  <div className="mapping-type type-credit" style={natureStyle}>Credit</div>
+                  <div className="mapping-type type-debit" style={natureStyle}>Debit</div>
                   <div className="mapping-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span>{labelMap[key]}</span>
                     {badge && (
@@ -787,13 +864,14 @@ export default function Mapping() {
           <button
             className="btn-save"
             onClick={() => saveAllSettings(true)}
+            disabled={saving}
             style={{
               width: '100%',
               padding: '1.2rem',
-              background: 'var(--teal)',
+              background: saving ? '#5eaca3' : 'var(--teal)',
               color: '#fff',
               borderRadius: '12px',
-              cursor: 'pointer',
+              cursor: saving ? 'not-allowed' : 'pointer',
               fontWeight: 'bold',
               fontSize: '1.1rem',
               border: 'none',
@@ -804,7 +882,8 @@ export default function Mapping() {
               gap: '0.75rem'
             }}
           >
-            <i className="fas fa-check-circle" style={{ fontSize: '1.2rem' }}></i> บันทึกและปิดหน้าต่าง
+            <i className={`fas ${saving ? 'fa-spinner fa-spin' : 'fa-check-circle'}`} style={{ fontSize: '1.2rem' }}></i>
+            {saving ? 'กำลังบันทึก...' : 'บันทึกและปิดหน้าต่าง'}
           </button>
         </div>
 
@@ -824,14 +903,24 @@ export default function Mapping() {
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' }}>
-                <button
-                  onClick={() => autoSuggestPaymentTypes(masterAccounts, masterDepartments)}
-                  disabled={loadingOpts || paymentSuggestLoading}
-                  style={{ padding: '0.4rem 0.8rem', background: paymentSuggestLoading ? '#f0f0f0' : 'var(--blue)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: paymentSuggestLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 500 }}
-                >
-                  <i className={`fas fa-magic ${paymentSuggestLoading ? 'fa-spin' : ''}`}></i> AI Suggest
-                </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    onClick={() => autoSuggestPaymentTypes(masterAccounts, masterDepartments)}
+                    disabled={loadingOpts || paymentSuggestLoading}
+                    style={{ padding: '0.4rem 0.8rem', background: paymentSuggestLoading ? '#f0f0f0' : 'var(--blue)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: paymentSuggestLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: paymentSuggestLoading ? '#999' : 'white', fontWeight: 500 }}
+                  >
+                    <i className={`fas fa-magic ${paymentSuggestLoading ? 'fa-spin' : ''}`}></i> AI Suggest
+                  </button>
+                  {Object.values(paymentSuggestions).some(s => s) && (
+                    <button
+                      onClick={() => setAcceptAllModal(true)}
+                      style={{ padding: '0.4rem 0.8rem', background: '#d97706', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 500 }}
+                    >
+                      <i className="fas fa-check-double"></i> Accept All
+                    </button>
+                  )}
+                </div>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-3)', fontWeight: 500 }}>
                   ({amountMappedCount}/{allPaymentTypes.length} mapped)
                 </span>
@@ -893,9 +982,11 @@ export default function Mapping() {
                       </div>
                     );
                   })}
-                  <div style={{ margin: '1.5rem 0 1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-400)' }}>
-                    ตัวเลือกอื่นๆ ทั้งหมด (All other types)
-                  </div>
+                  {customPaymentTypes.filter(t => !activeScan.paymentTypes.has(t)).length > 0 && (
+                    <div style={{ margin: '1.5rem 0 1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--gray-400)' }}>
+                      Custom Types (เพิ่มเอง)
+                    </div>
+                  )}
                 </>
               )}
 
@@ -903,7 +994,7 @@ export default function Mapping() {
                 .filter(t => !activeScan.paymentTypes.has(t))
                 .map(type => {
                 const pAmt = paymentAmount[type] || { dept: '', acc: '' };
-                const isCustom = !PAYMENT_TYPES.includes(type);
+                const isCustom = !activeScan.paymentTypes.has(type);
                 const suggestion = paymentSuggestions[type] || null;
 
                 // Resolve robust option objects for topChoice (even if not in master)

@@ -1,6 +1,6 @@
 const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'
 
-export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSource, onFinish, onBack }) {
+export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSource, description, onFinish, onBack }) {
   const totalDr = jvRows.reduce((s, r) => s + r.debit,  0)
   const totalCr = jvRows.reduce((s, r) => s + r.credit, 0)
 
@@ -20,30 +20,73 @@ export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSou
           </div>
         </div>
         <div className="card-body">
-          <div className="jv-meta-grid">
-            <div className="jv-meta-item">
-              <div className="jv-meta-label">Prefix</div>
-              <div className="jv-meta-value">{filePrefix || '—'}</div>
-            </div>
-            <div className="jv-meta-item">
-              <div className="jv-meta-label">Voucher No.</div>
-              <div className="jv-meta-value" style={{ fontFamily: 'monospace' }}>{headerData.DocNo || '—'}</div>
-            </div>
-            <div className="jv-meta-item">
-              <div className="jv-meta-label">Date</div>
-              <div className="jv-meta-value">{headerData.DocDate || '—'}</div>
-            </div>
-            <div className="jv-meta-item">
-              <div className="jv-meta-label">Source</div>
-              <div className="jv-meta-value" style={{ color: 'var(--success)' }}>{fileSource || '—'}</div>
-            </div>
-            <div className="jv-meta-item" style={{ gridColumn: 'span 4' }}>
-              <div className="jv-meta-label">Description</div>
-              <div className="jv-meta-value">Post from OCR: {headerData.DocName || 'Credit Card Report'}</div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '0',
+            background: 'var(--gray-50)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            overflow: 'hidden',
+            marginBottom: '0',
+          }}>
+            {/* Row 1: 4 cols */}
+            {[
+              { icon: 'fa-tag',        label: 'Prefix',      value: filePrefix,        mono: false, accent: true  },
+              { icon: 'fa-hashtag',    label: 'Voucher No.', value: headerData.DocNo,  mono: true,  accent: false },
+              { icon: 'fa-calendar',   label: 'Date',        value: headerData.DocDate,mono: false, accent: false },
+              { icon: 'fa-database',   label: 'Source',      value: fileSource,        mono: false, accent: false, green: true },
+            ].map(({ icon, label, value, mono, accent, green }, i) => (
+              <div key={i} style={{
+                padding: '1rem 1.25rem',
+                borderRight: i < 3 ? '1px solid var(--border)' : 'none',
+                borderBottom: '1px solid var(--border)',
+                background: accent ? 'var(--blue-light)' : 'white',
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em',
+                  textTransform: 'uppercase', color: accent ? 'var(--blue)' : 'var(--text-3)',
+                  marginBottom: '0.35rem',
+                }}>
+                  <i className={`fas ${icon}`} style={{ fontSize: '0.65rem' }} />
+                  {label}
+                </div>
+                <div style={{
+                  fontSize: '0.95rem', fontWeight: 600,
+                  fontFamily: mono ? "'DM Mono', monospace" : 'inherit',
+                  color: accent ? 'var(--blue)' : green ? 'var(--teal)' : 'var(--text)',
+                  letterSpacing: mono ? '-0.01em' : 'inherit',
+                }}>
+                  {value || '—'}
+                </div>
+              </div>
+            ))}
+
+            {/* Row 2: description full width */}
+            <div style={{
+              gridColumn: 'span 4',
+              padding: '0.85rem 1.25rem',
+              background: 'white',
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+            }}>
+              <div style={{
+                fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em',
+                textTransform: 'uppercase', color: 'var(--text-3)',
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                whiteSpace: 'nowrap',
+              }}>
+                <i className="fas fa-align-left" style={{ fontSize: '0.65rem' }} />
+                Description
+              </div>
+              <div style={{ width: '1px', height: '1rem', background: 'var(--border)', flexShrink: 0 }} />
+              <div style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>
+                {description || '—'}
+              </div>
             </div>
           </div>
 
-          <div className="table-wrapper" style={{ marginTop: '1.5rem', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)' }}>
+          <div className="table-wrapper" style={{ marginTop: '1rem', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)' }}>
             <table className="data-table">
               <thead>
                 <tr>
@@ -87,7 +130,7 @@ export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSou
               <i className="fas fa-print" /> พิมพ์ Voucher
             </button>
             <button className="btn-submit" onClick={onFinish}>
-              <i className="fas fa-check" /> เสร็จสิ้น (Finish)
+              <i className="fas fa-arrow-right" /> ต่อไป (Next)
             </button>
           </div>
         </div>

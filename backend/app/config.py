@@ -2,6 +2,8 @@
 Application configuration — loads settings from .env file.
 """
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
 import os
 
@@ -11,8 +13,8 @@ class Settings(BaseSettings):
 
     # OpenRouter API
     openrouter_api_key: str = ""
-    openrouter_ocr_model: str = "google/gemini-2.5-flash-lite"
-    openrouter_suggestion_model: str = "google/gemini-2.0-flash-lite"
+    openrouter_ocr_model: str
+    openrouter_suggestion_model: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # OCR engine label (informational — actual engine is the OpenRouter vision LLM)
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
     carmen_authorization: str = ""
 
     class Config:
-        env_file = ".env"
+        env_file = Path(__file__).parent.parent / ".env"
         env_file_encoding = "utf-8"
 
 

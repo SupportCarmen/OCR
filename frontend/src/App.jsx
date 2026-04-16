@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { EMPTY_DETAIL_ROW } from './constants'
-import { extractFromFile } from './lib/ocrApi'
-import { submitToLocal } from './lib/carmenApi'
+import { EMPTY_DETAIL_ROW, BANK_THAI_NAMES, detectBankFromCompanyName } from './constants'
+import { extractFromFile } from './lib/api/ocr'
+import { submitToLocal } from './lib/api/submit'
+import { submitToCarmen } from './lib/api/carmen'
+import { useToast } from './hooks/useToast'
+import { useModal } from './hooks/useModal'
 import StepWizard from './components/StepWizard'
 import UploadSection from './components/UploadSection'
 import ActionBar from './components/ActionBar'
@@ -12,20 +15,7 @@ import DocumentPreview from './components/DocumentPreview'
 import CustomModal from './components/CustomModal'
 import AccountingReview from './components/AccountingReview'
 import JournalVoucher from './components/JournalVoucher'
-
-const BANK_THAI_NAMES = {
-  BBL: 'ธนาคารกรุงเทพ',
-  KBANK: 'ธนาคารกสิกรไทย',
-  SCB: 'ธนาคารไทยพาณิชย์',
-}
-
-function detectBankFromCompanyName(backCompanyname) {
-  if (!backCompanyname) return null
-  if (backCompanyname.includes('กรุงเทพ')) return 'BBL'
-  if (backCompanyname.includes('กสิกร')) return 'KBANK'
-  if (backCompanyname.includes('ไทยพาณิชย์')) return 'SCB'
-  return null
-}
+import InputTaxReconciliation from './components/InputTaxReconciliation'
 
 export default function App() {
   const initialState = (() => {
@@ -37,34 +27,25 @@ export default function App() {
 
   const [step, setStep] = useState(initialState?.step > 1 ? initialState.step : 1)
   const [bank, setBank] = useState(initialState?.bank || '')
-  // cc// รองรับหลายไฟล์ (multi-file) — files เป็น array ของไฟล์ทั้งหมด
   const [files, setFiles] = useState([])
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState('')
   const [headerData, setHeaderData] = useState(initialState?.headerData || {})
   const [receiptMeta, setReceiptMeta] = useState(initialState?.receiptMeta || {})
   const [details, setDetails] = useState(initialState?.details || [])
   const [jvRows, setJvRows] = useState([])
-  const [modal, setModal] = useState({ show: false })
-  const [toasts, setToasts] = useState([])
   const [filePrefix, setFilePrefix] = useState('')
   const [fileSource, setFileSource] = useState('')
+  const [jvDescription, setJvDescription] = useState('')
+
+  const { toasts, showToast } = useToast()
+  const { modal, showModal, closeModal } = useModal()
 
   const fileInputRef = useRef(null)
   const submittedDocNos = useRef(new Set())
-
-  function showModal(config) { setModal({ show: true, ...config }) }
-  function closeModal() { setModal({ show: false }) }
-
-  function showToast(msg, type = 'info') {
-    const id = Date.now() + Math.random()
-    setToasts(prev => [...prev, { id, msg, type }])
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-    }, 3500)
-  }
 
   useEffect(() => {
     return () => {
@@ -72,26 +53,28 @@ export default function App() {
     }
   }, [previewUrl])
 
-  // cc// โหลด filePrefix และ fileSource จาก localStorage (accountingConfig)
+  // โหลด filePrefix และ fileSource จาก localStorage (accountingConfig)
   // Update whenever we move to step 5 (JournalVoucher) to get latest values from Mapping page
   useEffect(() => {
     try {
       const config = JSON.parse(localStorage.getItem('accountingConfig') || '{}')
       setFilePrefix(config.filePrefix || '')
       setFileSource(config.fileSource || '')
-    } catch (e) {}
+      const desc = config.description
+        ? `${config.description}${headerData.DocDate ? ` - ${headerData.DocDate}` : ''}`
+        : ''
+      setJvDescription(desc)
+    } catch { /* ignore */ }
   }, [step])
 
-  // cc// บันทึกสถานะล่าสุดลลง localStorage (Auto-Save)
+  // Auto-save wizard state to localStorage
   useEffect(() => {
-    // Save only if we have passed the initial steps
     if (step > 1) {
       const ocrState = { step, bank, headerData, receiptMeta, details }
       localStorage.setItem('ocr_wizard_state', JSON.stringify(ocrState))
     }
   }, [step, bank, headerData, receiptMeta, details])
 
-  // cc// รองรับ multi-file — เมื่อเลือกหลายไฟล์จะสร้าง detail row ตามจำนวนไฟล์
   function handleFileChange(e) {
     const selectedFiles = e.target.files
     if (!selectedFiles || selectedFiles.length === 0) return
@@ -101,11 +84,10 @@ export default function App() {
     setFiles(fileArray)
     setStatus('')
 
-    // Preview ไฟล์แรก
     const f = fileArray[0]
     const name = f.name.toLowerCase()
     const isImage = f.type.startsWith('image/') || /\.(jpe?g|png|gif|bmp|webp)$/i.test(name)
-    const isPDF = f.type === 'application/pdf' || /\.pdf$/i.test(name)
+    const isPDF   = f.type === 'application/pdf'  || /\.pdf$/i.test(name)
     if (isImage) {
       setPreviewUrl(URL.createObjectURL(f))
       setPreviewType('image')
@@ -122,19 +104,19 @@ export default function App() {
   function applyExtractedData(ext) {
     setHeaderData({
       DateProcessed: new Date().toLocaleDateString('en-GB'),
-      BankName: ext.bank_name || '',
-      DocName: ext.doc_name || '',
-      CompanyName: ext.company_name || '',
-      DocDate: ext.doc_date || '',
-      DocNo: ext.doc_no || '',
+      BankName:     ext.bank_name     || '',
+      DocName:      ext.doc_name      || '',
+      CompanyName:  ext.company_name  || '',
+      DocDate:      ext.doc_date      || '',
+      DocNo:        ext.doc_no        || '',
       MerchantName: ext.merchant_name || '',
-      MerchantId: ext.merchant_id || '',
+      MerchantId:   ext.merchant_id   || '',
     })
     setReceiptMeta({
-      CompanyTaxId: ext.company_tax_id || '',
+      CompanyTaxId:   ext.company_tax_id  || '',
       CompanyAddress: ext.company_address || '',
-      AccountNo: ext.account_no || '',
-      WhtRate: ext.wht_rate || '',
+      AccountNo:      ext.account_no      || '',
+      WhtRate:        ext.wht_rate        || '',
       WhtAmount: ext.wht_amount != null ? parseFloat(ext.wht_amount) || null : null,
       NetAmount: ext.net_amount != null ? parseFloat(ext.net_amount) || null : null,
     })
@@ -147,33 +129,29 @@ export default function App() {
           ...existing.company,
           ...(ext.bank_companyname && { name: ext.bank_companyname }),
           ...((ext.bank_tax_id || ext.back_tax_id) && { taxId: ext.bank_tax_id || ext.back_tax_id }),
-          ...(ext.bank_address     && { address: ext.bank_address }),
-          ...(ext.branch_no        && { branch: ext.branch_no }),
+          ...(ext.bank_address && { address: ext.bank_address }),
+          ...(ext.branch_no    && { branch:  ext.branch_no }),
         }
-        // Sync bank into accountingConfig so Mapping.jsx always reads the correct bank
         const detectedBankCode = detectBankFromCompanyName(ext.bank_companyname)
         const BANK_CODE_TO_NAME = {
-          BBL: 'Bangkok Bank (BBL)',
+          BBL:   'Bangkok Bank (BBL)',
           KBANK: 'Kasikornbank (KBANK)',
-          SCB: 'Siam Commercial Bank (SCB)',
+          SCB:   'Siam Commercial Bank (SCB)',
         }
         if (detectedBankCode && BANK_CODE_TO_NAME[detectedBankCode]) {
           existing.bank = BANK_CODE_TO_NAME[detectedBankCode]
         }
         localStorage.setItem('accountingConfig', JSON.stringify(existing))
-      } catch (e) {}
+      } catch { /* ignore */ }
     }
   }
 
-  // cc// ประมวลผลทุกไฟล์ที่เลือก — detail rows เพิ่มตามจำนวน PDF/ไฟล์
   async function processFile() {
     if (!bank) {
       showModal({
         title: 'ข้อมูลไม่ครบถ้วน',
         message: 'กรุณาเลือกธนาคารที่ต้องการนำเข้าข้อมูลก่อนดำเนินการ',
-        type: 'warning',
-        confirmText: 'รับทราบ',
-        onConfirm: closeModal
+        type: 'warning', confirmText: 'รับทราบ', onConfirm: closeModal,
       })
       return
     }
@@ -181,9 +159,7 @@ export default function App() {
       showModal({
         title: 'ไม่พบไฟล์เอกสาร',
         message: 'กรุณาเลือกไฟล์รูปภาพหรือ PDF ที่ต้องการประมวลผล',
-        type: 'warning',
-        confirmText: 'ตกลง',
-        onConfirm: closeModal
+        type: 'warning', confirmText: 'ตกลง', onConfirm: closeModal,
       })
       return
     }
@@ -221,9 +197,7 @@ export default function App() {
               showModal({
                 title: 'เกิดข้อผิดพลาด',
                 message: `ไม่สามารถอ่านข้อมูลได้: ${err.message}`,
-                type: 'error',
-                confirmText: 'ปิด',
-                onConfirm: closeModal
+                type: 'error', confirmText: 'ปิด', onConfirm: closeModal,
               })
               setStep(1)
             } finally {
@@ -242,9 +216,7 @@ export default function App() {
       showModal({
         title: 'เกิดข้อผิดพลาด',
         message: `ไม่สามารถอ่านข้อมูลได้: ${err.message}`,
-        type: 'error',
-        confirmText: 'ปิด',
-        onConfirm: closeModal
+        type: 'error', confirmText: 'ปิด', onConfirm: closeModal,
       })
       setStep(1)
     } finally {
@@ -262,38 +234,39 @@ export default function App() {
     )
   }
 
-  function addRow() { setDetails(prev => [...prev, { ...EMPTY_DETAIL_ROW }]) }
-  function deleteRow(index) { setDetails(prev => prev.filter((_, i) => i !== index)) }
+  function addRow()          { setDetails(prev => [...prev, { ...EMPTY_DETAIL_ROW }]) }
+  function deleteRow(index)  { setDetails(prev => prev.filter((_, i) => i !== index)) }
 
   async function handleSubmitFinal(rows, overwrite = false) {
+    setSubmitting(true)
     setJvRows(rows)
     const docNo = headerData.DocNo
     const payload = {
-      BankType: bank,
-      Overwrite: overwrite,
+      BankType:         bank,
+      Overwrite:        overwrite,
       OriginalFilename: files[0]?.name,
       Header: {
-        DateProcessed: headerData.DateProcessed || '',
-        BankName: headerData.BankName || '',
-        DocName: headerData.DocName || '',
-        CompanyName: headerData.CompanyName || '',
-        CompanyTaxId: receiptMeta.CompanyTaxId || '',
+        DateProcessed:  headerData.DateProcessed  || '',
+        BankName:       headerData.BankName        || '',
+        DocName:        headerData.DocName         || '',
+        CompanyName:    headerData.CompanyName     || '',
+        CompanyTaxId:   receiptMeta.CompanyTaxId   || '',
         CompanyAddress: receiptMeta.CompanyAddress || '',
-        AccountNo: receiptMeta.AccountNo || '',
-        DocDate: headerData.DocDate || '',
-        DocNo: headerData.DocNo || '',
-        MerchantName: headerData.MerchantName || '',
-        MerchantId: headerData.MerchantId || '',
-        WhtRate: receiptMeta.WhtRate || '',
-        WhtAmount: receiptMeta.WhtAmount || null,
-        NetAmount: receiptMeta.NetAmount || null,
+        AccountNo:      receiptMeta.AccountNo      || '',
+        DocDate:        headerData.DocDate         || '',
+        DocNo:          headerData.DocNo           || '',
+        MerchantName:   headerData.MerchantName    || '',
+        MerchantId:     headerData.MerchantId      || '',
+        WhtRate:        receiptMeta.WhtRate        || '',
+        WhtAmount:      receiptMeta.WhtAmount      || null,
+        NetAmount:      receiptMeta.NetAmount      || null,
       },
       Details: details.map(row => ({
         Transaction: row.Transaction || row.transaction || '',
-        PayAmt:      parseFloat(String(row.PayAmt || row.pay_amt || 0).replace(/,/g, '')) || 0,
+        PayAmt:      parseFloat(String(row.PayAmt    || row.pay_amt    || 0).replace(/,/g, '')) || 0,
         CommisAmt:   parseFloat(String(row.CommisAmt || row.commis_amt || 0).replace(/,/g, '')) || 0,
-        TaxAmt:      parseFloat(String(row.TaxAmt || row.tax_amt || 0).replace(/,/g, '')) || 0,
-        Total:       parseFloat(String(row.Total || row.total || 0).replace(/,/g, '')) || 0,
+        TaxAmt:      parseFloat(String(row.TaxAmt    || row.tax_amt    || 0).replace(/,/g, '')) || 0,
+        Total:       parseFloat(String(row.Total     || row.total      || 0).replace(/,/g, '')) || 0,
         WHTAmount:   parseFloat(String(row.WHTAmount || row.wht_amount || 0).replace(/,/g, '')) || 0,
       })),
     }
@@ -301,37 +274,78 @@ export default function App() {
       showToast('กำลังส่งข้อมูล...', 'info')
       await submitToLocal(payload)
       submittedDocNos.current.add(docNo)
-      showToast('อัปโหลดข้อมูลสำเร็จ', 'success')
-      showModal({
-        title: 'บันทึกสำเร็จ!',
-        message: `เอกสารหมายเลข ${docNo} ได้ถูกบันทึกลงฐานข้อมูลเรียบร้อยแล้ว`,
-        type: 'success',
-        confirmText: 'ดูรายการรายวัน (JV)',
-        onConfirm: () => {
-          closeModal()
-          setStep(5)
+
+      // Build and submit Carmen GL JV payload
+      let carmenError = null
+      try {
+        const carmenConfig = (() => {
+          try { return JSON.parse(localStorage.getItem('accountingConfig') || '{}') } catch { return {} }
+        })()
+        const carmenPayload = {
+          JvhSeq: -1,
+          JvhDate: (() => {
+            if (headerData.DocDate) {
+              const [d, m, y] = headerData.DocDate.split('/')
+              const parsed = new Date(`${y}-${m}-${d}`)
+              if (!isNaN(parsed)) return parsed.toISOString()
+            }
+            return new Date().toISOString()
+          })(),
+          Prefix:      carmenConfig.filePrefix || '',
+          JvhNo:       'Auto',
+          JvhSource:   carmenConfig.fileSource || '',
+          Status:      'Draft',
+          Description: carmenConfig.description
+            ? `${carmenConfig.description}${headerData.DocDate ? ` - ${headerData.DocDate}` : ''}`
+            : '',
+          Detail: rows.map(r => ({
+            JvhSeq: -1, JvdSeq: -1,
+            DeptCode: r.dept, AccCode: r.acc, Description: r.desc,
+            CurCode: 'THB', CurRate: 1,
+            CrAmount: r.credit, CrBase: r.credit,
+            DrAmount: r.debit,  DrBase: r.debit,
+            DimList: {},
+          })),
+          DimHList: { Dim: [] },
+          UserModified: '',
         }
+        console.log('[Carmen GL JV] payload:', JSON.stringify(carmenPayload, null, 2))
+        await submitToCarmen(carmenPayload)
+        showToast('ส่งข้อมูลเข้า Carmen GL JV สำเร็จ', 'success')
+      } catch (err) {
+        carmenError = err.message
+        showToast(`Carmen GL JV: ${err.message}`, 'error')
+      }
+
+      showModal({
+        title:   carmenError ? 'บันทึกสำเร็จ (Carmen มีปัญหา)' : 'บันทึกสำเร็จ!',
+        message: carmenError
+          ? `เอกสารหมายเลข ${docNo} บันทึกลงฐานข้อมูลแล้ว\n\nแต่การส่ง Carmen GL JV ล้มเหลว:\n${carmenError}`
+          : `เอกสารหมายเลข ${docNo} ได้ถูกบันทึกและส่ง Carmen GL JV เรียบร้อยแล้ว`,
+        type:        carmenError ? 'warning' : 'success',
+        confirmText: 'ดูรายการรายวัน (JV)',
+        onConfirm: () => { closeModal(); setStep(5) },
       })
     } catch (err) {
       if (err.code === 'DUPLICATE_DOC_NO') {
         showModal({
-          title: 'พบเอกสารซ้ำ',
+          title:   'พบเอกสารซ้ำ',
           message: `ระบบตรวจพบเอกสารหมายเลข ${docNo}\nมีอยู่ใน Database แล้ว ต้องการเขียนทับ (Overwrite) หรือไม่?`,
           type: 'warning',
           confirmText: 'Overwrite',
-          cancelText: 'ยกเลิก',
+          cancelText:  'ยกเลิก',
           onConfirm: () => { closeModal(); handleSubmitFinal(rows, true) },
-          onCancel: closeModal,
+          onCancel:  closeModal,
         })
       } else {
         showModal({
           title: 'เกิดข้อผิดพลาดในการบันทึก',
           message: err.message,
-          type: 'error',
-          confirmText: 'ปิด',
-          onConfirm: closeModal
+          type: 'error', confirmText: 'ปิด', onConfirm: closeModal,
         })
       }
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -357,14 +371,11 @@ export default function App() {
       title: 'ยกเลิกการทำงาน',
       message: 'ยืนยันการยกเลิกและล้างข้อมูลทั้งหมดหรือไม่?',
       type: 'warning',
-      confirmText: 'ยืนยัน',
-      cancelText: 'กลับตัว',
-      onConfirm: resetAll,
-      onCancel: closeModal
+      confirmText: 'ยืนยัน', cancelText: 'กลับตัว',
+      onConfirm: resetAll, onCancel: closeModal,
     })
   }
 
-  // cc// ปุ่มย้อนกลับ — กลับไป step ก่อนหน้า
   function goBack() {
     if (step > 1) setStep(step - 1)
   }
@@ -382,6 +393,26 @@ export default function App() {
         onCancel={modal.onCancel}
       />
 
+      {/* OCR loading overlay */}
+      {loading && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.55)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          zIndex: 99999,
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '16px', padding: '2.5rem 3rem',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', minWidth: '280px', textAlign: 'center',
+          }}>
+            <i className="fas fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--teal)' }} />
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-1)' }}>AI กำลังอ่านเอกสาร</div>
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-2)' }}>{status || 'กรุณารอสักครู่...'}</div>
+          </div>
+        </div>
+      )}
+
       <div className="app-container">
         <div className="toast-container" id="toastContainer">
           {toasts.slice(-1).map(t => (
@@ -394,9 +425,7 @@ export default function App() {
 
         <div className="app-header">
           <div className="brand">
-            <div className="logo-box">
-              <i className="fas fa-file-invoice-dollar" />
-            </div>
+            <div className="logo-box"><i className="fas fa-file-invoice-dollar" /></div>
             <h1>ระบบนำเข้าข้อมูล Credit Card Report</h1>
           </div>
         </div>
@@ -454,9 +483,11 @@ export default function App() {
               <div id="step4">
                 <AccountingReview
                   details={details}
+                  headerData={headerData}
                   onBack={() => setStep(3)}
                   onSubmit={handleSubmitFinal}
                   onGoMapping={() => { window.open('#mapping', '_blank') }}
+                  submitting={submitting}
                 />
               </div>
             )}
@@ -468,8 +499,20 @@ export default function App() {
                   headerData={headerData}
                   filePrefix={filePrefix}
                   fileSource={fileSource}
-                  onFinish={resetAll}
+                  description={jvDescription}
+                  onFinish={() => setStep(6)}
                   onBack={() => setStep(4)}
+                />
+              </div>
+            )}
+
+            {step === 6 && (
+              <div id="step6">
+                <InputTaxReconciliation
+                  details={details}
+                  headerData={headerData}
+                  onBack={() => setStep(5)}
+                  onFinish={resetAll}
                 />
               </div>
             )}

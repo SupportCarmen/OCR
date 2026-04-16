@@ -31,17 +31,17 @@ function buildRows(details, config) {
     const taxAmt    = toNum(detail.TaxAmt)
     const total     = toNum(detail.Total)
 
-    addRow(amtCfg, payAmt, payType, true)
-    addRow(commCfg, commisAmt, 'Commission', false)
-    addRow(taxCfg, taxAmt, 'Tax Amount', false)
-    addRow(netCfg, total, 'Net Payment', false)
+    addRow(amtCfg, payAmt, payType, false)
+    addRow(commCfg, commisAmt, 'Commission', true)
+    addRow(taxCfg, taxAmt, 'Tax Amount', true)
+    addRow(netCfg, total, 'Net Payment', true)
   })
   return rows
 }
 
 const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''
 
-export default function AccountingReview({ details, onBack, onSubmit, onGoMapping }) {
+export default function AccountingReview({ details, headerData = {}, onBack, onSubmit, onGoMapping, submitting = false }) {
   const [config, setConfig] = useState(null)
   const [warningModal, setWarningModal] = useState(false)
 
@@ -72,7 +72,11 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
     }
 
     window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    window.addEventListener('focus', loadConfig)
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('focus', loadConfig)
+    }
   }, [])
 
   const rows = config ? buildRows(details, config) : []
@@ -136,6 +140,9 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
             <span style={{ background: 'var(--gray-100)', color: 'var(--text-2)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 500 }}>
               Source: {config?.fileSource || '-'}
             </span>
+            <span style={{ background: 'var(--gray-100)', color: 'var(--text-2)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 500 }}>
+              Description: {config?.description ? `${config.description}${headerData.DocDate ? ` - ${headerData.DocDate}` : ''}` : '-'}
+            </span>
           </div>
         </div>
         <div className="card-body-flush table-wrapper">
@@ -189,8 +196,8 @@ export default function AccountingReview({ details, onBack, onSubmit, onGoMappin
           <button className="btn-cancel" onClick={loadConfig}>
             <i className="fas fa-sync-alt" /> Refresh
           </button>
-          <button className="btn-submit" disabled={rows.length === 0} onClick={() => hasMissing ? setWarningModal(true) : onSubmit(rows)}>
-            <i className="fas fa-cloud-upload-alt" /> ยืนยันและส่งข้อมูล
+          <button className="btn-submit" disabled={rows.length === 0 || submitting} onClick={() => hasMissing ? setWarningModal(true) : onSubmit(rows)}>
+            <i className={`fas ${submitting ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'}`} /> {submitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันและส่งข้อมูล'}
           </button>
         </div>
       </div>

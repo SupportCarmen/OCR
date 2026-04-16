@@ -19,6 +19,8 @@ from app.config import settings
 from app.database import init_db, migrate_db
 from app.routers.ocr import router as ocr_router
 from app.routers.mapping import router as mapping_router
+from app.routers.carmen import router as carmen_router
+from app.routers.tools import router as tools_router
 
 
 # ── Logging Setup ──
@@ -91,6 +93,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # ── Register Routers ──
 app.include_router(ocr_router)
 app.include_router(mapping_router)
+app.include_router(carmen_router)
+app.include_router(tools_router)
 
 
 # ── Root endpoint ──
