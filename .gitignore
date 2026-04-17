@@ -39,4 +39,5 @@ venv/
 .venv/
 
 # Claude Code
+.claude/
 CLAUDE.md
