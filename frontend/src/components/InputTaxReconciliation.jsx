@@ -222,15 +222,16 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           <button className="btn-cancel" onClick={onBack} style={{ marginRight: 'auto' }}>
             <i className="fas fa-arrow-left" /> ย้อนกลับ
           </button>
-          <button className="btn-cancel" onClick={() => window.print()}>
-            <i className="fas fa-print" /> พิมพ์
+          <button className="btn-icon" onClick={() => window.print()} title="พิมพ์เอกสาร" style={{ position: 'relative' }}>
+            <i className="fas fa-print" />
           </button>
-          <button className="btn-cancel" onClick={() => {
+          <button className="btn-danger" onClick={() => {
             showToast?.('จบกระบวนการโดยไม่เพิ่ม Input Tax', 'info')
             onFinish()
           }}>
             <i className="fas fa-times" /> Discard
           </button>
+          <div className="form-actions-sep" />
           <button className="btn-submit" onClick={() => { setSubmitError(null); setShowConfirm(true) }} disabled={!hasData}>
             <i className="fas fa-plus-circle" /> Add Input Tax
           </button>

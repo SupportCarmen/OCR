@@ -171,7 +171,7 @@ export default function App() {
 
       // Duplicate check — stop immediately if doc_no already submitted
       if (ext.is_duplicate) {
-        setStatus('❌ พบเอกสารซ้ำ')
+        setStatus('พบเอกสารซ้ำ')
         showModal({
           title: 'พบเอกสารซ้ำในระบบ',
           message: `เอกสารหมายเลข ${ext.doc_no} ถูกบันทึกไว้ในระบบแล้ว\nไม่สามารถนำเข้าเอกสารซ้ำได้`,
@@ -203,7 +203,7 @@ export default function App() {
             try {
               const ext2 = await extractFromFile(files[0], detectedBank)
               if (ext2.is_duplicate) {
-                setStatus('❌ พบเอกสารซ้ำ')
+                setStatus('พบเอกสารซ้ำ')
                 showModal({
                   title: 'พบเอกสารซ้ำในระบบ',
                   message: `เอกสารหมายเลข ${ext2.doc_no} ถูกบันทึกไว้ในระบบแล้ว\nไม่สามารถนำเข้าเอกสารซ้ำได้`,
@@ -218,7 +218,7 @@ export default function App() {
               setStep(3)
               showToast(`ประมวลผลใหม่ด้วย ${BANK_THAI_NAMES[detectedBank]} สำเร็จ`, 'success')
             } catch (err) {
-              setStatus(`❌ ${err.message}`)
+              setStatus(err.message)
               showModal({
                 title: 'เกิดข้อผิดพลาด',
                 message: `ไม่สามารถอ่านข้อมูลได้: ${err.message}`,
@@ -237,7 +237,7 @@ export default function App() {
         showToast(`อ่านข้อมูลสำเร็จ ${files.length} ไฟล์ — กรุณาตรวจสอบและแก้ไข`, 'success')
       }
     } catch (err) {
-      setStatus(`❌ ${err.message}`)
+      setStatus(err.message)
       showModal({
         title: 'เกิดข้อผิดพลาด',
         message: `ไม่สามารถอ่านข้อมูลได้: ${err.message}`,
@@ -407,20 +407,11 @@ export default function App() {
 
       {/* OCR loading overlay */}
       {loading && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.55)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          zIndex: 99999,
-        }}>
-          <div style={{
-            background: 'white', borderRadius: '16px', padding: '2.5rem 3rem',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', minWidth: '280px', textAlign: 'center',
-          }}>
-            <i className="fas fa-spinner fa-spin" style={{ fontSize: '2.5rem', color: 'var(--teal)' }} />
-            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-1)' }}>AI กำลังอ่านเอกสาร</div>
-            <div style={{ fontSize: '0.88rem', color: 'var(--text-2)' }}>{status || 'กรุณารอสักครู่...'}</div>
+        <div className="ocr-loading-overlay">
+          <div className="ocr-loading-box">
+            <div className="ocr-loading-spinner" />
+            <div className="ocr-loading-title">AI กำลังอ่านเอกสาร</div>
+            <div className="ocr-loading-status">{status || 'กรุณารอสักครู่...'}</div>
           </div>
         </div>
       )}

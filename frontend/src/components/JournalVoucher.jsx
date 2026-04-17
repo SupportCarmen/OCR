@@ -126,9 +126,10 @@ export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSou
                 <i className="fas fa-arrow-left" /> ย้อนกลับ
               </button>
             )}
-            <button className="btn-cancel" onClick={() => window.print()}>
-              <i className="fas fa-print" /> พิมพ์ Voucher
+            <button className="btn-icon" onClick={() => window.print()} title="พิมพ์ Voucher" style={{ position: 'relative' }}>
+              <i className="fas fa-print" />
             </button>
+            <div className="form-actions-sep" />
             <button className="btn-submit" onClick={onFinish}>
               <i className="fas fa-arrow-right" /> ต่อไป (Next)
             </button>

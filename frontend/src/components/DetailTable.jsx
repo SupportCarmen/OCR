@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { DETAIL_COLUMNS, DETAIL_LABELS } from '../constants'
 
-// cc// จัดรูปแบบตัวเลขให้มี comma และทศนิยม 2 ตำแหน่ง
 const formatAmount = (value) => {
-  if (!value) return ''
-  const num = parseFloat(String(value).replace(/,/g, ''))
-  if (isNaN(num)) return String(value)
+  const str = String(value ?? '').replace(/,/g, '').trim()
+  if (str === '') return ''
+  const num = parseFloat(str)
+  if (isNaN(num)) return str
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
@@ -20,6 +21,8 @@ const amountFields = ['PayAmt', 'CommisAmt', 'TaxAmt', 'Total']
 
 // cc// ลบ ACTION column และปุ่มเพิ่มรายการ, เพิ่ม Total Summary Card
 export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, readOnly }) {
+  const [focusedCell, setFocusedCell] = useState(null) // { row, col }
+
   return (
     <>
       <div className="data-card">
@@ -46,7 +49,12 @@ export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, 
                 <tr key={rowIdx}>
                   {DETAIL_COLUMNS.map(col => {
                     const isAmountField = amountFields.includes(col)
-                    const displayValue = isAmountField ? formatAmount(row[col]) : (row[col] ?? '')
+                    const isEditing = focusedCell?.row === rowIdx && focusedCell?.col === col
+                    // While focused: show raw number (no commas) so user can type freely
+                    // While blurred: show formatted value with commas
+                    const displayValue = isAmountField && !isEditing
+                      ? formatAmount(row[col])
+                      : (String(row[col] ?? '').replace(/,/g, ''))
                     return (
                       <td key={col}>
                         <input
@@ -54,6 +62,8 @@ export default function DetailTable({ details, onUpdate, onAddRow, onDeleteRow, 
                           className="detail-input"
                           value={displayValue}
                           readOnly={readOnly}
+                          onFocus={() => !readOnly && isAmountField && setFocusedCell({ row: rowIdx, col })}
+                          onBlur={() => setFocusedCell(null)}
                           onChange={e => !readOnly && onUpdate?.(rowIdx, col, e.target.value)}
                         />
                       </td>

@@ -1,26 +1,40 @@
 const STEPS = [
-  { n: 1, label: 'เลือกธนาคารและไฟล์' },
-  { n: 2, label: 'AI อ่านข้อมูล' },
-  { n: 3, label: 'ตรวจสอบข้อมูล' },
-  { n: 4, label: 'Review Accounting & Submit' },
-  { n: 5, label: 'Journal Voucher' },
-  { n: 6, label: 'Input Tax Reconciliation' },
+  { n: 1, label: 'เลือกธนาคาร', sub: 'และไฟล์' },
+  { n: 2, label: 'AI อ่านข้อมูล', sub: '' },
+  { n: 3, label: 'ตรวจสอบข้อมูล', sub: '' },
+  { n: 4, label: 'Accounting', sub: 'Review' },
+  { n: 5, label: 'Journal Voucher', sub: '' },
+  { n: 6, label: 'Input Tax', sub: 'Reconciliation' },
 ]
 
 export default function StepWizard({ step }) {
   return (
-    <div className="step-wizard">
-      {STEPS.map((s, i) => (
-        <div key={s.n} style={{ display: 'contents' }}>
-          <div className={`step ${step === s.n ? 'active' : step > s.n ? 'done' : ''}`}>
-            <div className="step-num">
-              {step > s.n ? <i className="fas fa-check" /> : String(s.n).padStart(2, '0')}
+    <div className="step-wizard-wrap">
+      <div className="step-wizard">
+        {STEPS.map((s, i) => {
+          const isDone   = step > s.n
+          const isActive = step === s.n
+          return (
+            <div key={s.n} style={{ display: 'contents' }}>
+              <div className={`step ${isActive ? 'active' : isDone ? 'done' : ''}`}>
+                <div className="step-num">
+                  {isDone ? <i className="fas fa-check" style={{ fontSize: '0.6rem' }} /> : String(s.n).padStart(2, '0')}
+                </div>
+                <span>
+                  {s.label}
+                  {s.sub && <span style={{ display: 'inline', opacity: 0.65 }}>{' '}{s.sub}</span>}
+                </span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div
+                  className="step-sep"
+                  style={step > s.n ? { background: 'var(--teal)', opacity: 0.4 } : {}}
+                />
+              )}
             </div>
-            <span>{s.label}</span>
-          </div>
-          {i < STEPS.length - 1 && <div className="step-sep" />}
-        </div>
-      ))}
+          )
+        })}
+      </div>
     </div>
   )
 }

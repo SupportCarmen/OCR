@@ -190,12 +190,13 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
           <button className="btn-cancel" onClick={onBack}>
             <i className="fas fa-arrow-left" /> ย้อนกลับ
           </button>
-          <button className="btn-cancel" style={{ marginRight: 'auto' }} onClick={onGoMapping}>
+          <button className="btn-cancel" onClick={onGoMapping} style={{ marginRight: 'auto' }}>
             <i className="fas fa-cog" /> ตั้งค่า Mapping
           </button>
-          <button className="btn-cancel" onClick={loadConfig}>
-            <i className="fas fa-sync-alt" /> Refresh
+          <button className="btn-icon" onClick={loadConfig} title="รีเฟรชข้อมูล Mapping" style={{ position: 'relative' }}>
+            <i className="fas fa-sync-alt" />
           </button>
+          <div className="form-actions-sep" />
           <button className="btn-submit" disabled={rows.length === 0 || submitting} onClick={() => hasMissing ? setWarningModal(true) : onSubmit(rows)}>
             <i className={`fas ${submitting ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'}`} /> {submitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันและส่งข้อมูล'}
           </button>

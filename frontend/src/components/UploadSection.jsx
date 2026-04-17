@@ -37,14 +37,16 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
           {BANKS.map((b) => {
             const isSelected = bank === b.value
             return (
-              <label 
-                key={b.value} 
+              <label
+                key={b.value}
                 className={`bank-option ${isSelected ? 'selected' : ''}`}
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') onBankChange(b.value) }}
               >
-                <input 
-                  type="radio" 
-                  name="bank" 
-                  value={b.value} 
+                <input
+                  type="radio"
+                  name="bank"
+                  value={b.value}
                   checked={isSelected}
                   onChange={(e) => onBankChange(e.target.value)}
                 />
@@ -58,19 +60,24 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
       </div>
 
       {/* File Upload Drop Zone */}
-      <div 
+      <div
         className={`panel-card upload-drop ${isDragOver ? 'dragover' : ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        role="button"
+        tabIndex={0}
+        aria-label="อัปโหลดไฟล์เอกสาร"
+        onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') fileInputRef.current?.click() }}
       >
-        <input 
-          type="file" 
-          id="fileInput" 
+        <input
+          type="file"
+          id="fileInput"
           ref={fileInputRef}
           accept="image/*, application/pdf"
           multiple={multiple}
           onChange={onFileChange}
+          aria-hidden="true"
         />
         <div className="upload-icon"><i className="fas fa-cloud-upload-alt"></i></div>
         <div className="upload-label">
