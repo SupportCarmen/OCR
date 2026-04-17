@@ -51,6 +51,7 @@ export async function extractFromFile(file, bankType) {
     wht_amount:       receipt.wht_amount       || '',
     net_amount:       receipt.net_amount       || '',
     bank_companyname: receipt.bank_companyname || '',
+    is_duplicate:     receipt.is_duplicate     || false,
     details,
   }
 }

@@ -56,39 +56,32 @@ Detail row fields (one object per card/payment type row):
 - tax_amt      : VAT on commission (VALUE ADDED TAX / ภาษีมูลค่าเพิ่ม)
 - total        : net amount credited to merchant per row (AMOUNT CREDIT TO MERCHANT / จำนวนเงินสุทธิ)
 
-Example — document with 2 payment rows:
+Example:
 {
   "bank_companyname": "ธนาคารกรุงเทพ จำกัด (มหาชน)",
-  "bank_tax_id":      "0107536000374",
-  "bank_address":     "333 ถนนสีลม เขตบางรัก กรุงเทพฯ 10500",
-  "branch_no":        "0000",
-  "bank_name":       "ธนาคารกรุงเทพ",
-  "doc_name":        "ใบเสร็จรับเงิน/ใบกำกับภาษี",
-  "company_name":    "บริษัท COMPANY NAME จำกัด",
-  "company_tax_id":  "0105555181506",
-  "company_address": "89 ซอยสุขุมวิท 2 แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110",
-  "account_no":      "206-0-90244-8",
-  "doc_date":        "09/09/2025",
-  "doc_no":          "25251-01-01485",
-  "merchant_name":   "COMPANY NAME CO.,LTD",
-  "merchant_id":     "002206198772",
-  "wht_rate":        "3.00",
-  "wht_amount":      "25.85",
-  "net_amount":      "28,636.58",
+  "bank_tax_id": "0107536000374",
+  "bank_address": "333 ถนนสีลม เขตบางรัก กรุงเทพฯ 10500",
+  "branch_no": "0000",
+  "bank_name": "ธนาคารกรุงเทพ",
+  "doc_name": "ใบเสร็จรับเงิน/ใบกำกับภาษี",
+  "company_name": "บริษัท ยูไนเต็ด จำกัด",
+  "company_tax_id": "0105555181506",
+  "company_address": "89 ซอยสุขุมวิท 2 กทม.",
+  "account_no": "206-0-90244-8",
+  "doc_date": "09/09/2025",
+  "doc_no": "25251-01-01485",
+  "merchant_name": "UNITED CO.,LTD",
+  "merchant_id": "002206198772",
+  "wht_rate": "3.00",
+  "wht_amount": "25.85",
+  "net_amount": "28,636.58",
   "details": [
     {
-      "transaction":  "Visa",
-      "pay_amt":      "5,407.00",
-      "commis_amt":   "136.48",
-      "tax_amt":      "9.55",
-      "total":        "5,260.97"
-    },
-    {
-      "transaction":  "Master",
-      "pay_amt":      "24,176.52",
-      "commis_amt":   "725.29",
-      "tax_amt":      "50.77",
-      "total":        "23,400.46"
+      "transaction": "Visa",
+      "pay_amt": "5,407.00",
+      "commis_amt": "136.48",
+      "tax_amt": "9.55",
+      "total": "5,260.97"
     }
   ]
 }

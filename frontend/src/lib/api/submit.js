@@ -4,7 +4,7 @@
 
 /**
  * Submit the processed document payload to the local backend DB.
- * @param {{ BankType: string, Overwrite: boolean, OriginalFilename: string, Header: object, Details: object[] }} payload
+ * @param {{ BankType: string, OriginalFilename: string, Header: object, Details: object[] }} payload
  * @returns {Promise<object>} response from backend
  */
 export async function submitToLocal(payload) {
@@ -36,11 +36,9 @@ export async function submitToLocal(payload) {
 
   const data = await res.json()
 
-  // Application-level errors (e.g. DUPLICATE_DOC_NO — HTTP 200 but ok:false)
   if (data.ok === false) {
     const error = new Error(data.detail || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล')
     error.status = 200
-    error.code   = data.error
     error.detail = data.detail
     throw error
   }

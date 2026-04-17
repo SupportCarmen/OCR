@@ -7,7 +7,7 @@ import './Mapping.css';
 
 // ─── CUSTOM SEARCH SELECT ───
 // topChoice: { code, name, name2?, source: 'ai'|'history' } | null
-function CustomSearchSelect({ value, onChange, options, placeholder, topChoice, suggestedValue }) {
+function CustomSearchSelect({ value, onChange, options, placeholder, topChoice, suggestedValue, hasError }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -70,7 +70,7 @@ function CustomSearchSelect({ value, onChange, options, placeholder, topChoice, 
         onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
         onChange={(e) => setSearchTerm(e.target.value)}
         title={isAISuggested ? `AI แนะนำ: ${suggestedValue}` : value && selectedDesc ? `${value} — ${selectedDesc}` : ''}
-        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--blue)' : isAISuggested ? '#c4b5fd' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
+        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--blue)' : isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : hasError ? '#fff1f2' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
       />
       {isOpen && (
         <div style={{
@@ -504,11 +504,12 @@ export default function Mapping() {
 
   const saveAllSettings = async (shouldClose = false) => {
     if (saving) return
-    if (missingCompanyFields.length > 0) {
+    const allMissing = [...missingTopFields, ...missingCompanyFields];
+    if (allMissing.length > 0) {
       setModalConfig({
         show: true,
         title: 'กรุณากรอกข้อมูลให้ครบ',
-        message: `กรุณากรอก ${missingCompanyFields.map(f => f.label).join(', ')} ก่อนบันทึก`,
+        message: `กรุณากรอก ${allMissing.map(f => f.label).join(', ')} ก่อนบันทึก`,
         type: 'error'
       });
       return;
@@ -612,6 +613,13 @@ export default function Mapping() {
   ];
   const missingCompanyFields = companyRequiredFields.filter(f => !company[f.key]?.trim());
 
+  const topLevelRequired = [
+    { key: 'bank',       label: 'Bank',        value: bank },
+    { key: 'filePrefix', label: 'File Prefix', value: filePrefix },
+    { key: 'fileSource', label: 'File Source', value: fileSource },
+  ];
+  const missingTopFields = topLevelRequired.filter(f => !f.value?.trim());
+
   return (
     <>
       <CustomModal
@@ -643,7 +651,9 @@ export default function Mapping() {
         {/* Bank Selection */}
         <div className="section">
           <div className="form-grid">
-            <label>Bank</label>
+            <label style={!bank ? { color: '#dc2626', fontWeight: 600 } : {}}>
+              Bank {!bank && <span style={{ color: '#dc2626' }}>*</span>}
+            </label>
             <select value={bank} onChange={(e) => {
               const selected = e.target.value;
               setBank(selected);
@@ -651,23 +661,29 @@ export default function Mapping() {
                 const info = BANK_INFO[selected];
                 setCompany(prev => ({ ...prev, name: info.name, taxId: info.taxId, address: info.address }));
               }
-            }} className="search-select-trigger" style={{ width: '100%' }}>
+            }} className="search-select-trigger" style={{ width: '100%', ...(!bank ? { borderColor: '#dc2626', background: '#fff1f2' } : {}) }}>
               <option value="">เลือกธนาคาร...</option>
               <option value="Bangkok Bank (BBL)">Bangkok Bank (BBL)</option>
               <option value="Kasikornbank (KBANK)">Kasikornbank (KBANK)</option>
               <option value="Siam Commercial Bank (SCB)">Siam Commercial Bank (SCB)</option>
             </select>
 
-            <label>File Prefix</label>
+            <label style={!filePrefix ? { color: '#dc2626', fontWeight: 600 } : {}}>
+              File Prefix {!filePrefix && <span style={{ color: '#dc2626' }}>*</span>}
+            </label>
             <CustomSearchSelect
               value={filePrefix}
               onChange={(code) => setFilePrefix(code)}
               options={masterGLPrefixes}
               placeholder={loadingOpts ? 'กำลังโหลด...' : 'เลือกคำนำหน้าไฟล์...'}
+              hasError={!filePrefix}
             />
 
-            <label>File Source</label>
-            <input type="text" placeholder="ระบุแหล่งที่มาไฟล์ (เช่น Email, Drive)" value={fileSource} onChange={(e) => setFileSource(e.target.value)} />
+            <label style={!fileSource ? { color: '#dc2626', fontWeight: 600 } : {}}>
+              File Source {!fileSource && <span style={{ color: '#dc2626' }}>*</span>}
+            </label>
+            <input type="text" placeholder="ระบุแหล่งที่มาไฟล์ (เช่น Email, Drive)" value={fileSource} onChange={(e) => setFileSource(e.target.value)}
+              style={!fileSource ? { borderColor: '#dc2626', background: '#fff1f2' } : {}} />
 
             <label>Description</label>
             <input type="text" placeholder="รายละเอียดเพิ่มเติม" value={description} onChange={(e) => setDescription(e.target.value)} />

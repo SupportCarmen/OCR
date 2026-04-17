@@ -52,3 +52,21 @@ export async function submitToCarmen(payload) {
   }
   return res.json()
 }
+
+/**
+ * Submit an Input Tax record to Carmen (via backend proxy).
+ * @param {object} payload - Input tax payload
+ * @returns {Promise<object>}
+ */
+export async function submitInputTax(payload) {
+  const res = await fetch('/api/v1/ocr/carmen/input-tax', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const errTxt = await res.text()
+    throw new Error(`Carmen Input Tax ล้มเหลว (${res.status}): ${errTxt}`)
+  }
+  return res.json()
+}

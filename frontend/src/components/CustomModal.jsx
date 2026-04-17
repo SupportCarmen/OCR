@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * CustomModal - A premium replacement for browser alert() and confirm()
@@ -33,7 +34,7 @@ export default function CustomModal({
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal-overlay">
       <div className="modal-box">
         <div className={`modal-icon ${type}`}>
@@ -41,15 +42,15 @@ export default function CustomModal({
         </div>
         <h3 className="modal-title">{title}</h3>
         <p className="modal-msg">{message}</p>
-        
+
         <div className="modal-actions">
           {onCancel && (
             <button className="btn btn-outline" onClick={onCancel}>
               {cancelText}
             </button>
           )}
-          <button 
-            className={`btn ${type === 'error' ? 'btn-danger' : type === 'warning' ? 'btn-primary' : 'btn-primary'}`} 
+          <button
+            className={`btn ${type === 'error' ? 'btn-danger' : type === 'warning' ? 'btn-primary' : 'btn-primary'}`}
             style={type === 'error' ? { background: 'var(--rose)' } : type === 'warning' ? { background: 'var(--amber)' } : {}}
             onClick={onConfirm}
           >
@@ -57,6 +58,7 @@ export default function CustomModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

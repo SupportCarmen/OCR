@@ -63,7 +63,6 @@ class SubmitHeader(BaseModel):
 class SubmitPayload(BaseModel):
     model_config = ConfigDict(extra='ignore', populate_by_name=True)
     BankType:         Optional[str] = Field(None, alias="bank_type")
-    Overwrite:        bool = False
     OriginalFilename: Optional[str] = Field(None, alias="original_filename")
     Header:           SubmitHeader
     Details:          List[SubmitDetailItem] = []
@@ -80,11 +79,13 @@ router = APIRouter(prefix="/api/v1/ocr", tags=["OCR"])
 async def extract_receipt(
     files: List[UploadFile] = File(..., description="รูปใบเสร็จ (JPG, PNG, PDF)"),
     bank_type: Optional[BankType] = Query(None, description="ประเภทธนาคาร BBL/KBANK/SCB"),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Stateless extraction:
     Read files, call LLM, return JSON data.
     Does NOT save to DB or Disk.
+    Sets is_duplicate=True if doc_no already exists in submitted receipts.
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
@@ -111,6 +112,18 @@ async def extract_receipt(
             original_filename=upload_file.filename,
             bank_type=bank_type.value if bank_type else None,
         )
+
+        # Duplicate check — flag if doc_no already submitted
+        if extracted.doc_no:
+            dup = await db.execute(
+                select(Receipt).where(
+                    Receipt.doc_no == extracted.doc_no,
+                    Receipt.submitted_at.isnot(None),
+                )
+            )
+            if dup.scalars().first():
+                extracted.is_duplicate = True
+
         results.append(extracted)
 
     return results
@@ -240,7 +253,6 @@ async def submit_receipt_stateless(
     """Save user-confirmed data to DB. Delegates all logic to submit_tool."""
     inp = SubmitInput(
         bank_type=payload.BankType,
-        overwrite=payload.Overwrite,
         original_filename=payload.OriginalFilename or "uploaded_file",
         doc_no=payload.Header.DocNo,
         doc_date=payload.Header.DocDate,
@@ -269,10 +281,6 @@ async def submit_receipt_stateless(
     )
 
     result = await submit_tool.run(inp, db)
-
-    # Duplicate detected — surface to frontend as-is (not an HTTP error)
-    if not result.success and result.output and result.output.get("error") == "DUPLICATE_DOC_NO":
-        return {"ok": False, **result.output}
 
     if not result.success:
         raise HTTPException(status_code=500, detail=result.errors[0] if result.errors else "Submit failed")

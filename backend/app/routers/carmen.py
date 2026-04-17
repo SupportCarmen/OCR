@@ -12,7 +12,19 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from app.config import settings
-from app.services.carmen_service import CarmenAPIError, get_account_codes, get_departments, get_gl_prefix, post_gljv
+from app.services.carmen_service import (
+    CarmenAPIError,
+    get_account_codes,
+    get_departments,
+    get_gl_prefix,
+    get_period_list,
+    get_tax_profiles,
+    get_vendors,
+    post_gljv,
+    post_input_tax,
+    put_gljv,
+    put_input_tax,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,3 +71,60 @@ async def proxy_gljv(request: Request):
         return await post_gljv(body)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen GL JV ล้มเหลว: {e.detail}")
+
+
+@router.put("/gljv/{jvh_seq}")
+async def proxy_update_gljv(jvh_seq: int, request: Request):
+    _require_auth()
+    body = await request.json()
+    try:
+        return await put_gljv(jvh_seq, body)
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=f"Carmen GL JV update ล้มเหลว: {e.detail}")
+
+
+@router.get("/vendors")
+async def proxy_vendors():
+    _require_auth()
+    try:
+        return await get_vendors()
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
+@router.get("/tax-profiles")
+async def proxy_tax_profiles():
+    _require_auth()
+    try:
+        return await get_tax_profiles()
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
+@router.get("/period-list")
+async def proxy_period_list():
+    _require_auth()
+    try:
+        return await get_period_list()
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
+@router.post("/input-tax")
+async def proxy_create_input_tax(request: Request):
+    _require_auth()
+    body = await request.json()
+    try:
+        return await post_input_tax(body)
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=f"Carmen Input Tax ล้มเหลว: {e.detail}")
+
+
+@router.put("/input-tax/{rec_seq}")
+async def proxy_update_input_tax(rec_seq: int, request: Request):
+    _require_auth()
+    body = await request.json()
+    try:
+        return await put_input_tax(rec_seq, body)
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=f"Carmen Input Tax update ล้มเหลว: {e.detail}")

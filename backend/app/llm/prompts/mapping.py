@@ -35,10 +35,7 @@ Available Department Codes:
 Commission — Available Account Codes (type=I, {commission_acc_count} codes):
 {commission_acc_lines if commission_acc_lines else "  (none available)"}
 
-Tax Amount — Available Account Codes (type=B, {balance_acc_count} codes):
-{balance_acc_lines if balance_acc_lines else "  (none available)"}
-
-Net Amount — Available Account Codes (type=B, {balance_acc_count} codes):
+Tax Amount and Net Amount — Available Account Codes (type=B, {balance_acc_count} codes):
 {balance_acc_lines if balance_acc_lines else "  (none available)"}
 
 Return ONLY a valid JSON object — no markdown, no explanation:
@@ -63,7 +60,6 @@ def build_payment_types_prompt(
     payment_types: List[str],
 ) -> str:
     """Build the prompt for suggesting dept/acc for dynamic payment type rows."""
-    keys_json = "\n".join(f'  "<payment_type>": {{"dept": "<dept_code or null>", "acc": "<acc_code or null>"}},' for _ in payment_types[:1])
     return f"""You are an accounting assistant for a Thai company receiving credit card settlement reports.
 
 Each payment type below is a card payment channel in the bank's settlement report. Suggest the best Department Code and Account Code for each.

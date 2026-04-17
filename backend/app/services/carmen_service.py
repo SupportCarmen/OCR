@@ -71,3 +71,63 @@ async def post_gljv(body: dict) -> Any:
             return resp.json()
         except Exception:
             raise CarmenAPIError(resp.status_code, resp.text)
+
+
+async def put_gljv(jvh_seq: int, body: dict) -> Any:
+    """Update an existing GL Journal Voucher in Carmen API."""
+    hdrs = {**_headers(), "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.put(f"{_BASE_URL}/gljv/{jvh_seq}", json=body, headers=hdrs)
+        try:
+            return resp.json()
+        except Exception:
+            raise CarmenAPIError(resp.status_code, resp.text)
+
+
+async def get_vendors() -> Any:
+    """Fetch vendor list from Carmen API."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(f"{_BASE_URL}/vendor", headers=_headers())
+        if resp.status_code != 200:
+            raise CarmenAPIError(resp.status_code, resp.text)
+        return resp.json()
+
+
+async def get_tax_profiles() -> Any:
+    """Fetch tax profile list from Carmen API."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(f"{_BASE_URL}/taxProfile", headers=_headers())
+        if resp.status_code != 200:
+            raise CarmenAPIError(resp.status_code, resp.text)
+        return resp.json()
+
+
+async def get_period_list() -> Any:
+    """Fetch AP period list from Carmen API."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(f"{_BASE_URL}/getPeriodList", headers=_headers())
+        if resp.status_code != 200:
+            raise CarmenAPIError(resp.status_code, resp.text)
+        return resp.json()
+
+
+async def post_input_tax(body: dict) -> Any:
+    """Create an Input Tax record in Carmen API."""
+    hdrs = {**_headers(), "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.post(f"{_BASE_URL}/inputTaxRec", json=body, headers=hdrs)
+        try:
+            return resp.json()
+        except Exception:
+            raise CarmenAPIError(resp.status_code, resp.text)
+
+
+async def put_input_tax(rec_seq: int, body: dict) -> Any:
+    """Update an existing Input Tax record in Carmen API."""
+    hdrs = {**_headers(), "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.put(f"{_BASE_URL}/inputTaxRec/{rec_seq}", json=body, headers=hdrs)
+        try:
+            return resp.json()
+        except Exception:
+            raise CarmenAPIError(resp.status_code, resp.text)

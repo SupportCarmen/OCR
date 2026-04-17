@@ -224,3 +224,4 @@ class ExtractedReceiptData(BaseModel):
     bank_address: Optional[str] = Field(None, description="ที่อยู่ของธนาคาร (ที่อยู่สำนักงานใหญ่ที่พิมพ์บนเอกสาร)")
     branch_no: Optional[str] = Field(None, description="รหัสสาขาของธนาคาร (ถ้ามี)")
     details: List[ExtractedDetailRow] = Field(default_factory=list, description="รายการ card/payment type rows")
+    is_duplicate: bool = Field(False, description="True ถ้า doc_no นี้มีอยู่ใน DB แล้ว (submitted)")

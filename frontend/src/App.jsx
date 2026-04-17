@@ -168,6 +168,20 @@ export default function App() {
     setStatus('AI กำลังอ่านข้อมูลจากเอกสาร...')
     try {
       const ext = await extractFromFile(files[0], bank)
+
+      // Duplicate check — stop immediately if doc_no already submitted
+      if (ext.is_duplicate) {
+        setStatus('❌ พบเอกสารซ้ำ')
+        showModal({
+          title: 'พบเอกสารซ้ำในระบบ',
+          message: `เอกสารหมายเลข ${ext.doc_no} ถูกบันทึกไว้ในระบบแล้ว\nไม่สามารถนำเข้าเอกสารซ้ำได้`,
+          type: 'error',
+          confirmText: 'ตกลง',
+          onConfirm: () => { closeModal(); setStep(1) },
+        })
+        return
+      }
+
       applyExtractedData(ext)
 
       const detectedBank = detectBankFromCompanyName(ext.bank_companyname)
@@ -188,6 +202,17 @@ export default function App() {
             setStatus('AI กำลังอ่านข้อมูลใหม่...')
             try {
               const ext2 = await extractFromFile(files[0], detectedBank)
+              if (ext2.is_duplicate) {
+                setStatus('❌ พบเอกสารซ้ำ')
+                showModal({
+                  title: 'พบเอกสารซ้ำในระบบ',
+                  message: `เอกสารหมายเลข ${ext2.doc_no} ถูกบันทึกไว้ในระบบแล้ว\nไม่สามารถนำเข้าเอกสารซ้ำได้`,
+                  type: 'error',
+                  confirmText: 'ตกลง',
+                  onConfirm: () => { closeModal(); setStep(1) },
+                })
+                return
+              }
               applyExtractedData(ext2)
               setStatus('อ่านข้อมูลสำเร็จ ✓')
               setStep(3)
@@ -237,13 +262,12 @@ export default function App() {
   function addRow()          { setDetails(prev => [...prev, { ...EMPTY_DETAIL_ROW }]) }
   function deleteRow(index)  { setDetails(prev => prev.filter((_, i) => i !== index)) }
 
-  async function handleSubmitFinal(rows, overwrite = false) {
+  async function handleSubmitFinal(rows) {
     setSubmitting(true)
     setJvRows(rows)
     const docNo = headerData.DocNo
     const payload = {
       BankType:         bank,
-      Overwrite:        overwrite,
       OriginalFilename: files[0]?.name,
       Header: {
         DateProcessed:  headerData.DateProcessed  || '',
@@ -327,23 +351,11 @@ export default function App() {
         onConfirm: () => { closeModal(); setStep(5) },
       })
     } catch (err) {
-      if (err.code === 'DUPLICATE_DOC_NO') {
-        showModal({
-          title:   'พบเอกสารซ้ำ',
-          message: `ระบบตรวจพบเอกสารหมายเลข ${docNo}\nมีอยู่ใน Database แล้ว ต้องการเขียนทับ (Overwrite) หรือไม่?`,
-          type: 'warning',
-          confirmText: 'Overwrite',
-          cancelText:  'ยกเลิก',
-          onConfirm: () => { closeModal(); handleSubmitFinal(rows, true) },
-          onCancel:  closeModal,
-        })
-      } else {
-        showModal({
-          title: 'เกิดข้อผิดพลาดในการบันทึก',
-          message: err.message,
-          type: 'error', confirmText: 'ปิด', onConfirm: closeModal,
-        })
-      }
+      showModal({
+        title: 'เกิดข้อผิดพลาดในการบันทึก',
+        message: err.message,
+        type: 'error', confirmText: 'ปิด', onConfirm: closeModal,
+      })
     } finally {
       setSubmitting(false)
     }
@@ -513,6 +525,7 @@ export default function App() {
                   headerData={headerData}
                   onBack={() => setStep(5)}
                   onFinish={resetAll}
+                  showToast={showToast}
                 />
               </div>
             )}

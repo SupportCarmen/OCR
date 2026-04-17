@@ -2,15 +2,13 @@
 Tool: submit_receipt
 
 Persists user-confirmed receipt data to the local database.
-Handles duplicate doc_no detection and optional overwrite.
+Duplicate doc_no check is performed at /extract time; submit blocks duplicates as a safeguard.
 
 Usage:
     inp = submit.SubmitInput(bank_type="SCB", ...)
     result = await submit.run(inp, db)
     if result.success:
         receipt_id = result.output["receipt_id"]
-    elif result.output and result.output.get("error") == "DUPLICATE_DOC_NO":
-        # prompt user to confirm overwrite
 """
 
 import logging
@@ -36,7 +34,6 @@ TOOL_NAME = "submit_receipt"
 class SubmitInput:
     """Typed input for the submit_receipt tool (HTTP-layer agnostic)."""
     bank_type: Optional[str]
-    overwrite: bool
     original_filename: str
     doc_no: Optional[str]
     doc_date: Optional[str]
@@ -63,9 +60,9 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
         success=False + output = {error: "DUPLICATE_DOC_NO", ...}  → duplicate detected
         success=False + errors   → unexpected failure
     """
-    tool_input = {"doc_no": inp.doc_no, "bank_type": inp.bank_type, "overwrite": inp.overwrite}
+    tool_input = {"doc_no": inp.doc_no, "bank_type": inp.bank_type}
     try:
-        # 1. Duplicate check (submitted receipts only)
+        # 1. Duplicate safeguard (primary check is at /extract time)
         if inp.doc_no:
             dup_result = await db.execute(
                 select(Receipt).where(
@@ -73,24 +70,13 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
                     Receipt.submitted_at.isnot(None),
                 )
             )
-            existing = dup_result.scalars().all()
-
-            if existing:
-                if not inp.overwrite:
-                    return ToolResult(
-                        success=False,
-                        tool=TOOL_NAME,
-                        input=tool_input,
-                        output={
-                            "error": "DUPLICATE_DOC_NO",
-                            "doc_no": inp.doc_no,
-                            "detail": f"หมายเลข {inp.doc_no} ถูกบันทึกไว้ในระบบแล้ว",
-                        },
-                    )
-                # Overwrite: delete old record(s)
-                for old in existing:
-                    await db.delete(old)
-                await db.flush()
+            if dup_result.scalars().first():
+                return ToolResult(
+                    success=False,
+                    tool=TOOL_NAME,
+                    input=tool_input,
+                    errors=[f"หมายเลขเอกสาร {inp.doc_no} ถูกบันทึกไว้ในระบบแล้ว"],
+                )
 
         # 2. Create OCRTask (record-keeping stub)
         task_id = str(uuid.uuid4())

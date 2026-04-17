@@ -19,6 +19,7 @@
 | 1.6 | 08 Apr 2026 | Intern Team | Complete API inventory (add /export, /debug-llm, /health); detailed DB schema with all fields; environment variables section |
 | 1.7 | 08 Apr 2026 | Intern Team | Add GET /api/v1/ocr/carmen/gl-prefix endpoint for GL Prefix master data |
 | 1.8 | 09 Apr 2026 | Intern Team | Fix GL Prefix response field name (PrefixName); /extract now accepts multiple files; remove bank_name from /suggest requests; add missing localStorage keys (ocr_wizard_state, filePrefix, fileSource) |
+| 1.9 | 16 Apr 2026 | Intern Team | Major architecture restructure: LLM layer (app/llm/), Tool layer (app/tools/ + ToolResult + registry), Carmen router split, generic tools endpoint (/api/v1/tools/), frontend domain API split (lib/api/*), custom hooks (useToast, useModal) |
 
 ---
 
@@ -59,6 +60,10 @@ flowchart LR
         direction TB
         OCR_R["📤 OCR Router<br/>(extract, submit)"]
         Map_R["🤖 Mapping Router<br/>(suggest, history)"]
+        Carmen_R["🔁 Carmen Router<br/>(proxy)"]
+        Tools_R["🛠️ Tools Router<br/>(agent invoke)"]
+        Tools_L["⚙️ Tools Layer<br/>(extract, submit, map_gl)"]
+        LLM_L["🧠 LLM Layer<br/>(client + prompt registry)"]
         DB["🗄️ MySQL/MariaDB<br/>(ocr_db)"]
     end
     
@@ -70,8 +75,13 @@ flowchart LR
 
     User -->|Upload & Select| Frontend
     Frontend -->|REST API| Backend
-    Backend -->|Proxy| Carmen
-    Backend -->|LLM Call| OpenRouter
+    OCR_R -->|delegate| Tools_L
+    Map_R -->|delegate| Tools_L
+    Tools_R -->|invoke stateless tools| Tools_L
+    Carmen_R -->|HTTP| Carmen
+    Tools_L -->|call_text_llm / get_client| LLM_L
+    LLM_L -->|LLM Call| OpenRouter
+    Tools_L -->|read/write| DB
 ```
 
 ### 3.2 Request Flow (ลำดับขั้นตอนข้อมูล)
@@ -132,20 +142,29 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant User as User / Frontend (React)
-    participant API as API Service (FastAPI)
+    participant Router as OCR Router (FastAPI)
+    participant Tool as tools/extract
+    participant Prompts as llm/prompts
+    participant Client as llm/client
     participant LLM as OpenRouter (Vision LLM)
 
-    User->>API: POST /api/v1/ocr/extract (files[], bank_type)
-    activate API
-    loop for each file
-        API->>API: Image Preprocessing (Pillow — resize, keep color)
-        API->>LLM: POST with base64 image + bank-specific prompt
-        activate LLM
-        LLM-->>API: JSON Structured Data (ExtractedReceiptData)
-        deactivate LLM
-    end
-    API-->>User: 200 OK (array of ExtractedReceiptData)
-    deactivate API
+    User->>Router: POST /api/v1/ocr/extract (files[], bank_type)
+    activate Router
+    Router->>Tool: extract.run(file_bytes, filename, bank_type)
+    activate Tool
+    Tool->>Tool: preprocess_image() — Pillow resize, keep color
+    Tool->>Prompts: get_ocr_prompt(bank_type)
+    Prompts-->>Tool: bank-specific prompt string
+    Tool->>Client: get_client()
+    Client-->>Tool: AsyncOpenAI instance
+    Tool->>LLM: vision call with base64 image + prompt
+    activate LLM
+    LLM-->>Tool: JSON Structured Data
+    deactivate LLM
+    Tool-->>Router: ToolResult(success, output=ExtractedReceiptData)
+    deactivate Tool
+    Router-->>User: 200 OK (array of ExtractedReceiptData)
+    deactivate Router
 ```
 
 ### 3.4 Sequence Diagram: API 2 - Get Account Codes (Proxy)
@@ -200,18 +219,25 @@ sequenceDiagram
     DB-->>API: Saved mappings (field_type, dept, acc, confirmed_count)
     API-->>UI: 200 OK (history map)
 
-    UI->>API: POST /api/v1/mapping/suggest (bank_name, accounts[], departments[])
+    UI->>API: POST /api/v1/mapping/suggest (accounts[], departments[])
     activate API
-    API->>LLM: Prompt with account list + Thai matching rules
-    LLM-->>API: {Commission, Tax Amount, Net Amount} → {dept, acc}
-    API->>API: Validate codes against master lists
+    API->>+MapTool: map_gl.suggest_fixed_fields(accounts, departments)
+    MapTool->>PromptBuilder: build_fixed_fields_prompt(dept_lines, acc_lines, ...)
+    PromptBuilder-->>MapTool: prompt string
+    MapTool->>LLM: call_text_llm(prompt) via llm/client
+    LLM-->>MapTool: {Commission, Tax Amount, Net Amount} → {dept, acc}
+    MapTool-->>-API: ToolResult(suggestions)
     API-->>UI: 200 OK (suggestions, source: 'ai')
     deactivate API
 
     UI->>API: POST /api/v1/mapping/suggest-payment-types (payment_types[], accounts[], departments[])
     activate API
-    API->>LLM: Prompt with payment type names + naming conventions
-    LLM-->>API: {VSA-P, MCA-INT-P, QR-VSA, ...} → {dept, acc}
+    API->>+MapTool: map_gl.suggest_payment_types(payment_types, accounts, departments)
+    MapTool->>PromptBuilder: build_payment_types_prompt(types, dept_lines, acc_lines, ...)
+    PromptBuilder-->>MapTool: prompt string
+    MapTool->>LLM: call_text_llm(prompt) via llm/client
+    LLM-->>MapTool: {VSA-P, MCA-INT-P, QR-VSA, ...} → {dept, acc}
+    MapTool-->>-API: ToolResult(suggestions)
     API-->>UI: 200 OK (suggestions per type, source: 'ai')
     deactivate API
 
@@ -625,7 +651,68 @@ sequenceDiagram
 
 ---
 
-### 5.13 API 11: Health Check
+### 5.13 API 11a: Generic Tools — List / Schema / Invoke
+
+**วัตถุประสงค์**: ให้ LLM Agent เรียกใช้ stateless tools โดยตรงโดยไม่ต้องรู้ path เฉพาะ
+
+#### List All Tools
+
+**Method**: GET | **Endpoint**: `/api/v1/tools`
+
+**JSON Response**:
+```json
+{
+  "tools": [
+    {
+      "name": "extract_receipt",
+      "description": "Extract structured data from a bank receipt image using Vision LLM",
+      "input_schema": { "file_bytes": "bytes", "filename": "str", "bank_type": "str?" },
+      "invocable": false
+    },
+    {
+      "name": "suggest_gl_fixed_fields",
+      "description": "LLM-suggest GL account/dept codes for Commission, Tax Amount, Net Amount",
+      "input_schema": { "accounts": "list[{code, name, type?}]", "departments": "list[{code, name}]" },
+      "invocable": true
+    }
+  ],
+  "count": 4
+}
+```
+
+#### Get Tool Schema
+
+**Method**: GET | **Endpoint**: `/api/v1/tools/{name}`
+
+#### Invoke a Tool
+
+**Method**: POST | **Endpoint**: `/api/v1/tools/{name}`
+
+**JSON Request** (keys must match `input_schema`):
+```json
+{
+  "accounts": [{ "code": "113200", "name": "BANK RECEIVABLE", "type": "DEBIT" }],
+  "departments": [{ "code": "100", "name": "ACCOUNTING" }]
+}
+```
+
+**JSON Response** (ToolResult):
+```json
+{
+  "success": true,
+  "tool": "suggest_gl_fixed_fields",
+  "input": { "accounts": [...], "departments": [...] },
+  "output": { "Commission": { "dept": "100", "acc": "551100" }, ... },
+  "metadata": {},
+  "errors": []
+}
+```
+
+> `extract_receipt` และ `submit_receipt` ต้อง injected dependencies (bytes / DB session) — ระบบจะ block พร้อม HTTP 400 `invocable: false`
+
+---
+
+### 5.14 API 11: Health Check
 
 **วัตถุประสงค์**: ตรวจสอบสถานะ API และฐานข้อมูล
 
@@ -795,7 +882,7 @@ CARMEN_BASE_URL=https://carmen.example.com
 | `KBANK` | ธนาคารกสิกรไทย | KBANK |
 | `SCB` | ธนาคารไทยพาณิชย์ | SCB |
 
-แต่ละธนาคารมี **bank-specific extraction prompts** ใน `backend/app/services/openrouter_ocr.py` เพื่อปรับปรุงความแม่นยำ
+แต่ละธนาคารมี **bank-specific extraction prompts** ใน `backend/app/llm/prompts/<bank>.py` เพื่อปรับปรุงความแม่นยำ — เพิ่มธนาคารใหม่ได้โดยสร้างไฟล์ใหม่ + ลงทะเบียนใน `llm/prompts/__init__.py`
 
 ### 9.2 ประเภทไฟล์ที่รองรับ
 
@@ -838,14 +925,32 @@ CARMEN_BASE_URL=https://carmen.example.com
 
 ### 10.2 Key Frontend Files
 
+**API Layer** (`src/lib/api/`) — import directly from these files:
+
+| File | Exported Functions |
+| :--- | :--- |
+| `src/lib/api/ocr.js` | `extractFromFile()`, `markSubmitted()` |
+| `src/lib/api/submit.js` | `submitToLocal()` |
+| `src/lib/api/carmen.js` | `fetchAccountCodes()`, `fetchDepartments()`, `fetchGLPrefixes()`, `submitToCarmen()` |
+| `src/lib/api/mapping.js` | `suggestMapping()`, `suggestPaymentTypes()`, `fetchMappingHistory()`, `saveMappingHistory()` |
+
+> `src/lib/ocrApi.js` และ `src/lib/carmenApi.js` ยังคงอยู่เป็น re-export wrapper เพื่อ backward compat — new code ควร import จาก `lib/api/*` โดยตรง
+
+**Hooks** (`src/hooks/`):
+
+| File | Purpose |
+| :--- | :--- |
+| `src/hooks/useToast.js` | `useToast()` → `{ toasts, showToast(msg, type) }` — auto-dismiss 3.5s |
+| `src/hooks/useModal.js` | `useModal()` → `{ modal, showModal(config), closeModal() }` |
+
+**App & Pages**:
+
 | File | Role |
 | :--- | :--- |
-| `frontend/src/App.jsx` | Root component — 5-step state management |
-| `frontend/src/lib/ocrApi.js` | `extractFromFile()` → POST /api/v1/ocr/extract |
-| `frontend/src/lib/carmenApi.js` | Carmen proxy + mapping API calls |
-| `frontend/src/constants/index.js` | BANKS, DETAIL_COLUMNS, HEADER_LABELS, DETAIL_LABELS, EMPTY_DETAIL_ROW |
-| `frontend/src/pages/Mapping.jsx` | Account mapping configuration page |
-| `frontend/src/components/*.jsx` | Reusable UI components |
+| `src/App.jsx` | Root — 5-step wizard, shared state; uses `useToast` + `useModal` |
+| `src/constants/index.js` | `BANKS`, `BANK_THAI_NAMES`, `detectBankFromCompanyName()`, `DETAIL_COLUMNS`, `HEADER_LABELS`, `DETAIL_LABELS`, `EMPTY_DETAIL_ROW` |
+| `src/pages/Mapping.jsx` | Account mapping configuration page |
+| `src/components/*.jsx` | Reusable UI components |
 
 ### 10.3 Storage & Persistence
 
@@ -863,11 +968,16 @@ CARMEN_BASE_URL=https://carmen.example.com
 | :--- | :--- |
 | **Stateless extraction** | `/extract` returns JSON immediately without DB write — allows frontend review/edit before confirm |
 | **Single Vision LLM call** | Image + structured JSON in one call — faster, cheaper than multi-step OCR |
-| **Bank-specific prompts** | Each bank has tailored extraction rules → better accuracy |
+| **Bank-specific prompts in registry** | `llm/prompts/__init__.py` holds a `_REGISTRY` dict; `get_ocr_prompt(bank_type)` returns the right prompt — adding a new bank requires only a new file + one registry entry |
+| **Shared prompt fragments** | `_shared.py` exports `ROW_RULES` / `OUTPUT_RULES`; all bank prompts append them — reduces duplication and ensures consistency |
+| **Shared LLM client** | `llm/client.py` is the single place that constructs `AsyncOpenAI` — never construct the client elsewhere |
+| **Tool-first architecture** | Business logic lives in `app/tools/`; routers are thin HTTP wrappers; every tool returns `ToolResult` for uniform handling |
+| **Generic tools endpoint** | `POST /api/v1/tools/{name}` lets an LLM agent call stateless tools by name — tools needing DB session or file bytes are blocked (`_REQUIRES_INJECTION`) |
 | **Color images preserved** | Vision LLM reads color better than grayscale |
 | **Duplicate check on submitted only** | Allows editing before submit; duplicate check only applies to finalized (submitted_at NOT NULL) receipts |
 | **Overwrite support** | Hard delete old record + re-insert on Overwrite=true (atomic operation) |
 | **AI-first mapping** | Mapping page auto-triggers AI suggest on bank selection; history is loaded but AI always runs |
 | **localStorage caching** | Avoid re-fetching master data every step; user can modify offline |
-| **Carmen proxy in backend** | Avoid frontend CORS issues; centralize authorization |
+| **Carmen proxy in backend** | Separate `carmen.py` router + `carmen_service.py` — avoid frontend CORS issues, centralize authorization |
+| **Frontend domain API split** | `lib/api/*` separates OCR / Carmen / Mapping / Submit concerns — `ocrApi.js` and `carmenApi.js` kept as backward-compat re-exports |
 | **Safe migrations** | `migrate_db()` idempotent — runs on startup, adds missing columns safely |

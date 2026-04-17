@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { submitInputTax } from '../lib/api/carmen'
 
 function toNum(v) {
   return parseFloat(String(v ?? '').replace(/,/g, '')) || 0
@@ -6,8 +8,11 @@ function toNum(v) {
 
 const fmt = n => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function InputTaxReconciliation({ details, headerData, onBack, onFinish }) {
+export default function InputTaxReconciliation({ details, headerData, onBack, onFinish, showToast }) {
   const [config, setConfig] = useState(null)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
 
   useEffect(() => {
     try {
@@ -36,6 +41,62 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
     : ''
 
   const hasData = netAmount > 0 || taxAmount > 0
+
+  async function handleAddInputTax() {
+    setSubmitting(true)
+    setSubmitError(null)
+
+    // taxPeriod: "MM/YYYY" → derive prefix, FrDate, ToDate
+    const [mm, yyyy] = (taxPeriod || '/').split('/')
+    const prefix   = `vat${yyyy}${mm}`
+    const frDate   = `${yyyy}-${mm}-01`
+    const lastDay  = new Date(Number(yyyy), Number(mm), 0).getDate()
+    const toDate   = `${yyyy}-${mm}-${String(lastDay).padStart(2, '0')}`
+
+    // DocDate: "DD/MM/YYYY" → "YYYY-MM-DDT00:00:00.000Z"
+    let invhTInvDt = ''
+    if (headerData.DocDate) {
+      const [dd, mo, yy] = headerData.DocDate.split('/')
+      invhTInvDt = `${yy}-${mo}-${dd}T00:00:00.000Z`
+    }
+
+    const rateInt = Math.round(taxRate)
+
+    const payload = {
+      Prefix:         prefix,
+      Source:         'OCC',
+      FrDate:         frDate,
+      ToDate:         toDate,
+      InvhTInvNo:     headerData.DocNo || '',
+      InvhTInvDt:     invhTInvDt,
+      InvhDesc:       description || '',
+      VnName:         company.name || '',
+      TaxProfileCode: `VAT0${rateInt}`,
+      BfTaxAmt:       String(netAmount),
+      TaxRate:        taxRate,
+      TaxAmt:         taxAmount,
+      TotalAmt:       String(total),
+      TaxId:          company.taxId || '',
+      BranchNo:       company.branch || '',
+      Address:        company.address || '',
+      UserModified:   'admin',
+      TaxProfileDesc: `VAT ${rateInt}%`,
+      VnCode:         '',
+    }
+
+    try {
+      await submitInputTax(payload)
+      setShowConfirm(false)
+      showToast?.('เพิ่ม Input Tax Reconciliation เข้าระบบสำเร็จ', 'success')
+      onFinish()
+    } catch (err) {
+      const msg = err.message || 'เกิดข้อผิดพลาด'
+      setSubmitError(msg)
+      showToast?.(`เพิ่ม Input Tax ล้มเหลว: ${msg}`, 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div>
@@ -164,11 +225,72 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           <button className="btn-cancel" onClick={() => window.print()}>
             <i className="fas fa-print" /> พิมพ์
           </button>
-          <button className="btn-submit" onClick={onFinish}>
-            <i className="fas fa-check" /> เสร็จสิ้น (Finish)
+          <button className="btn-cancel" onClick={() => {
+            showToast?.('จบกระบวนการโดยไม่เพิ่ม Input Tax', 'info')
+            onFinish()
+          }}>
+            <i className="fas fa-times" /> Discard
+          </button>
+          <button className="btn-submit" onClick={() => { setSubmitError(null); setShowConfirm(true) }} disabled={!hasData}>
+            <i className="fas fa-plus-circle" /> Add Input Tax
           </button>
         </div>
       </div>
+
+      {showConfirm && createPortal(
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '12px', padding: '2rem 2.25rem',
+            maxWidth: '440px', width: '90%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem', color: 'var(--teal)' }}>
+              <i className="fas fa-file-invoice" />
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.65rem' }}>
+              เพิ่ม Input Tax Reconciliation
+            </div>
+            <p style={{ color: 'var(--text-2)', fontSize: '0.92rem', marginBottom: '1.5rem', lineHeight: 1.7 }}>
+              รายการนี้จะถูกเพิ่มเข้าสู่ระบบ<br />
+              <strong>Input Tax Reconciliation</strong> โดยอัตโนมัติ<br />
+              ต้องการดำเนินการต่อใช่ไหม?
+            </p>
+            {submitError && (
+              <div style={{
+                background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px',
+                padding: '0.6rem 0.85rem', marginBottom: '1.25rem',
+                color: '#b91c1c', fontSize: '0.85rem', textAlign: 'left',
+              }}>
+                <i className="fas fa-exclamation-circle" style={{ marginRight: '0.4rem' }} />
+                {submitError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                className="btn-cancel"
+                onClick={() => setShowConfirm(false)}
+                disabled={submitting}
+              >
+                ยกเลิก
+              </button>
+              <button
+                className="btn-submit"
+                onClick={handleAddInputTax}
+                disabled={submitting}
+              >
+                {submitting
+                  ? <><i className="fas fa-spinner fa-spin" /> กำลังส่ง...</>
+                  : <><i className="fas fa-check" /> ยืนยัน</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }
