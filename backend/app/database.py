@@ -57,6 +57,18 @@ async def migrate_db():
                 await conn.execute(text(f"ALTER TABLE receipts ADD COLUMN {col} {col_type}"))
             except Exception:
                 pass  # Column already exists — skip (works for both MySQL and SQLite)
+
+        # Make file_path nullable in ocr_tasks (safe, idempotent)
+        try:
+            await conn.execute(text("ALTER TABLE ocr_tasks MODIFY file_path VARCHAR(512) NULL"))
+        except Exception:
+            pass
+
+        # Add usage_type to llm_usage_logs (safe, idempotent)
+        try:
+            await conn.execute(text("ALTER TABLE llm_usage_logs ADD COLUMN usage_type VARCHAR(50) NULL AFTER task_id"))
+        except Exception:
+            pass
                 
         # Drop old unique constraint on mapping_history and add new one
         try:

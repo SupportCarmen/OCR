@@ -24,7 +24,12 @@ def get_client() -> AsyncOpenAI:
     )
 
 
-async def call_text_llm(prompt: str, model: Optional[str] = None) -> Optional[dict]:
+async def call_text_llm(
+    prompt: str,
+    model: Optional[str] = None,
+    task_id: Optional[str] = None,
+    usage_type: Optional[str] = None
+) -> Optional[dict]:
     """
     Call the text/suggestion LLM with a single user prompt.
 
@@ -33,13 +38,29 @@ async def call_text_llm(prompt: str, model: Optional[str] = None) -> Optional[di
 
     Uses settings.openrouter_suggestion_model by default.
     """
+    from app.services.usage_service import log_llm_usage
+    import asyncio
+
     client = get_client()
+    target_model = model or settings.openrouter_suggestion_model
     response = await client.chat.completions.create(
-        model=model or settings.openrouter_suggestion_model,
+        model=target_model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
         max_tokens=2048,
     )
+
+    # Log usage in the background
+    if response.usage:
+        asyncio.create_task(log_llm_usage(
+            model=target_model,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+            total_tokens=response.usage.total_tokens,
+            task_id=task_id,
+            usage_type=usage_type
+        ))
+
     content = (
         response.choices[0].message.content
         if response.choices and response.choices[0].message
@@ -55,4 +76,8 @@ async def call_text_llm(prompt: str, model: Optional[str] = None) -> Optional[di
             last = lines[-1].strip()
             raw = "\n".join(lines[1:-1] if last == "```" else lines[1:]).strip()
 
-    return json.loads(raw)
+    try:
+        return json.loads(raw)
+    except Exception:
+        logger.error(f"Failed to parse LLM JSON: {raw[:200]}")
+        return None

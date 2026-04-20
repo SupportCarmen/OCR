@@ -110,11 +110,24 @@ async def extract_receipt(
                 detail=f"{upload_file.filename} exceeds {settings.max_file_size_mb}MB limit",
             )
 
+        # Create a task record for tracking usage even if stateless
+        import uuid
+        task = OCRTask(
+            id=str(uuid.uuid4()),
+            original_filename=upload_file.filename,
+            file_path="DEBUG_PATH_123",
+            status=TaskStatus.COMPLETED,
+            ocr_engine=settings.ocr_engine,
+        )
+        db.add(task)
+        await db.commit()
+
         extracted = await ocr_service.extract_stateless(
             file_bytes=file_bytes,
             original_filename=upload_file.filename,
             bank_type=bank_type_str,
             hints=hints or None,
+            task_id=task.id,
         )
 
         # Duplicate check — flag if doc_no already submitted

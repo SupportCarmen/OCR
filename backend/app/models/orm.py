@@ -15,7 +15,7 @@ class OCRTask(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     original_filename = Column(String(255), nullable=False)
-    file_path = Column(String(512), nullable=False)
+    file_path = Column(String(512), nullable=True, default="N/A")
     status = Column(SAEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj]), default=TaskStatus.PENDING, nullable=False)
     ocr_engine = Column(String(100), nullable=True)
     raw_text = Column(Text, nullable=True)
@@ -106,3 +106,19 @@ class CorrectionFeedback(Base):
     __table_args__ = (
         UniqueConstraint("receipt_id", "field_name", name="uq_correction_receipt_field"),
     )
+
+
+class LLMUsageLog(Base):
+    """Log token usage for every LLM interaction."""
+    __tablename__ = "llm_usage_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String(36), ForeignKey("ocr_tasks.id"), nullable=True)
+    model = Column(String(100), nullable=False)
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    usage_type = Column(String(50), nullable=True) # e.g. OCR, AR_INVOICE, MAPPING
+    created_at = Column(DateTime, server_default=func.now())
+
+    task = relationship("OCRTask")

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { EMPTY_DETAIL_ROW, BANK_THAI_NAMES, detectBankFromCompanyName } from '../constants'
+import { EMPTY_DETAIL_ROW, BANK_THAI_NAMES, detectBankFromCompanyName, detectBankFromExtracted } from '../constants'
 import { extractFromFile } from '../lib/api/ocr'
 import { submitToLocal } from '../lib/api/submit'
 import { submitToCarmen } from '../lib/api/carmen'
@@ -185,7 +185,7 @@ export function useOcrWizard() {
 
       applyExtractedData(ext)
 
-      const detectedBank = detectBankFromCompanyName(ext.bank_companyname)
+      const detectedBank = detectBankFromExtracted(ext)
       if (detectedBank && detectedBank !== bank) {
         setStatus('อ่านข้อมูลสำเร็จ ✓')
         setStep(3)
@@ -358,11 +358,21 @@ export function useOcrWizard() {
         onConfirm: () => { closeModal(); setStep(5) },
       })
     } catch (err) {
-      showModal({
-        title: 'เกิดข้อผิดพลาดในการบันทึก',
-        message: err.message,
-        type: 'error', confirmText: 'ปิด', onConfirm: closeModal,
-      })
+      if (err.code === 'DUPLICATE_DOC_NO') {
+        showModal({
+          title:   'พบเอกสารซ้ำในระบบ',
+          message: `เอกสารหมายเลข ${docNo} ถูกบันทึกไว้ในระบบแล้ว\nไม่สามารถนำเข้าเอกสารซ้ำได้`,
+          type: 'error',
+          confirmText: 'ตกลง',
+          onConfirm: closeModal,
+        })
+      } else {
+        showModal({
+          title: 'เกิดข้อผิดพลาดในการบันทึก',
+          message: err.message,
+          type: 'error', confirmText: 'ปิด', onConfirm: closeModal,
+        })
+      }
     } finally {
       setSubmitting(false)
     }

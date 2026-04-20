@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import Home from './pages/Home'
-import App from './App'
+import CreditCardOCR from './pages/CreditCardOCR'
 import Mapping from './pages/Mapping'
+import ARInvoice from './pages/ARInvoice'
 import './index.css'
 
 function getRoute() {
@@ -23,8 +24,10 @@ function Router() {
     // Sub-routes under CreditCardOCR
     const sub = route.replace('creditcardocr', '').replace(/^\//, '')
     if (sub === 'mapping') return <Mapping />
-    return <App />
+    return <CreditCardOCR />
   }
+  if (route.startsWith('arinvoice')) return <ARInvoice />
+  
   return <Home />
 }
 

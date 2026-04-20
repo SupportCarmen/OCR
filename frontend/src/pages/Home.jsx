@@ -15,7 +15,7 @@ const MODULES = [
   },
   {
     id: 'ar-invoice',
-    route: null, // coming soon
+    route: '#/ARInvoice', // Activated AR Invoice route
     name: 'AR Invoice Processing',
     description: 'ระบบจัดการใบแจ้งหนี้ลูกค้า (AR Invoice) อ่านข้อมูลอัตโนมัติ และบันทึกเข้าระบบบัญชี',
     icon: 'fa-receipt',

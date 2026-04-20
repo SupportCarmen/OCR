@@ -15,7 +15,7 @@ USE ocr_db;
 CREATE TABLE IF NOT EXISTS ocr_tasks (
     id              VARCHAR(36)     NOT NULL,
     original_filename VARCHAR(255)  NOT NULL,
-    file_path       VARCHAR(500)    NOT NULL,
+    file_path       VARCHAR(500)    NULL,
     status          ENUM('pending','processing','completed','failed')
                                     NOT NULL DEFAULT 'pending',
     ocr_engine      VARCHAR(100)    NULL,

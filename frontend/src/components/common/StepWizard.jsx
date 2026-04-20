@@ -1,4 +1,4 @@
-const STEPS = [
+const DEFAULT_STEPS = [
   { n: 1, label: 'เลือกธนาคาร', sub: 'และไฟล์' },
   { n: 2, label: 'AI อ่านข้อมูล', sub: '' },
   { n: 3, label: 'ตรวจสอบข้อมูล', sub: '' },
@@ -7,7 +7,8 @@ const STEPS = [
   { n: 6, label: 'Input Tax', sub: 'Reconciliation' },
 ]
 
-export default function StepWizard({ step }) {
+export default function StepWizard({ step, steps }) {
+  const STEPS = steps || DEFAULT_STEPS
   return (
     <div className="step-wizard-wrap">
       <div className="step-wizard">

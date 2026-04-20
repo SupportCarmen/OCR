@@ -47,6 +47,7 @@ async def extract_from_image(
     filename: str = "receipt.png",
     bank_type: Optional[str] = None,
     hints: Optional[dict] = None,
+    task_id: Optional[str] = None,
 ) -> Tuple[str, ExtractedReceiptData]:
     """
     Send an image to OpenRouter vision LLM and return:
@@ -54,8 +55,11 @@ async def extract_from_image(
 
     bank_type: "SCB" | "BBL" | "KBANK" — selects bank-specific prompt.
     hints: correction hints from correction_feedback (appended to prompt).
+    task_id: optional ID to link token usage to an OCR task.
     Raises on API or JSON parse failure — let the caller handle errors.
     """
+    from app.services.usage_service import log_llm_usage
+
     if not settings.openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY is not configured")
 
@@ -97,6 +101,18 @@ async def extract_from_image(
         max_tokens=8192,
     )
 
+    # Log usage in the background
+    if response.usage:
+        import asyncio
+        asyncio.create_task(log_llm_usage(
+            model=settings.openrouter_ocr_model,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+            total_tokens=response.usage.total_tokens,
+            task_id=task_id,
+            usage_type="BANK_OCR"
+        ))
+
     raw_content = response.choices[0].message.content if (response.choices and response.choices[0].message) else None
     if raw_content is None:
         raise ValueError("LLM returned None content — model may have hit token limit or safety filter")
@@ -107,9 +123,15 @@ async def extract_from_image(
 
     logger.info(f"Raw LLM response:\n{result_text[:1000]}")
 
-    # Save last raw response for debug endpoint (Windows-compatible)
-    import pathlib, tempfile
-    pathlib.Path(tempfile.gettempdir()).joinpath("last_llm_response.txt").write_text(result_text, encoding="utf-8")
+    # Save last raw response for debug endpoint (debug mode only)
+    if settings.app_debug:
+        import pathlib, tempfile, stat
+        tmp = pathlib.Path(tempfile.gettempdir()) / "last_llm_response.txt"
+        tmp.write_text(result_text, encoding="utf-8")
+        try:
+            tmp.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        except Exception:
+            pass
 
     # Strip markdown code fences if model wraps response
     if result_text.startswith("```"):
@@ -125,6 +147,7 @@ async def extract_from_image(
 
     # Only pass known fields to ExtractedReceiptData
     extracted = ExtractedReceiptData(**{k: v for k, v in data.items() if k in _RECEIPT_FIELDS})
+    extracted.raw_text = raw_text
 
     # Post-process: remove rows with zero or null pay_amt.
     def _is_zero(v: Optional[str]) -> bool:

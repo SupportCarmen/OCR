@@ -88,7 +88,7 @@ async def suggest_fixed_fields(
             balance_acc_count=len(balance_acc),
         )
 
-        data = await call_text_llm(prompt)
+        data = await call_text_llm(prompt, usage_type="MAPPING_SUGGESTION")
         if data is None:
             return ToolResult(success=True, tool=TOOL_FIXED, input=tool_input,
                               output={"suggestions": {}, "source": "ai"})
@@ -147,7 +147,7 @@ async def suggest_payment_types(
             payment_types=payment_types,
         )
 
-        data = await call_text_llm(prompt)
+        data = await call_text_llm(prompt, usage_type="MAPPING_SUGGESTION")
         if data is None:
             return ToolResult(success=True, tool=TOOL_PAYMENT, input=tool_input,
                               output={"suggestions": {}, "source": "ai"})

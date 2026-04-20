@@ -35,6 +35,7 @@ from app.routers.mapping import router as mapping_router
 from app.routers.carmen import router as carmen_router
 from app.routers.tools import router as tools_router
 from app.routers.feedback import router as feedback_router
+from app.routers.ar_invoice import router as ar_invoice_router
 
 
 # ── Logging Setup (uses the reconfigured UTF-8 stderr) ──
@@ -101,7 +102,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         logger.error("Unhandled exception: %s %s\n%s", request.method, request.url, tb)
     except Exception:
         pass  # avoid recursive encoding errors in the handler
-    return JSONResponse(status_code=500, content={"detail": str(exc), "traceback": tb})
+    content = {"detail": str(exc)}
+    if settings.app_debug:
+        content["traceback"] = tb
+    return JSONResponse(status_code=500, content=content)
 
 
 # ── Register Routers ──
@@ -110,9 +114,10 @@ app.include_router(mapping_router)
 app.include_router(carmen_router)
 app.include_router(tools_router)
 app.include_router(feedback_router)
+app.include_router(ar_invoice_router)
 
 
-# ── Root endpoint ──
+# Root endpoint ──
 @app.get("/", tags=["Root"])
 async def root():
     return {

@@ -1,9 +1,9 @@
-import { useOcrWizard } from './hooks/useOcrWizard'
-import { StepWizard, FormActions, CustomModal } from './components/common'
-import { UploadSection, ActionBar, HeaderCard, DetailTable, DocumentPreview } from './components/ocr'
-import { AccountingReview, JournalVoucher, InputTaxReconciliation } from './components/accounting'
+import { useOcrWizard } from '../hooks/useOcrWizard'
+import { StepWizard, FormActions, CustomModal } from '../components/common'
+import { UploadSection, ActionBar, HeaderCard, DetailTable, DocumentPreview } from '../components/ocr'
+import { AccountingReview, JournalVoucher, InputTaxReconciliation } from '../components/accounting'
 
-export default function App() {
+export default function CreditCardOCR() {
   const {
     step, bank, files, previewUrl, previewType,
     loading, submitting, status,
@@ -52,8 +52,20 @@ export default function App() {
 
         <div className="app-header">
           <div className="brand">
-            <div className="logo-box"><i className="fas fa-file-invoice-dollar" /></div>
-            <h1>ระบบนำเข้าข้อมูล Credit Card Report</h1>
+            <div className="logo-box" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', color: 'white' }}>
+              <i className="fas fa-file-invoice-dollar" />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>Carmen ERP</h1>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: '0.1rem' }}>
+                Credit Card Report OCR
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <a href="#/" className="btn btn-sm btn-outline" style={{ textDecoration: 'none' }}>
+              <i className="fas fa-arrow-left" /> กลับหน้าหลัก
+            </a>
           </div>
         </div>
 

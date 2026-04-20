@@ -123,7 +123,6 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
                 border: '1px solid var(--border)', borderRadius: '4px',
                 padding: '0.2rem 0.65rem', fontSize: '0.8rem', fontWeight: 500,
               }}>
-                <i className="fas fa-calendar-alt" style={{ marginRight: '0.35rem', color: 'var(--text-3)' }} />
                 Tax Period: {taxPeriod}
               </span>
             )}

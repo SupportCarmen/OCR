@@ -38,6 +38,7 @@ async def extract_stateless(
     original_filename: str,
     bank_type: Optional[str] = None,
     hints: Optional[dict] = None,
+    task_id: Optional[str] = None,
 ) -> ExtractedReceiptData:
     """
     Stateless OCR extraction:
@@ -62,7 +63,7 @@ async def extract_stateless(
 
     # 2. Vision LLM
     logger.info(f"Extracting stateless: {original_filename} (bank={bank_type}, hints={len(hints) if hints else 0})")
-    _, extracted = await extract_from_image(processed_bytes, original_filename, bank_type, hints=hints)
+    _, extracted = await extract_from_image(processed_bytes, original_filename, bank_type, hints=hints, task_id=task_id)
     return extracted
 
 
@@ -101,7 +102,7 @@ async def process_single_file(
 
     try:
         # ── 3. OCR Extraction ──
-        extracted = await extract_stateless(file_bytes, original_filename, bank_type)
+        extracted = await extract_stateless(file_bytes, original_filename, bank_type, task_id=task.id)
 
         # ── 4. Create Receipt (header) — submitted_at=NULL = pending review ──
         receipt = Receipt(

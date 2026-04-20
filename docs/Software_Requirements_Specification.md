@@ -21,6 +21,7 @@
 | 1.8 | 09 Apr 2026 | Intern Team | Fix GL Prefix response field name (PrefixName); /extract now accepts multiple files; remove bank_name from /suggest requests; add missing localStorage keys (ocr_wizard_state, filePrefix, fileSource) |
 | 1.9 | 16 Apr 2026 | Intern Team | Major architecture restructure: LLM layer (app/llm/), Tool layer (app/tools/ + ToolResult + registry), Carmen router split, generic tools endpoint (/api/v1/tools/), frontend domain API split (lib/api/*), custom hooks (useToast, useModal) |
 | 2.0 | 17 Apr 2026 | Intern Team | Correction Learning System: feedback router (/api/v1/feedback/correction), correction_feedback table, correction_service (ratio-based hints), prompt injection at extract time, diffCorrections/logCorrections on frontend |
+| 2.1 | 20 Apr 2026 | Intern Team | Architecture refactor: backend models/ package split (enums/orm/schemas), useOcrWizard hook extracted from App.jsx, barrel files (index.js) per component domain, Home hub page; UI/UX redesign with IBM Plex Sans + indigo design system |
 
 ---
 
@@ -1033,6 +1034,17 @@ CARMEN_BASE_URL=https://carmen.example.com
 | 4 | `AccountingReview` | แสดง Journal Entry + mapping alerts |
 | 5 | `JournalVoucher` | สรุป JV + ยืนยันบันทึก |
 
+### 10.1b Backend Models Package
+
+`backend/app/models.py` ถูก refactor เป็น `backend/app/models/` package เพื่อรองรับการขยาย:
+
+| File | Contents |
+| :--- | :--- |
+| `app/models/__init__.py` | Re-exports ทุก symbol เพื่อ backward compatibility (`from app.models import X` ยังใช้ได้) |
+| `app/models/enums.py` | `TaskStatus`, `BankType` enums |
+| `app/models/orm.py` | SQLAlchemy ORM classes: `OCRTask`, `Receipt`, `ReceiptDetail`, `MappingHistory`, `CorrectionFeedback` |
+| `app/models/schemas.py` | Pydantic schemas: `ExtractedReceiptData`, `OCRTaskResponse`, `ReceiptSchema`, ฯลฯ |
+
 ### 10.2 Key Frontend Files
 
 **API Layer** (`src/lib/api/`) — import directly from these files:
@@ -1050,6 +1062,7 @@ CARMEN_BASE_URL=https://carmen.example.com
 
 | File | Purpose |
 | :--- | :--- |
+| `src/hooks/useOcrWizard.js` | All wizard state + handlers extracted from App.jsx — exposes step, bank, files, headerData, details, jvRows, toasts, modal, and all handlers |
 | `src/hooks/useToast.js` | `useToast()` → `{ toasts, showToast(msg, type) }` — auto-dismiss 3.5s |
 | `src/hooks/useModal.js` | `useModal()` → `{ modal, showModal(config), closeModal() }` |
 
@@ -1057,12 +1070,43 @@ CARMEN_BASE_URL=https://carmen.example.com
 
 | File | Role |
 | :--- | :--- |
-| `src/App.jsx` | Root — 5-step wizard, shared state; uses `useToast` + `useModal` |
+| `src/App.jsx` | Thin render shell (~115 lines) — imports `useOcrWizard`, renders step JSX only |
+| `src/pages/Home.jsx` | Landing hub page — links to OCR wizard and Mapping |
 | `src/constants/index.js` | `BANKS`, `BANK_THAI_NAMES`, `detectBankFromCompanyName()`, `DETAIL_COLUMNS`, `HEADER_LABELS`, `DETAIL_LABELS`, `EMPTY_DETAIL_ROW` |
 | `src/pages/Mapping.jsx` | Account mapping configuration page |
-| `src/components/*.jsx` | Reusable UI components |
 
-### 10.3 Storage & Persistence
+**Component Barrel Files** (ใช้ grouped imports แทน per-file imports):
+
+| Barrel | Exports |
+| :--- | :--- |
+| `src/components/common/index.js` | `StepWizard`, `FormActions`, `CustomModal`, `CustomSearchSelect` |
+| `src/components/ocr/index.js` | `UploadSection`, `ActionBar`, `HeaderCard`, `DetailTable`, `DocumentPreview` |
+| `src/components/accounting/index.js` | `AccountingReview`, `JournalVoucher`, `InputTaxReconciliation` |
+
+### 10.3 CSS Architecture & Design System
+
+ระบบใช้ layered CSS (plain CSS, no Tailwind) แบ่งเป็น 4 ระดับ:
+
+| File | Role |
+| :--- | :--- |
+| `src/styles/base.css` | Design tokens (CSS variables), resets, keyframe animations, utility classes |
+| `src/styles/layout.css` | App container, header, main grid, responsive breakpoints |
+| `src/styles/components.css` | All reusable components: buttons, cards, tables, modals, step wizard, toast |
+| `src/styles/pages/home.css` | Home hub page styles |
+| `src/styles/pages/mapping.css` | Mapping page styles |
+
+**Design Tokens:**
+
+| Token | Value | Usage |
+| :--- | :--- | :--- |
+| `--primary` | `#4f46e5` (indigo) | Brand color, buttons, links, focus rings |
+| `--teal` | `#0891b2` | Secondary accent |
+| `--emerald` | `#059669` | Success states, ONLINE badge |
+| `--rose` | `#e11d48` | Danger, credit indicators |
+| Font | IBM Plex Sans + IBM Plex Mono | Body + monospace |
+| Shadow scale | xs/sm/md/lg/xl | 5-level elevation |
+
+### 10.4 Storage & Persistence
 
 - **localStorage keys**:
   - `accountingConfig`: account code + department mappings — รวม field `filePrefix` (GL file prefix สำหรับ JV) และ `fileSource` (ชื่อแหล่งที่มา)
