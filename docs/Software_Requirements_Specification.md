@@ -20,6 +20,7 @@
 | 1.7 | 08 Apr 2026 | Intern Team | Add GET /api/v1/ocr/carmen/gl-prefix endpoint for GL Prefix master data |
 | 1.8 | 09 Apr 2026 | Intern Team | Fix GL Prefix response field name (PrefixName); /extract now accepts multiple files; remove bank_name from /suggest requests; add missing localStorage keys (ocr_wizard_state, filePrefix, fileSource) |
 | 1.9 | 16 Apr 2026 | Intern Team | Major architecture restructure: LLM layer (app/llm/), Tool layer (app/tools/ + ToolResult + registry), Carmen router split, generic tools endpoint (/api/v1/tools/), frontend domain API split (lib/api/*), custom hooks (useToast, useModal) |
+| 2.0 | 17 Apr 2026 | Intern Team | Correction Learning System: feedback router (/api/v1/feedback/correction), correction_feedback table, correction_service (ratio-based hints), prompt injection at extract time, diffCorrections/logCorrections on frontend |
 
 ---
 
@@ -35,7 +36,8 @@
 2. **Inbound Interface - Master Data Sync**: แบคเอนด์ทำหน้าที่เป็น Proxy ดึงข้อมูลรหัสบัญชีและแผนกจาก Carmen ERP เพื่อใช้ในการตั้งค่า Mapping
 3. **Inbound Interface - AI Accounting Mapping**: ระบบ AI แนะนำรหัสบัญชีอัตโนมัติ พร้อมการบันทึกประวัติการแมปแยกตามธนาคารและประเภทการชำระเงิน
 4. **Inbound Interface - Accounting Journal Review**: กระบวนการแสดง Journal Entry (Debit/Credit) และยืนยัน Journal Voucher ก่อน Submit
-5. **Inbound Interface - Data Submission**: ส่งข้อมูลชุดสมบูรณ์ที่ผ่านการตรวจสอบแล้วบันทึกลงในฐานข้อมูล SQLite พร้อมการตรวจสอบการซ้ำซ้อน
+5. **Inbound Interface - Data Submission**: ส่งข้อมูลชุดสมบูรณ์ที่ผ่านการตรวจสอบแล้วบันทึกลงในฐานข้อมูล MySQL/MariaDB พร้อมการตรวจสอบการซ้ำซ้อน
+6. **Correction Learning System**: บันทึกการแก้ไขของผู้ใช้ที่ submit time เพื่อเรียนรู้ pattern ที่ LLM มักจะอ่านผิด และนำไปใช้เพิ่ม hint ใน prompt ของธนาคารนั้นๆ โดยอัตโนมัติ
 
 ---
 
@@ -62,8 +64,10 @@ flowchart LR
         Map_R["🤖 Mapping Router<br/>(suggest, history)"]
         Carmen_R["🔁 Carmen Router<br/>(proxy)"]
         Tools_R["🛠️ Tools Router<br/>(agent invoke)"]
+        FB_R["📝 Feedback Router<br/>(correction)"]
         Tools_L["⚙️ Tools Layer<br/>(extract, submit, map_gl)"]
         LLM_L["🧠 LLM Layer<br/>(client + prompt registry)"]
+        CorrSvc["🔄 Correction Service<br/>(hints + ratio)"]
         DB["🗄️ MySQL/MariaDB<br/>(ocr_db)"]
     end
     
@@ -76,9 +80,12 @@ flowchart LR
     User -->|Upload & Select| Frontend
     Frontend -->|REST API| Backend
     OCR_R -->|delegate| Tools_L
+    OCR_R -->|get hints| CorrSvc
     Map_R -->|delegate| Tools_L
     Tools_R -->|invoke stateless tools| Tools_L
     Carmen_R -->|HTTP| Carmen
+    FB_R -->|upsert correction| DB
+    CorrSvc -->|query receipts + correction_feedback| DB
     Tools_L -->|call_text_llm / get_client| LLM_L
     LLM_L -->|LLM Call| OpenRouter
     Tools_L -->|read/write| DB
@@ -133,16 +140,25 @@ sequenceDiagram
         DB-->>BE: Confirmed
         BE-->>UI: Success {receipt_id}
     end
+
+    rect rgb(140, 90, 200)
+        Note over User,DB: STEP 4 (post-submit): Log Corrections
+        UI->>UI: diffCorrections(final vs original)
+        UI->>BE: POST /api/v1/feedback/correction (per changed field)
+        BE->>DB: INSERT ... ON DUPLICATE KEY UPDATE correction_feedback
+    end
 ```
 
-### 3.3 Sequence Diagram: API 1 - Extract OCR Data (Stateless)
+### 3.3 Sequence Diagram: API 1 - Extract OCR Data (Stateless + Hint Injection)
 
-ขั้นตอนการส่งไฟล์เพื่อใช้ Vision LLM ในการอ่านข้อมูล (ไม่บันทึกลงฐานข้อมูล)
+ขั้นตอนการส่งไฟล์เพื่อใช้ Vision LLM ในการอ่านข้อมูล พร้อมการ inject correction hints อัตโนมัติ
 
 ```mermaid
 sequenceDiagram
     participant User as User / Frontend (React)
     participant Router as OCR Router (FastAPI)
+    participant CorrSvc as correction_service
+    participant DB as MySQL/MariaDB
     participant Tool as tools/extract
     participant Prompts as llm/prompts
     participant Client as llm/client
@@ -150,21 +166,53 @@ sequenceDiagram
 
     User->>Router: POST /api/v1/ocr/extract (files[], bank_type)
     activate Router
-    Router->>Tool: extract.run(file_bytes, filename, bank_type)
+
+    Router->>CorrSvc: get_correction_hints(bank_type, db)
+    CorrSvc->>DB: COUNT receipts submitted (bank, 90d)
+    CorrSvc->>DB: COUNT corrections per field (bank, 90d)
+    CorrSvc-->>Router: hints = {field: "rate"} if error_rate > 10%
+
+    Router->>Tool: extract_stateless(file_bytes, bank_type, hints)
     activate Tool
     Tool->>Tool: preprocess_image() — Pillow resize, keep color
-    Tool->>Prompts: get_ocr_prompt(bank_type)
-    Prompts-->>Tool: bank-specific prompt string
+    Tool->>Prompts: get_ocr_prompt(bank_type, hints)
+    Note right of Prompts: hints appended as CORRECTION NOTES<br/>if any field error_rate > 10%
+    Prompts-->>Tool: bank-specific prompt + optional hints
     Tool->>Client: get_client()
     Client-->>Tool: AsyncOpenAI instance
     Tool->>LLM: vision call with base64 image + prompt
     activate LLM
     LLM-->>Tool: JSON Structured Data
     deactivate LLM
-    Tool-->>Router: ToolResult(success, output=ExtractedReceiptData)
+    Tool-->>Router: ExtractedReceiptData
     deactivate Tool
     Router-->>User: 200 OK (array of ExtractedReceiptData)
     deactivate Router
+```
+
+### 3.3a Sequence Diagram: Correction Learning — Log & Learn
+
+ขั้นตอนการบันทึกการแก้ไขและเรียนรู้จาก pattern ที่ผิดซ้ำ
+
+```mermaid
+sequenceDiagram
+    participant User as User / Frontend (React)
+    participant FB as Feedback Router
+    participant DB as MySQL/MariaDB
+
+    Note over User: User submits after editing fields in Step 3
+    User->>User: diffCorrections(finalHeader, originalHeader, finalDetails, originalDetails)
+    Note right of User: compares final submitted values vs<br/>LLM-extracted originals — returns diff list
+
+    loop for each changed field
+        User->>FB: POST /api/v1/feedback/correction<br/>{receipt_id: doc_no, bank_type, field_name, original_value, corrected_value}
+        FB->>DB: INSERT ... ON DUPLICATE KEY UPDATE correction_feedback
+        Note right of DB: UPSERT on (receipt_id, field_name)<br/>1 document + 1 field = 1 record
+        DB-->>FB: ok
+        FB-->>User: {id, field_name, corrected_value, ...}
+    end
+
+    Note over DB: Next extraction for same bank:<br/>correction_service queries ratio<br/>corrections(field,90d) / receipts(bank,90d)<br/>fields > 10% get hint injected into prompt
 ```
 
 ### 3.4 Sequence Diagram: API 2 - Get Account Codes (Proxy)
@@ -712,7 +760,45 @@ sequenceDiagram
 
 ---
 
-### 5.14 API 11: Health Check
+### 5.14 API 12: Log Correction Feedback
+
+**วัตถุประสงค์**: บันทึกการแก้ไขของผู้ใช้เพื่อใช้ปรับปรุง LLM prompt ในอนาคต (เรียกที่ submit time โดย `diffCorrections`)
+
+**Method**: POST | **Endpoint**: `/api/v1/feedback/correction`
+
+**JSON Request**:
+```json
+{
+  "receipt_id": "SCB-2026-00123",
+  "bank_type": "SCB",
+  "field_name": "merchant_name",
+  "original_value": "EXAMPLE CO",
+  "corrected_value": "EXAMPLE CO LTD"
+}
+```
+
+> `field_name` ใช้ชื่อ snake_case ตรงกับ LLM prompt field (เช่น `merchant_name`, `doc_no`, `pay_amt`) — frontend จะ map จาก PascalCase ผ่าน `FIELD_NAME_MAP` ใน `feedback.js`
+
+**JSON Response**:
+```json
+{
+  "id": 42,
+  "receipt_id": "SCB-2026-00123",
+  "bank_type": "SCB",
+  "field_name": "merchant_name",
+  "original_value": "EXAMPLE CO",
+  "corrected_value": "EXAMPLE CO LTD",
+  "created_at": "2026-04-17T10:30:00"
+}
+```
+
+**กรณี skip** (original == corrected): คืน `id: -1`, `created_at: null` — ไม่บันทึกลง DB
+
+**UPSERT behavior**: ใช้ `INSERT ... ON DUPLICATE KEY UPDATE` — unique constraint คือ `(receipt_id, field_name)` — 1 เอกสาร + 1 field = 1 record เสมอ
+
+---
+
+### 5.15 API 11: Health Check
 
 **วัตถุประสงค์**: ตรวจสอบสถานะ API และฐานข้อมูล
 
@@ -731,7 +817,7 @@ sequenceDiagram
 
 ## 6. โครงสร้างฐานข้อมูล (Database Schema)
 
-ระบบใช้ **MySQL/MariaDB** ผ่าน `aiomysql` (async) โดยมี 4 ตาราง:
+ระบบใช้ **MySQL/MariaDB** ผ่าน `aiomysql` (async) โดยมี 5 ตาราง:
 
 ### 6.1 Table: `ocr_tasks`
 
@@ -810,6 +896,30 @@ sequenceDiagram
 | `confirmed_count` | INT | | NO | 1 | จำนวนครั้งที่ยืนยัน (เพิ่มครั้งละ 1 เมื่อ save) |
 | `created_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาสร้าง |
 | `updated_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาแก้ไขล่าสุด |
+
+---
+
+### 6.5 Table: `correction_feedback`
+
+**ความหมาย**: บันทึกการแก้ไขที่ผู้ใช้ทำในแต่ละ field เพื่อใช้คำนวณ error rate และ inject hints เข้า prompt
+
+| Column | Type | Key | Null | Default | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INT UNSIGNED | PK | NO | AUTO_INCREMENT | Correction ID |
+| `receipt_id` | VARCHAR(100) | IDX | NO | | เก็บ `doc_no` ของเอกสาร (ไม่ใช่ FK เพราะ log ที่ submit time) |
+| `bank_type` | VARCHAR(50) | IDX | NO | | รหัสธนาคาร (BBL/KBANK/SCB) |
+| `field_name` | VARCHAR(100) | IDX | NO | | ชื่อ field ที่ถูกแก้ (snake_case ตรงกับ LLM prompt) |
+| `original_value` | TEXT | | YES | | ค่าที่ LLM อ่านได้ (ก่อนแก้) |
+| `corrected_value` | TEXT | | YES | | ค่าที่ผู้ใช้แก้ไขเป็น |
+| `created_at` | DATETIME | IDX | NO | CURRENT_TIMESTAMP | เวลาที่บันทึก |
+
+**Unique Constraint**: `(receipt_id, field_name)` — 1 เอกสาร + 1 field = 1 record เสมอ (UPSERT)
+
+**การใช้งาน** — `correction_service.get_correction_hints(bank_type)`:
+
+- นับ `submitted receipts` ของธนาคารนั้นใน 90 วัน → denominator
+- นับ `corrections per field` ใน 90 วัน → numerator
+- `error_rate = corrections / receipts` → hint ถ้า > 10% และมี receipts >= 10 ใบ
 
 ---
 

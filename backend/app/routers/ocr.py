@@ -28,6 +28,7 @@ from app.models import (
     ExtractedReceiptData,
 )
 from app.services import ocr_service
+from app.services.correction_service import get_correction_hints
 from app.tools import submit as submit_tool
 from app.tools.submit import SubmitInput
 from app.utils.image_processing import is_valid_image
@@ -91,6 +92,8 @@ async def extract_receipt(
         raise HTTPException(status_code=400, detail="No files uploaded")
 
     results = []
+    bank_type_str = bank_type.value if bank_type else None
+    hints = await get_correction_hints(bank_type_str, db) if bank_type_str else {}
 
     for upload_file in files:
         if not is_valid_image(upload_file.filename):
@@ -110,7 +113,8 @@ async def extract_receipt(
         extracted = await ocr_service.extract_stateless(
             file_bytes=file_bytes,
             original_filename=upload_file.filename,
-            bank_type=bank_type.value if bank_type else None,
+            bank_type=bank_type_str,
+            hints=hints or None,
         )
 
         # Duplicate check — flag if doc_no already submitted

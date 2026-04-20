@@ -1,141 +1,140 @@
+import { useState, useEffect } from 'react'
+import { fetchAccountCodes } from '../lib/api/carmen'
+
 const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'
 
-export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSource, description, onFinish, onBack }) {
+let _accCache = null
+
+export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSource, description, carmenJvId, onFinish, onBack }) {
   const totalDr = jvRows.reduce((s, r) => s + r.debit,  0)
   const totalCr = jvRows.reduce((s, r) => s + r.credit, 0)
 
+  const [accNameMap, setAccNameMap] = useState(_accCache || {})
+
+  useEffect(() => {
+    if (_accCache) return
+    fetchAccountCodes()
+      .then(list => {
+        const map = {}
+        list.forEach(a => { if (a.AccCode) map[a.AccCode] = a.Description || '' })
+        _accCache = map
+        setAccNameMap(map)
+      })
+      .catch(() => {})
+  }, [])
+
+  const getAccName = (acc) => accNameMap[acc] || ''
+
   return (
-    <div>
-      <div className="section-header">
-        <span className="status-badge-success">
-          <i className="fas fa-check-circle" /> Step 5: Created Successfully
-        </span>
+    <>
+      {/* Header Row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0, color: '#1e293b' }}>Journal Voucher</h2>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <span style={{ background: 'var(--gray-200)', color: 'var(--text-3)', padding: '0.35rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}>OCC</span>
+            <span style={{ background: '#3b82f6', color: 'white', padding: '0.35rem 1rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 600 }}>Normal</span>
+        </div>
       </div>
 
-      <div className="data-card">
-        <div className="card-title">
-          <div className="card-title-left"><i className="fas fa-receipt" /> Journal Voucher</div>
-          <div className="btn-group">
-            <span className="status-badge info">Normal</span>
-          </div>
+      {/* Inputs block */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+        <div style={{ flex: '0 0 100px', border: '1px solid var(--border-hi)', borderRadius: '4px', position: 'relative', padding: '0.5rem 0.75rem', background: '#fff' }}>
+            <span style={{ position: 'absolute', top: '-8px', left: '8px', background: '#fff', padding: '0 4px', fontSize: '0.7rem', color: 'var(--text-4)' }}>Prefix</span>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>{filePrefix || 'IC'}</div>
         </div>
-        <div className="card-body">
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '0',
-            background: 'var(--gray-50)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            overflow: 'hidden',
-            marginBottom: '0',
-          }}>
-            {/* Row 1: 4 cols */}
-            {[
-              { icon: 'fa-tag',        label: 'Prefix',      value: filePrefix,        mono: false, accent: true  },
-              { icon: 'fa-hashtag',    label: 'Voucher No.', value: headerData.DocNo,  mono: true,  accent: false },
-              { icon: 'fa-calendar',   label: 'Date',        value: headerData.DocDate,mono: false, accent: false },
-              { icon: 'fa-database',   label: 'Source',      value: fileSource,        mono: false, accent: false, green: true },
-            ].map(({ icon, label, value, mono, accent, green }, i) => (
-              <div key={i} style={{
-                padding: '1rem 1.25rem',
-                borderRight: i < 3 ? '1px solid var(--border)' : 'none',
-                borderBottom: '1px solid var(--border)',
-                background: accent ? 'var(--blue-light)' : 'white',
-              }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '0.4rem',
-                  fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em',
-                  textTransform: 'uppercase', color: accent ? 'var(--blue)' : 'var(--text-3)',
-                  marginBottom: '0.35rem',
-                }}>
-                  <i className={`fas ${icon}`} style={{ fontSize: '0.65rem' }} />
-                  {label}
-                </div>
-                <div style={{
-                  fontSize: '0.95rem', fontWeight: 600,
-                  fontFamily: mono ? "'DM Mono', monospace" : 'inherit',
-                  color: accent ? 'var(--blue)' : green ? 'var(--teal)' : 'var(--text)',
-                  letterSpacing: mono ? '-0.01em' : 'inherit',
-                }}>
-                  {value || '—'}
-                </div>
-              </div>
-            ))}
+        <div style={{ flex: '0 0 200px', border: '1px solid var(--border)', borderRadius: '4px', position: 'relative', padding: '0.5rem 0.75rem', background: '#fff' }}>
+            <span style={{ position: 'absolute', top: '-8px', left: '8px', background: '#fff', padding: '0 4px', fontSize: '0.7rem', color: 'var(--text-4)' }}>Voucher No.</span>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>{carmenJvId || '26030007'}</div>
+        </div>
+        <div style={{ flex: '0 0 200px', border: '1px solid var(--border)', borderRadius: '4px', position: 'relative', padding: '0.5rem 0.75rem', background: '#fff' }}>
+            <span style={{ position: 'absolute', top: '-8px', left: '8px', background: '#fff', padding: '0 4px', fontSize: '0.7rem', color: 'var(--text-4)' }}>Date</span>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>{headerData.DocDate || '30/03/2026'}</div>
+        </div>
+        <div style={{ flex: 1, border: '1px solid var(--border)', borderRadius: '4px', position: 'relative', padding: '0.5rem 0.75rem', background: '#fff' }}>
+            <span style={{ position: 'absolute', top: '-8px', left: '8px', background: '#fff', padding: '0 4px', fontSize: '0.7rem', color: 'var(--text-4)' }}>Description</span>
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>{description || 'BBLTEST - 30/03/2026'}</div>
+        </div>
+      </div>
 
-            {/* Row 2: description full width */}
-            <div style={{
-              gridColumn: 'span 4',
-              padding: '0.85rem 1.25rem',
-              background: 'white',
-              display: 'flex', alignItems: 'center', gap: '0.6rem',
-            }}>
-              <div style={{
-                fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em',
-                textTransform: 'uppercase', color: 'var(--text-3)',
-                display: 'flex', alignItems: 'center', gap: '0.4rem',
-                whiteSpace: 'nowrap',
-              }}>
-                <i className="fas fa-align-left" style={{ fontSize: '0.65rem' }} />
-                Description
-              </div>
-              <div style={{ width: '1px', height: '1rem', background: 'var(--border)', flexShrink: 0 }} />
-              <div style={{ fontSize: '0.9rem', color: 'var(--text-2)' }}>
-                {description || '—'}
-              </div>
-            </div>
-          </div>
-
-          <div className="table-wrapper" style={{ marginTop: '1rem', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th width="48">#</th>
-                  <th width="130">Dept.</th>
-                  <th width="130">Acc Code</th>
-                  <th>Description</th>
-                  <th width="150" className="text-right">Debit</th>
-                  <th width="150" className="text-right">Credit</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jvRows.map((r, i) => (
-                  <tr key={i}>
-                    <td style={{ textAlign: 'center' }}>{i + 1}</td>
-                    <td>{r.dept}</td>
-                    <td>{r.acc}</td>
-                    <td>{r.desc}</td>
-                    <td className="text-right" style={{ fontFamily: 'monospace' }}>{r.debit ? fmt(r.debit) : ''}</td>
-                    <td className="text-right" style={{ fontFamily: 'monospace' }}>{r.credit ? fmt(r.credit) : ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="jv-total-row">
-                  <td colSpan={4} style={{ textAlign: 'right', fontWeight: 700 }}>ยอดรวม (TOTAL):</td>
-                  <td className="text-right" style={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(totalDr)}</td>
-                  <td className="text-right" style={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(totalCr)}</td>
-                </tr>
-              </tfoot>
+      {/* Table block */}
+      <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
+                <thead>
+                    <tr style={{ backgroundColor: '#2b4d81', color: '#fff' }}>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>Dept.</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>Account<br/>#</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', textAlign: 'left', whiteSpace: 'nowrap' }}>Account Name</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', textAlign: 'left' }}>Comment</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold' }}>Currency</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', textAlign: 'right' }}>Rate</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', textAlign: 'right', whiteSpace: 'nowrap' }}>Dr.<br/>Amount</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', textAlign: 'right', whiteSpace: 'nowrap' }}>Cr.<br/>Amount</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', textAlign: 'right', whiteSpace: 'nowrap' }}>Dr. Base</th>
+                        <th style={{ padding: '0.75rem 0.5rem', fontWeight: 'bold', textAlign: 'right', whiteSpace: 'nowrap' }}>Cr. Base</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {jvRows.map((r, i) => (
+                        <tr key={i} style={{ borderBottom: i === jvRows.length - 1 ? 'none' : '1px solid var(--gray-100)', backgroundColor: i % 2 === 1 ? '#f9fafb' : '#fff' }}>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444' }}>{r.dept}</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444' }}>{r.acc}</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444', textAlign: 'left' }}>{getAccName(r.acc)}</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444', textAlign: 'left' }}>{r.desc}</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444' }}>THB</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444', textAlign: 'right' }}>1.00000000</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444', textAlign: 'right' }}>{fmt(r.debit)}</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444', textAlign: 'right' }}>{fmt(r.credit)}</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444', textAlign: 'right' }}>{fmt(r.debit)}</td>
+                            <td style={{ padding: '0.6rem 0.5rem', color: '#444', textAlign: 'right' }}>{fmt(r.credit)}</td>
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot>
+                    <tr style={{ borderTop: '1px solid var(--border)' }}>
+                        <td colSpan={6}></td>
+                        <td style={{ padding: '0.8rem 0.5rem', fontWeight: 'bold', color: '#2b4d81', textAlign: 'right' }}>{fmt(totalDr)}</td>
+                        <td style={{ padding: '0.8rem 0.5rem', fontWeight: 'bold', color: '#2b4d81', textAlign: 'right' }}>{fmt(totalCr)}</td>
+                        <td style={{ padding: '0.8rem 0.5rem', fontWeight: 'bold', color: '#2b4d81', textAlign: 'right' }}>{fmt(totalDr)}</td>
+                        <td style={{ padding: '0.8rem 0.5rem', fontWeight: 'bold', color: '#2b4d81', textAlign: 'right' }}>{fmt(totalCr)}</td>
+                    </tr>
+                </tfoot>
             </table>
-          </div>
-
-          <div className="form-actions">
-            {onBack && (
-              <button className="btn btn-outline" onClick={onBack} style={{ marginRight: 'auto' }}>
-                <i className="fas fa-arrow-left" /> ย้อนกลับ
-              </button>
-            )}
-            <button className="btn-icon" onClick={() => window.print()} title="พิมพ์ Voucher" style={{ position: 'relative' }}>
-              <i className="fas fa-print" />
-            </button>
-            <div className="form-actions-sep" />
-            <button className="btn-submit" onClick={onFinish}>
-              <i className="fas fa-arrow-right" /> ต่อไป (Next)
-            </button>
-          </div>
         </div>
       </div>
-    </div>
+
+      <div className="form-actions" style={{ marginTop: '1.5rem', backgroundColor: 'transparent', borderTop: 'none', padding: '0' }}>
+        {onBack && (
+          <button className="btn-cancel" onClick={onBack} style={{ marginRight: 'auto' }}>
+            <i className="fas fa-arrow-left" /> ย้อนกลับ
+          </button>
+        )}
+        <button
+          className="btn-cancel"
+          onClick={() => {
+            if (carmenJvId) {
+                window.open(`https://dev.carmen4.com/#/glJv/${carmenJvId}/show`, '_blank');
+            } else {
+                alert('ไม่สามารถเปิดได้: ไม่พบ Voucher ID (InternalMessage) จาก Carmen');
+            }
+          }}
+          style={{
+            background: carmenJvId ? 'var(--blue-light)' : 'var(--gray-100)',
+            color: carmenJvId ? 'var(--blue)' : 'var(--text-4)',
+            border: `1px solid ${carmenJvId ? 'var(--blue)' : 'var(--border)'}`,
+            padding: '0.5rem 1rem',
+            borderRadius: '4px',
+            cursor: carmenJvId ? 'pointer' : 'not-allowed'
+          }}
+          title={carmenJvId ? `เปิดดู JV #${carmenJvId}` : 'รอการสร้าง JV ID'}
+        >
+          <i className="fas fa-external-link-alt" /> เปิดดูหน้า JV
+        </button>
+        <div className="form-actions-sep" />
+        <button className="btn-submit" onClick={onFinish} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer' }}>
+          <i className="fas fa-arrow-right" /> ต่อไป (Next)
+        </button>
+      </div>
+    </>
   )
 }

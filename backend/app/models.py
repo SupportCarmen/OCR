@@ -126,6 +126,23 @@ class MappingHistory(Base):
     __table_args__ = (UniqueConstraint("bank_name", "field_type", name="uq_mapping_bank_field"),)
 
 
+class CorrectionFeedback(Base):
+    """Track user corrections to OCR extraction — for learning patterns."""
+    __tablename__ = "correction_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    receipt_id = Column(String(100), nullable=False, index=True)  # stores doc_no
+    bank_type = Column(String(50), nullable=False, index=True)
+    field_name = Column(String(100), nullable=False, index=True)  # snake_case field names
+    original_value = Column(Text, nullable=True)
+    corrected_value = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("receipt_id", "field_name", name="uq_correction_receipt_field"),
+    )
+
+
 # ═══════════════════════════════════════════════════
 # Pydantic Schemas
 # ═══════════════════════════════════════════════════
@@ -225,3 +242,25 @@ class ExtractedReceiptData(BaseModel):
     branch_no: Optional[str] = Field(None, description="รหัสสาขาของธนาคาร (ถ้ามี)")
     details: List[ExtractedDetailRow] = Field(default_factory=list, description="รายการ card/payment type rows")
     is_duplicate: bool = Field(False, description="True ถ้า doc_no นี้มีอยู่ใน DB แล้ว (submitted)")
+
+
+# CorrectionFeedback — API schema for logging user corrections
+class CorrectionFeedbackRequest(BaseModel):
+    receipt_id: str
+    bank_type: str
+    field_name: str
+    original_value: Optional[str] = None
+    corrected_value: Optional[str] = None
+
+
+class CorrectionFeedbackResponse(BaseModel):
+    id: int
+    receipt_id: str
+    bank_type: str
+    field_name: str
+    original_value: Optional[str] = None
+    corrected_value: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

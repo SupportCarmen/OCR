@@ -37,11 +37,14 @@ async def extract_stateless(
     file_bytes: bytes,
     original_filename: str,
     bank_type: Optional[str] = None,
+    hints: Optional[dict] = None,
 ) -> ExtractedReceiptData:
     """
     Stateless OCR extraction:
     resize → OpenRouter vision LLM → return structured data.
     Does NOT save to DB or Disk.
+
+    hints: correction hints from correction_feedback (passed to prompt builder).
     """
     ext = os.path.splitext(original_filename)[1].lower()
 
@@ -58,8 +61,8 @@ async def extract_stateless(
         )
 
     # 2. Vision LLM
-    logger.info(f"Extracting stateless: {original_filename} (bank={bank_type})")
-    _, extracted = await extract_from_image(processed_bytes, original_filename, bank_type)
+    logger.info(f"Extracting stateless: {original_filename} (bank={bank_type}, hints={len(hints) if hints else 0})")
+    _, extracted = await extract_from_image(processed_bytes, original_filename, bank_type, hints=hints)
     return extracted
 
 

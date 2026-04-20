@@ -7,9 +7,22 @@ Start the server:
     uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 """
 
+import sys
+import io
 import logging
 import traceback
 from contextlib import asynccontextmanager
+
+# ── Force UTF-8 on Windows (prevents 'charmap' codec errors with Thai text) ──
+if sys.platform == "win32":
+    # Reconfigure stdout/stderr to UTF-8
+    for _stream_name in ("stdout", "stderr"):
+        _stream = getattr(sys, _stream_name)
+        if hasattr(_stream, "buffer"):
+            setattr(
+                sys, _stream_name,
+                io.TextIOWrapper(_stream.buffer, encoding="utf-8", errors="replace", line_buffering=True),
+            )
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,13 +34,15 @@ from app.routers.ocr import router as ocr_router
 from app.routers.mapping import router as mapping_router
 from app.routers.carmen import router as carmen_router
 from app.routers.tools import router as tools_router
+from app.routers.feedback import router as feedback_router
 
 
-# ── Logging Setup ──
+# ── Logging Setup (uses the reconfigured UTF-8 stderr) ──
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,  # override any handlers uvicorn may have set up
 )
 logger = logging.getLogger(__name__)
 
@@ -81,13 +96,12 @@ app.add_middleware(
 # ── Global error handler ──
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error(
-        "Unhandled exception: %s %s\n%s",
-        request.method,
-        request.url,
-        traceback.format_exc(),
-    )
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
+    tb = traceback.format_exc()
+    try:
+        logger.error("Unhandled exception: %s %s\n%s", request.method, request.url, tb)
+    except Exception:
+        pass  # avoid recursive encoding errors in the handler
+    return JSONResponse(status_code=500, content={"detail": str(exc), "traceback": tb})
 
 
 # ── Register Routers ──
@@ -95,6 +109,7 @@ app.include_router(ocr_router)
 app.include_router(mapping_router)
 app.include_router(carmen_router)
 app.include_router(tools_router)
+app.include_router(feedback_router)
 
 
 # ── Root endpoint ──

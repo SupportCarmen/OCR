@@ -18,6 +18,23 @@ _REGISTRY: dict[str, str] = {
 }
 
 
-def get_ocr_prompt(bank_type: str | None) -> str:
-    """Return the bank-specific OCR prompt, falling back to generic."""
-    return _REGISTRY.get(bank_type or "", _GENERIC)
+def get_ocr_prompt(bank_type: str | None, hints: dict[str, str] | None = None) -> str:
+    """Return the bank-specific OCR prompt, falling back to generic.
+
+    hints: {field_name: error_rate_info} from correction_service.
+           When provided, a warning section is appended telling LLM
+           which fields are often extracted incorrectly (no specific values).
+    """
+    base_prompt = _REGISTRY.get(bank_type or "", _GENERIC)
+    if not hints:
+        return base_prompt
+
+    hint_lines = "\n".join(
+        f"- {field}: often extracted incorrectly — read the document carefully for this field"
+        for field in hints.keys()
+    )
+    return (
+        base_prompt
+        + f"\n\n⚠️ CORRECTION NOTES (fields that are often wrong for {bank_type}):\n"
+        + hint_lines
+    )

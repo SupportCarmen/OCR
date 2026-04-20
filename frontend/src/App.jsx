@@ -3,6 +3,7 @@ import { EMPTY_DETAIL_ROW, BANK_THAI_NAMES, detectBankFromCompanyName } from './
 import { extractFromFile } from './lib/api/ocr'
 import { submitToLocal } from './lib/api/submit'
 import { submitToCarmen } from './lib/api/carmen'
+import { logCorrections, diffCorrections } from './lib/api/feedback'
 import { useToast } from './hooks/useToast'
 import { useModal } from './hooks/useModal'
 import StepWizard from './components/StepWizard'
@@ -33,13 +34,17 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState('')
+  const [receiptId, setReceiptId] = useState(initialState?.receiptId || null)
   const [headerData, setHeaderData] = useState(initialState?.headerData || {})
   const [receiptMeta, setReceiptMeta] = useState(initialState?.receiptMeta || {})
   const [details, setDetails] = useState(initialState?.details || [])
+  const [originalDetails, setOriginalDetails] = useState(initialState?.originalDetails || [])
+  const [originalHeader, setOriginalHeader] = useState(initialState?.originalHeader || {})
   const [jvRows, setJvRows] = useState([])
   const [filePrefix, setFilePrefix] = useState('')
   const [fileSource, setFileSource] = useState('')
   const [jvDescription, setJvDescription] = useState('')
+  const [carmenJvId, setCarmenJvId] = useState(null)
 
   const { toasts, showToast } = useToast()
   const { modal, showModal, closeModal } = useModal()
@@ -70,10 +75,10 @@ export default function App() {
   // Auto-save wizard state to localStorage
   useEffect(() => {
     if (step > 1) {
-      const ocrState = { step, bank, headerData, receiptMeta, details }
+      const ocrState = { step, bank, receiptId, headerData, receiptMeta, details, originalDetails, originalHeader }
       localStorage.setItem('ocr_wizard_state', JSON.stringify(ocrState))
     }
-  }, [step, bank, headerData, receiptMeta, details])
+  }, [step, bank, receiptId, headerData, receiptMeta, details, originalDetails])
 
   function handleFileChange(e) {
     const selectedFiles = e.target.files
@@ -101,7 +106,9 @@ export default function App() {
     setStep(1)
   }
 
-  function applyExtractedData(ext) {
+  function applyExtractedData(ext, taskId = null) {
+    // Use doc_no as identifier for logging (even before submission creates receipt_id)
+    setReceiptId(ext.doc_no || taskId || null)
     setHeaderData({
       DateProcessed: new Date().toLocaleDateString('en-GB'),
       BankName:     ext.bank_name     || '',
@@ -120,7 +127,19 @@ export default function App() {
       WhtAmount: ext.wht_amount != null ? parseFloat(ext.wht_amount) || null : null,
       NetAmount: ext.net_amount != null ? parseFloat(ext.net_amount) || null : null,
     })
-    setDetails(ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }])
+    const detailsList = ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }]
+    setDetails(detailsList)
+    setOriginalDetails(JSON.parse(JSON.stringify(detailsList)))
+    setOriginalHeader(JSON.parse(JSON.stringify({
+      DateProcessed: new Date().toLocaleDateString('en-GB'),
+      BankName:     ext.bank_name     || '',
+      DocName:      ext.doc_name      || '',
+      CompanyName:  ext.company_name  || '',
+      DocDate:      ext.doc_date      || '',
+      DocNo:        ext.doc_no        || '',
+      MerchantName: ext.merchant_name || '',
+      MerchantId:   ext.merchant_id   || '',
+    })))
 
     if (ext.bank_companyname || ext.bank_tax_id || ext.bank_address || ext.branch_no) {
       try {
@@ -299,6 +318,13 @@ export default function App() {
       await submitToLocal(payload)
       submittedDocNos.current.add(docNo)
 
+      // Log corrections (fire-and-forget — compare final vs original)
+      const corrections = diffCorrections(headerData, originalHeader, details, originalDetails)
+      if (corrections.length > 0) {
+        logCorrections(receiptId, bank, corrections)
+          .catch(err => console.error('[feedback] Error logging corrections:', err))
+      }
+
       // Build and submit Carmen GL JV payload
       let carmenError = null
       try {
@@ -334,7 +360,12 @@ export default function App() {
           UserModified: '',
         }
         console.log('[Carmen GL JV] payload:', JSON.stringify(carmenPayload, null, 2))
-        await submitToCarmen(carmenPayload)
+        const carmenRes = await submitToCarmen(carmenPayload)
+        
+        if (carmenRes && carmenRes.InternalMessage) {
+          setCarmenJvId(carmenRes.InternalMessage)
+        }
+        
         showToast('ส่งข้อมูลเข้า Carmen GL JV สำเร็จ', 'success')
       } catch (err) {
         carmenError = err.message
@@ -372,6 +403,7 @@ export default function App() {
     setReceiptMeta({})
     setDetails([])
     setJvRows([])
+    setCarmenJvId(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
     localStorage.removeItem('ocr_wizard_state')
     closeModal()
@@ -503,6 +535,7 @@ export default function App() {
                   filePrefix={filePrefix}
                   fileSource={fileSource}
                   description={jvDescription}
+                  carmenJvId={carmenJvId}
                   onFinish={() => setStep(6)}
                   onBack={() => setStep(4)}
                 />

@@ -115,3 +115,23 @@ CREATE TABLE IF NOT EXISTS mapping_history (
     UNIQUE KEY uq_mapping_bank_field (bank_name, field_type),
     INDEX idx_mapping_history_bank (bank_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- correction_feedback — user corrections for OCR learning
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS correction_feedback (
+    id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    receipt_id      VARCHAR(100)    NOT NULL                COMMENT 'stores doc_no',
+    bank_type       VARCHAR(50)     NOT NULL,
+    field_name      VARCHAR(100)    NOT NULL                COMMENT 'snake_case field names matching LLM prompt',
+    original_value  TEXT            NULL        COMMENT 'LLM extracted value',
+    corrected_value TEXT            NULL        COMMENT 'User corrected value',
+    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_correction_receipt_field (receipt_id, field_name),
+    INDEX idx_correction_bank_type (bank_type),
+    INDEX idx_correction_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

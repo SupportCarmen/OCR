@@ -46,19 +46,21 @@ async def extract_from_image(
     image_bytes: bytes,
     filename: str = "receipt.png",
     bank_type: Optional[str] = None,
+    hints: Optional[dict] = None,
 ) -> Tuple[str, ExtractedReceiptData]:
     """
     Send an image to OpenRouter vision LLM and return:
       (raw_text, ExtractedReceiptData)
 
     bank_type: "SCB" | "BBL" | "KBANK" — selects bank-specific prompt.
+    hints: correction hints from correction_feedback (appended to prompt).
     Raises on API or JSON parse failure — let the caller handle errors.
     """
     if not settings.openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY is not configured")
 
     client = get_client()
-    prompt = get_ocr_prompt(bank_type)
+    prompt = get_ocr_prompt(bank_type, hints=hints)
 
     mime_type = _get_mime_type(filename)
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
@@ -104,7 +106,6 @@ async def extract_from_image(
         raise ValueError("LLM returned empty string from vision model")
 
     logger.info(f"Raw LLM response:\n{result_text[:1000]}")
-    print(f"\n{'='*60}\nRAW LLM RESPONSE:\n{result_text}\n{'='*60}\n", flush=True)
 
     # Save last raw response for debug endpoint (Windows-compatible)
     import pathlib, tempfile
