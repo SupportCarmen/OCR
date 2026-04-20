@@ -134,7 +134,7 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
             <i className="fas fa-file-invoice" /> รายละเอียดรายการรายวัน (Journal Details)
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', marginRight: '2rem' }}>
-            <span style={{ background: 'var(--blue-light)', color: 'var(--blue)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--blue-mid)', fontWeight: 600 }}>
+            <span style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--primary-mid)', fontWeight: 600 }}>
               Prefix: {config?.filePrefix || '-'}
             </span>
             <span style={{ background: 'var(--gray-100)', color: 'var(--text-2)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 500 }}>

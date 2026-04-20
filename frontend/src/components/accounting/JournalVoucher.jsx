@@ -115,9 +115,9 @@ export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSou
               }
             }}
             style={{
-              background: carmenJvId ? 'var(--blue-light)' : 'var(--gray-100)',
-              color:      carmenJvId ? 'var(--blue)'       : 'var(--text-4)',
-              border:     `1px solid ${carmenJvId ? 'var(--blue)' : 'var(--border)'}`,
+              background: carmenJvId ? 'var(--primary-light)' : 'var(--gray-100)',
+              color:      carmenJvId ? 'var(--primary)'       : 'var(--text-4)',
+              border:     `1px solid ${carmenJvId ? 'var(--primary)' : 'var(--border)'}`,
               cursor:     carmenJvId ? 'pointer'           : 'not-allowed',
             }}
             title={carmenJvId ? `เปิดดู JV #${carmenJvId}` : 'รอการสร้าง JV ID'}

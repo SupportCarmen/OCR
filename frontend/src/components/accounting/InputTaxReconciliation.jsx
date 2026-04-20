@@ -111,8 +111,8 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           </div>
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginRight: '0.5rem' }}>
             <span style={{
-              background: 'var(--blue-light)', color: 'var(--blue)',
-              border: '1px solid var(--blue-mid)', borderRadius: '4px',
+              background: 'var(--primary-light)', color: 'var(--primary)',
+              border: '1px solid var(--primary-mid)', borderRadius: '4px',
               padding: '0.2rem 0.65rem', fontSize: '0.8rem', fontWeight: 600,
             }}>
               Source: OCC
@@ -181,8 +181,8 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
                     </td>
                     <td>
                       <span style={{
-                        background: 'var(--blue-light)', color: 'var(--blue)',
-                        border: '1px solid var(--blue-mid)', borderRadius: '4px',
+                        background: 'var(--primary-light)', color: 'var(--primary)',
+                        border: '1px solid var(--primary-mid)', borderRadius: '4px',
                         padding: '0.15rem 0.5rem', fontSize: '0.78rem', fontWeight: 600,
                         whiteSpace: 'nowrap',
                       }}>

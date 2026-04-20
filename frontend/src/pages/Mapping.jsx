@@ -659,7 +659,7 @@ export default function Mapping() {
         <div className="section">
           <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span>ACCOUNT CODE MAPPING {loadingOpts && <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: 'var(--blue)' }}><i className="fas fa-spinner fa-spin"></i> กำลังโหลดรหัสบัญชี...</span>}</span>
+              <span>ACCOUNT CODE MAPPING {loadingOpts && <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: 'var(--primary)' }}><i className="fas fa-spinner fa-spin"></i> กำลังโหลดรหัสบัญชี...</span>}</span>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
               {(Object.values(mainSuggestions).some(s => s) || Object.values(paymentSuggestions).some(s => s)) && (
@@ -674,9 +674,9 @@ export default function Mapping() {
                 onClick={() => autoSuggest(masterAccounts, masterDepartments)}
                 disabled={masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading}
                 title={masterAccounts.length === 0 ? 'Loading account codes...' : masterDepartments.length === 0 ? 'Loading departments...' : suggestLoading ? 'Suggesting...' : 'Click to get AI suggestions'}
-                style={{ padding: '0.4rem 0.8rem', background: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? '#f0f0f0' : 'var(--blue)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? '#999' : 'white', fontWeight: 500 }}
+                style={{ padding: '0.4rem 0.8rem', background: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'var(--gray-100)' : 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'var(--gray-400)' : 'white', fontWeight: 500, boxShadow: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'none' : '0 2px 10px rgba(79,70,229,0.25)' }}
               >
-                <i className={`fas fa-magic ${suggestLoading ? 'fa-spin' : ''}`}></i> AI Suggest
+                <i className={`fas fa-wand-magic-sparkles ${suggestLoading ? 'fa-spin' : ''}`} style={{ color: 'inherit' }}></i> AI Suggest
               </button>
               <button onClick={loadInitialData} disabled={loadingOpts} style={{ padding: '0.4rem 0.8rem', background: 'white', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-2)' }}>
                 <i className={`fas fa-sync-alt ${loadingOpts ? 'fa-spin' : ''}`}></i> Refresh
@@ -692,8 +692,8 @@ export default function Mapping() {
             <div></div>
 
             {/* Amount */}
-            <div className="mapping-type type-credit" style={{ color: 'var(--blue)', background: 'var(--blue-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Credit</div>
-            <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--blue)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
+            <div className="mapping-type type-credit" style={{ color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Credit</div>
+            <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
             <div style={{ gridColumn: 'span 3' }}>
               <div id="amountMappingStatus" style={{
                 fontSize: '0.85rem',
@@ -727,7 +727,7 @@ export default function Mapping() {
               const badge = meta === 'history'
                 ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
                 : meta === 'ai'
-                  ? { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-magic' }
+                  ? { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-wand-magic-sparkles' }
                   : null;
 
               const suggestion = mainSuggestions[key] || null;
@@ -856,9 +856,9 @@ export default function Mapping() {
                   <button
                     onClick={() => autoSuggestPaymentTypes(masterAccounts, masterDepartments)}
                     disabled={loadingOpts || paymentSuggestLoading}
-                    style={{ padding: '0.4rem 0.8rem', background: paymentSuggestLoading ? '#f0f0f0' : 'var(--blue)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: paymentSuggestLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: paymentSuggestLoading ? '#999' : 'white', fontWeight: 500 }}
+                    style={{ padding: '0.4rem 0.8rem', background: paymentSuggestLoading ? 'var(--gray-100)' : 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: paymentSuggestLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: paymentSuggestLoading ? 'var(--gray-400)' : 'white', fontWeight: 500, boxShadow: paymentSuggestLoading ? 'none' : '0 2px 10px rgba(79,70,229,0.25)' }}
                   >
-                    <i className={`fas fa-magic ${paymentSuggestLoading ? 'fa-spin' : ''}`}></i> AI Suggest
+                    <i className={`fas fa-wand-magic-sparkles ${paymentSuggestLoading ? 'fa-spin' : ''}`} style={{ color: 'inherit' }}></i> AI Suggest
                   </button>
                   {Object.values(paymentSuggestions).some(s => s) && (
                     <button
@@ -981,11 +981,11 @@ export default function Mapping() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <div style={{
-                          background: isCustom ? '#f0fdf4' : 'var(--blue-light)',
-                          color: isCustom ? '#16a34a' : 'var(--blue)',
+                          background: isCustom ? '#f0fdf4' : 'var(--primary-light)',
+                          color: isCustom ? '#16a34a' : 'var(--primary)',
                           padding: '0.4rem 0.5rem',
                           borderRadius: '4px',
-                          border: `1px solid ${isCustom ? '#86efac' : 'var(--blue-mid)'}`,
+                          border: `1px solid ${isCustom ? '#86efac' : 'var(--primary-mid)'}`,
                           fontSize: '0.85rem',
                           fontWeight: 600,
                           textAlign: 'center',
@@ -1051,7 +1051,7 @@ export default function Mapping() {
                     placeholder="Custom type..."
                     style={{ flex: 1, padding: '0.4rem 0.5rem', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.85rem', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', outline: 'none' }}
                   />
-                  <button onClick={handleAddCustomType} title="เพิ่ม" style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.4rem 0.7rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                  <button onClick={handleAddCustomType} title="เพิ่ม" style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.4rem 0.7rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                     <i className="fas fa-plus"></i> Add
                   </button>
                 </div>
@@ -1060,7 +1060,7 @@ export default function Mapping() {
             </div>
             <div className="mapping-modal-footer" style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
               <button className="btn-cancel" onClick={() => { setPaymentSuggestions({}); setIsAmountModalOpen(false); }} style={{ padding: '0.5rem 1rem', background: 'var(--gray-300)', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ยกเลิก</button>
-              <button className="btn-confirm" onClick={saveAmountSelection} style={{ padding: '0.5rem 1rem', background: 'var(--blue)', color: '#fff', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ตกลง</button>
+              <button className="btn-confirm" onClick={saveAmountSelection} style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: '#fff', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ตกลง</button>
             </div>
           </div>
         </div>,

@@ -46,7 +46,7 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
 
   const topBadge = topChoice?.source === 'history'
     ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
-    : { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-magic' };
+    : { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-wand-magic-sparkles' };
 
   const selectedOption = value ? options.find(o => o.code === value) : null;
   const selectedDesc = selectedOption
@@ -65,7 +65,7 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
         onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
         onChange={(e) => setSearchTerm(e.target.value)}
         title={isAISuggested ? `AI แนะนำ: ${suggestedValue}` : value && selectedDesc ? `${value} — ${selectedDesc}` : ''}
-        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--blue)' : isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : hasError ? '#fff1f2' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
+        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--primary)' : isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : hasError ? '#fff1f2' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
       />
       {isOpen && (
         <div style={{
@@ -104,10 +104,10 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
               key={i}
               style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer', transition: 'background 0.1s' }}
               onMouseDown={(e) => { e.preventDefault(); onChange(opt.code); setIsOpen(false); }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--blue-light)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-light)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
-              <div style={{ fontWeight: 600, color: 'var(--blue)', fontSize: '0.85rem', fontFamily: "'DM Mono', monospace" }}>{opt.code} <span style={{ color: 'var(--text-3)', fontWeight: 500, fontFamily: "'Sarabun', sans-serif" }}> - {opt.name}</span></div>
+              <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '0.85rem', fontFamily: "'DM Mono', monospace" }}>{opt.code} <span style={{ color: 'var(--text-3)', fontWeight: 500, fontFamily: "'Sarabun', sans-serif" }}> - {opt.name}</span></div>
               {opt.name2 && <div style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: '3px', fontFamily: "'Sarabun', sans-serif" }}>{opt.name2}</div>}
             </div>
           ))}
