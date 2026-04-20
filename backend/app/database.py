@@ -57,6 +57,13 @@ async def migrate_db():
                 await conn.execute(text(f"ALTER TABLE receipts ADD COLUMN {col} {col_type}"))
             except Exception:
                 pass  # Column already exists — skip (works for both MySQL and SQLite)
+                
+        # Drop old unique constraint on mapping_history and add new one
+        try:
+            await conn.execute(text("ALTER TABLE mapping_history DROP INDEX uq_mapping_bank_field"))
+            await conn.execute(text("ALTER TABLE mapping_history ADD CONSTRAINT uq_mapping_bank_field_choice UNIQUE (bank_name, field_type, dept_code, acc_code)"))
+        except Exception as e:
+            pass # Constraint might already be updated or error in syntax for SQLite
 
 
 async def get_db() -> AsyncSession:

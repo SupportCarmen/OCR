@@ -1,4 +1,4 @@
-import { HEADER_LABELS } from '../constants'
+import { HEADER_LABELS } from '../../constants'
 
 export default function HeaderCard({ headerData, onUpdate, readOnly }) {
   return (

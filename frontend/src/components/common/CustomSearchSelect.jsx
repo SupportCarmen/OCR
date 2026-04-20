@@ -1,0 +1,119 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+// ─── CUSTOM SEARCH SELECT ───
+// topChoice: { code, name, name2?, source: 'ai'|'history' } | null
+export default function CustomSearchSelect({ value, onChange, options, placeholder, topChoice, suggestedValue, hasError }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    setSearchTerm(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearchTerm(value || '');
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [value]);
+
+  const q = searchTerm.toLowerCase();
+  const filtered = options.filter(o =>
+    (o.code && o.code.toLowerCase().includes(q)) ||
+    (o.name && o.name.toLowerCase().includes(q)) ||
+    (o.name2 && o.name2.toLowerCase().includes(q))
+  );
+
+  // Show top choice when: exists, not already selected, and matches search (or search is empty)
+  const showTopChoice = topChoice &&
+    topChoice.code !== value &&
+    (!q ||
+      topChoice.code.toLowerCase().includes(q) ||
+      (topChoice.name && topChoice.name.toLowerCase().includes(q)));
+
+  const filteredWithoutTop = showTopChoice
+    ? filtered.filter(o => o.code !== topChoice.code)
+    : filtered;
+
+  const topBadge = topChoice?.source === 'history'
+    ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
+    : { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-magic' };
+
+  const selectedOption = value ? options.find(o => o.code === value) : null;
+  const selectedDesc = selectedOption
+    ? [selectedOption.name, selectedOption.name2].filter(Boolean).join(' · ')
+    : null;
+
+  const isAISuggested = !isOpen && !!suggestedValue;
+  const displayValue = isOpen ? searchTerm : (isAISuggested ? suggestedValue : value || '');
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={displayValue}
+        onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        title={isAISuggested ? `AI แนะนำ: ${suggestedValue}` : value && selectedDesc ? `${value} — ${selectedDesc}` : ''}
+        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--blue)' : isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : hasError ? '#fff1f2' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
+      />
+      {isOpen && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0,
+          maxHeight: '280px', overflowY: 'auto', background: 'white',
+          border: '1px solid var(--border)', borderRadius: '6px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 9999, marginTop: '4px'
+        }}>
+          {/* ── Top Choice ── */}
+          {showTopChoice && (
+            <>
+              <div
+                onMouseDown={(e) => { e.preventDefault(); onChange(topChoice.code); setIsOpen(false); }}
+                onMouseEnter={(e) => e.currentTarget.style.background = topChoice.source === 'history' ? '#dcfce7' : '#ede9fe'}
+                onMouseLeave={(e) => e.currentTarget.style.background = topBadge.bg}
+                style={{ padding: '0.6rem 0.8rem', background: topBadge.bg, borderBottom: `1px solid ${topBadge.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', transition: 'background 0.1s' }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, color: topBadge.color, fontSize: '0.85rem', fontFamily: "'DM Mono', monospace" }}>
+                    {topChoice.code} <span style={{ fontWeight: 500, fontFamily: "'Sarabun', sans-serif" }}>- {topChoice.name}</span>
+                  </div>
+                  {topChoice.name2 && <div style={{ fontSize: '0.72rem', color: topBadge.color, opacity: 0.75, marginTop: '2px', fontFamily: "'Sarabun', sans-serif" }}>{topChoice.name2}</div>}
+                </div>
+              </div>
+              {filteredWithoutTop.length > 0 && (
+                <div style={{ padding: '0.2rem 0.8rem', fontSize: '0.7rem', color: 'var(--text-4)', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-100)' }}>
+                  ตัวเลือกทั้งหมด
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Normal list ── */}
+          {filteredWithoutTop.map((opt, i) => (
+            <div
+              key={i}
+              style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer', transition: 'background 0.1s' }}
+              onMouseDown={(e) => { e.preventDefault(); onChange(opt.code); setIsOpen(false); }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--blue-light)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <div style={{ fontWeight: 600, color: 'var(--blue)', fontSize: '0.85rem', fontFamily: "'DM Mono', monospace" }}>{opt.code} <span style={{ color: 'var(--text-3)', fontWeight: 500, fontFamily: "'Sarabun', sans-serif" }}> - {opt.name}</span></div>
+              {opt.name2 && <div style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: '3px', fontFamily: "'Sarabun', sans-serif" }}>{opt.name2}</div>}
+            </div>
+          ))}
+          {!showTopChoice && filtered.length === 0 && <div style={{ padding: '0.8rem', color: 'var(--text-4)', fontSize: '0.8rem', textAlign: 'center' }}>ไม่พบข้อมูล</div>}
+        </div>
+      )}
+    </div>
+  );
+}

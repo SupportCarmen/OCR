@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BANKS } from '../constants'
+import { BANKS } from '../../constants'
 
 export default function UploadSection({ bank, onBankChange, onFileChange, fileInputRef, fileName, multiple }) {
   const [isDragOver, setIsDragOver] = useState(false)

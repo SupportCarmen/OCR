@@ -1,0 +1,141 @@
+/* ═══════════════════════════════════════════
+   LAYOUT — App Container, Grid, Header, Main Content
+   ═══════════════════════════════════════════ */
+
+.app-container {
+    max-width: 1440px;
+    margin: 0 auto;
+    animation: fadeUp 0.5s var(--ease) both;
+}
+
+/* ─── HEADER ─── */
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2.25rem;
+    padding-bottom: 1.75rem;
+    border-bottom: 1px solid var(--border);
+    animation: fadeDown 0.5s var(--ease) both;
+}
+
+.app-header h1 {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--gray-900);
+}
+
+.app-header h1 i {
+    width: 46px; height: 46px;
+    border-radius: var(--radius-lg);
+    background: var(--blue-light);
+    border: 1px solid var(--blue-mid);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    color: var(--blue);
+    flex-shrink: 0;
+}
+
+.app-header::after {
+    content: '● SYSTEM ONLINE';
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--teal);
+    background: var(--teal-light);
+    border: 1px solid #99f6e4;
+    border-radius: 100px;
+    padding: 0.4rem 0.9rem;
+    animation: blink 3s ease-in-out infinite;
+}
+
+/* ─── BRAND / HEADER ─── */
+.app-header .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.app-header .logo-box {
+    width: 42px; height: 42px;
+    border-radius: var(--radius-lg);
+    background: var(--blue-light);
+    border: 1px solid var(--blue-mid);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    color: var(--blue);
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+}
+
+/* ─── MAIN LAYOUT ─── */
+.main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+    width: 100%;
+}
+
+@media (max-width: 1100px) {
+    .main-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── RESULT AREA ─── */
+.main-content {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 1.75rem;
+    align-items: start;
+    animation: fadeUp 0.5s var(--ease) both;
+}
+
+/* UI Improvement: Show Preview immediately, hide data until processed */
+.main-content.hide-data {
+    grid-template-columns: 340px 1fr;
+}
+
+.main-content.hide-data .data-column {
+    display: block;
+    opacity: 0.3;
+    pointer-events: none;
+    filter: blur(1px) grayscale(100%);
+}
+
+@media (max-width: 1100px) { .main-content { grid-template-columns: 1fr; } }
+
+/* Data Cards */
+.data-column { display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* ─── SECTION HEADER ─── */
+.section-header {
+    display: flex; align-items: center; gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.section-title {
+    font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-4);
+    margin-bottom: 0.85rem;
+    display: flex; align-items: center; gap: 0.75rem;
+}
+
+.section-title i { color: var(--blue); }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); order: -1; margin-right: 0.75rem; display: none; }
+
+/* ─── RESPONSIVE LAYOUT ─── */
+@media (max-width: 768px) {
+    .app-header { flex-wrap: wrap; gap: 0.75rem; }
+    .action-bar { flex-wrap: wrap; }
+    .form-actions { flex-direction: column; }
+    .btn-cancel, .btn-submit, .btn-danger { width: 100%; justify-content: center; }
+    .btn-icon { width: 100%; height: auto; padding: 0.6rem; }
+    .form-actions-sep { display: none; }
+    .btn-add-row { margin: 0.75rem 1rem; width: calc(100% - 2rem); }
+    .total-summary-grid { grid-template-columns: 1fr 1fr; }
+}

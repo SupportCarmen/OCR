@@ -77,17 +77,20 @@ async def suggest_payment_types(req: SuggestPaymentTypesRequest):
 async def get_mapping_history(bank_name: str, db: AsyncSession = Depends(get_db)):
     """Return all saved mapping history rows for a given bank."""
     result = await db.execute(
-        select(MappingHistory).where(MappingHistory.bank_name == bank_name)
+        select(MappingHistory)
+        .where(MappingHistory.bank_name == bank_name)
+        .order_by(MappingHistory.confirmed_count.desc(), MappingHistory.updated_at.desc())
     )
     rows = result.scalars().all()
 
     history: Dict[str, dict] = {}
     for row in rows:
-        history[row.field_type] = {
-            "dept": row.dept_code,
-            "acc": row.acc_code,
-            "confirmed_count": row.confirmed_count,
-        }
+        if row.field_type not in history:
+            history[row.field_type] = {
+                "dept": row.dept_code,
+                "acc": row.acc_code,
+                "confirmed_count": row.confirmed_count,
+            }
     return {"bank_name": bank_name, "history": history}
 
 
@@ -103,6 +106,8 @@ async def save_mapping_history(req: SaveHistoryRequest, db: AsyncSession = Depen
             select(MappingHistory).where(
                 MappingHistory.bank_name == req.bank_name,
                 MappingHistory.field_type == field_type,
+                MappingHistory.dept_code == mapping.dept,
+                MappingHistory.acc_code == mapping.acc,
             )
         )
         existing = result.scalar_one_or_none()

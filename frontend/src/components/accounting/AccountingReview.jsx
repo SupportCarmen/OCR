@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import CustomModal from './CustomModal'
+import CustomModal from '../common/CustomModal'
 
 function toNum(v) {
   return parseFloat(String(v ?? '').replace(/,/g, '')) || 0

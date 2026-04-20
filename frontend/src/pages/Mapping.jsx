@@ -1,127 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { fetchAccountCodes, fetchDepartments, fetchGLPrefixes } from '../lib/api/carmen';
-import { suggestMapping, suggestPaymentTypes, saveMappingHistory } from '../lib/api/mapping';
-import CustomModal from '../components/CustomModal';
-import './Mapping.css';
+import { suggestMapping, suggestPaymentTypes, saveMappingHistory, fetchMappingHistory } from '../lib/api/mapping';
+import CustomModal from '../components/common/CustomModal';
+import CustomSearchSelect from '../components/common/CustomSearchSelect';
+import '../styles/pages/mapping.css';
 
-// ─── CUSTOM SEARCH SELECT ───
-// topChoice: { code, name, name2?, source: 'ai'|'history' } | null
-function CustomSearchSelect({ value, onChange, options, placeholder, topChoice, suggestedValue, hasError }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const wrapperRef = useRef(null);
-
-  useEffect(() => {
-    setSearchTerm(value || '');
-  }, [value]);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
-        setSearchTerm(value || '');
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [value]);
-
-  const q = searchTerm.toLowerCase();
-  const filtered = options.filter(o =>
-    (o.code && o.code.toLowerCase().includes(q)) ||
-    (o.name && o.name.toLowerCase().includes(q)) ||
-    (o.name2 && o.name2.toLowerCase().includes(q))
-  );
-
-  // Show top choice when: exists, not already selected, and matches search (or search is empty)
-  const showTopChoice = topChoice &&
-    topChoice.code !== value &&
-    (!q ||
-      topChoice.code.toLowerCase().includes(q) ||
-      (topChoice.name && topChoice.name.toLowerCase().includes(q)));
-
-  const filteredWithoutTop = showTopChoice
-    ? filtered.filter(o => o.code !== topChoice.code)
-    : filtered;
-
-  const topBadge = topChoice?.source === 'history'
-    ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
-    : { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-magic' };
-
-  const selectedOption = value ? options.find(o => o.code === value) : null;
-  const selectedDesc = selectedOption
-    ? [selectedOption.name, selectedOption.name2].filter(Boolean).join(' · ')
-    : null;
-
-  const isAISuggested = !isOpen && !!suggestedValue;
-  const displayValue = isOpen ? searchTerm : (isAISuggested ? suggestedValue : value || '');
-
-  return (
-    <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={displayValue}
-        onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        title={isAISuggested ? `AI แนะนำ: ${suggestedValue}` : value && selectedDesc ? `${value} — ${selectedDesc}` : ''}
-        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--blue)' : isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : hasError ? '#fff1f2' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
-      />
-      {isOpen && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
-          maxHeight: '280px', overflowY: 'auto', background: 'white',
-          border: '1px solid var(--border)', borderRadius: '6px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 9999, marginTop: '4px'
-        }}>
-          {/* ── Top Choice ── */}
-          {showTopChoice && (
-            <>
-              <div
-                onMouseDown={(e) => { e.preventDefault(); onChange(topChoice.code); setIsOpen(false); }}
-                onMouseEnter={(e) => e.currentTarget.style.background = topChoice.source === 'history' ? '#dcfce7' : '#ede9fe'}
-                onMouseLeave={(e) => e.currentTarget.style.background = topBadge.bg}
-                style={{ padding: '0.6rem 0.8rem', background: topBadge.bg, borderBottom: `1px solid ${topBadge.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', transition: 'background 0.1s' }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700, color: topBadge.color, fontSize: '0.85rem', fontFamily: "'DM Mono', monospace" }}>
-                    {topChoice.code} <span style={{ fontWeight: 500, fontFamily: "'Sarabun', sans-serif" }}>- {topChoice.name}</span>
-                  </div>
-                  {topChoice.name2 && <div style={{ fontSize: '0.72rem', color: topBadge.color, opacity: 0.75, marginTop: '2px', fontFamily: "'Sarabun', sans-serif" }}>{topChoice.name2}</div>}
-                </div>
-              </div>
-              {filteredWithoutTop.length > 0 && (
-                <div style={{ padding: '0.2rem 0.8rem', fontSize: '0.7rem', color: 'var(--text-4)', background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-100)' }}>
-                  ตัวเลือกทั้งหมด
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── Normal list ── */}
-          {filteredWithoutTop.map((opt, i) => (
-            <div
-              key={i}
-              style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer', transition: 'background 0.1s' }}
-              onMouseDown={(e) => { e.preventDefault(); onChange(opt.code); setIsOpen(false); }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--blue-light)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              <div style={{ fontWeight: 600, color: 'var(--blue)', fontSize: '0.85rem', fontFamily: "'DM Mono', monospace" }}>{opt.code} <span style={{ color: 'var(--text-3)', fontWeight: 500, fontFamily: "'Sarabun', sans-serif" }}> - {opt.name}</span></div>
-              {opt.name2 && <div style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: '3px', fontFamily: "'Sarabun', sans-serif" }}>{opt.name2}</div>}
-            </div>
-          ))}
-          {!showTopChoice && filtered.length === 0 && <div style={{ padding: '0.8rem', color: 'var(--text-4)', fontSize: '0.8rem', textAlign: 'center' }}>ไม่พบข้อมูล</div>}
-        </div>
-      )}
-    </div>
-  );
-}
 
 
 const BANK_INFO = {
@@ -192,9 +76,10 @@ export default function Mapping() {
   const autoSuggest = async (accounts, departments) => {
     if (!accounts.length) return;
 
-    // Only fetch for fields that don't have mappings yet
+    // Only fetch for fields that don't have mappings yet AND don't have a history suggestion
     const fieldsToFetch = ['commission', 'tax', 'net'].filter(f =>
-      !mappings[f] || (!mappings[f].dept && !mappings[f].acc)
+      (!mappings[f] || (!mappings[f].dept && !mappings[f].acc)) &&
+      !(mainSuggestions[f] && mainSuggestions[f].source === 'history')
     );
 
     if (fieldsToFetch.length === 0) {
@@ -321,9 +206,10 @@ export default function Mapping() {
 
     const allTypes = specificTypes || [...activeScan.paymentTypes, ...customPaymentTypes];
 
-    // Only suggest for payment types that don't have mappings yet
+    // Only suggest for payment types that don't have mappings yet AND don't have a history suggestion
     const needsAI = allTypes.filter(t =>
-      !paymentAmount[t] || (!paymentAmount[t].dept && !paymentAmount[t].acc)
+      (!paymentAmount[t] || (!paymentAmount[t].dept && !paymentAmount[t].acc)) &&
+      !(paymentSuggestions[t] && paymentSuggestions[t].source === 'history')
     );
 
     if (needsAI.length === 0) {
@@ -396,6 +282,52 @@ export default function Mapping() {
     }
   };
 
+  // Auto-load history when bank changes
+  useEffect(() => {
+    // ปิดการใช้งานแบบ history ไปก่อนใช้ ai suggest เป็นหลักเพื่อเก็บข้อมูล
+    /*
+    if (!bank) return;
+    let isSubscribed = true;
+
+    fetchMappingHistory(bank).then(result => {
+      if (!isSubscribed || !result.history) return;
+      const history = result.history;
+
+      setMainSuggestions(prev => {
+        const next = { ...prev };
+        ['commission', 'tax', 'net'].forEach(k => {
+          if (history[k] && next[k]?.source !== 'history') {
+            next[k] = { dept: history[k].dept, acc: history[k].acc, source: 'history' };
+          }
+        });
+        return next;
+      });
+
+      setSuggestionMeta(prev => {
+        const next = { ...prev };
+        ['commission', 'tax', 'net'].forEach(k => {
+          if (history[k] && next[k] !== 'history') {
+            next[k] = 'history';
+          }
+        });
+        return next;
+      });
+
+      setPaymentSuggestions(prev => {
+        const next = { ...prev };
+        Object.keys(history).forEach(k => {
+          if (!['commission', 'tax', 'net'].includes(k) && next[k]?.source !== 'history') {
+            next[k] = { dept: history[k].dept, acc: history[k].acc, source: 'history' };
+          }
+        });
+        return next;
+      });
+    }).catch(err => console.error('[Mapping] Failed to fetch history:', err));
+
+    return () => { isSubscribed = false; };
+    */
+  }, [bank]);
+
   // Load from LocalStorage and APIs on mount
   useEffect(() => {
     loadInitialData();
@@ -412,7 +344,7 @@ export default function Mapping() {
         const types = new Set();
         let comm = false, tx = false, n = false;
         const toNum = (v) => parseFloat(String(v ?? '').replace(/,/g, '')) || 0;
-        
+
         ocrState.details.forEach(d => {
           if (d.Transaction) types.add(d.Transaction);
           if (toNum(d.CommisAmt) > 0) comm = true;
@@ -446,7 +378,7 @@ export default function Mapping() {
         setFilePrefix(parsed.filePrefix || '');
         setFileSource(parsed.fileSource || '');
         setDescription(parsed.description || '');
-        
+
         let companyData = { name: '', taxId: '', branch: '', address: '' };
         if (parsed.company) {
           companyData = { ...companyData, ...parsed.company };
@@ -462,7 +394,7 @@ export default function Mapping() {
           companyData.address = info.address;
         }
         setCompany(companyData);
-        
+
         if (parsed.mappings) {
           setMappings(prev => ({ ...prev, ...parsed.mappings }));
         }
@@ -534,7 +466,7 @@ export default function Mapping() {
       if (shouldClose && window.opener) {
         window.close();
       } else {
-        window.location.hash = '';
+        window.location.hash = '/CreditCardOCR';
         if (!shouldClose) {
           setModalConfig({
             show: true,
@@ -606,15 +538,15 @@ export default function Mapping() {
   const amountMappedCount = allPaymentTypes.filter(t => paymentAmount[t]?.dept && paymentAmount[t]?.acc).length;
 
   const companyRequiredFields = [
-    { key: 'name',    label: 'Company Name' },
-    { key: 'taxId',   label: 'Tax ID' },
-    { key: 'branch',  label: 'Branch No' },
+    { key: 'name', label: 'Company Name' },
+    { key: 'taxId', label: 'Tax ID' },
+    { key: 'branch', label: 'Branch No' },
     { key: 'address', label: 'Address' },
   ];
   const missingCompanyFields = companyRequiredFields.filter(f => !company[f.key]?.trim());
 
   const topLevelRequired = [
-    { key: 'bank',       label: 'Bank',        value: bank },
+    { key: 'bank', label: 'Bank', value: bank },
     { key: 'filePrefix', label: 'File Prefix', value: filePrefix },
     { key: 'fileSource', label: 'File Source', value: fileSource },
   ];
@@ -643,7 +575,7 @@ export default function Mapping() {
         <h1><i className="fas fa-project-diagram"></i> Account Mapping Configuration</h1>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <button onClick={() => window.location.hash = ''} className="btn-cancel" style={{ textDecoration: 'none', padding: '0.6rem 1.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', background: 'white', border: '1px solid var(--border)', cursor: 'pointer' }}>
+          <button onClick={() => window.location.hash = '/CreditCardOCR'} className="btn-cancel" style={{ textDecoration: 'none', padding: '0.6rem 1.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', background: 'white', border: '1px solid var(--border)', cursor: 'pointer' }}>
             <i className="fas fa-arrow-left"></i> กลับสู่หน้าหลัก
           </button>
         </div>
@@ -762,7 +694,7 @@ export default function Mapping() {
             {/* Amount */}
             <div className="mapping-type type-credit" style={{ color: 'var(--blue)', background: 'var(--blue-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Credit</div>
             <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--blue)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
-             <div style={{ gridColumn: 'span 3' }}>
+            <div style={{ gridColumn: 'span 3' }}>
               <div id="amountMappingStatus" style={{
                 fontSize: '0.85rem',
                 padding: '0.7rem 1rem',
@@ -910,7 +842,7 @@ export default function Mapping() {
         <div className="mapping-modal" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setPaymentSuggestions({}); setIsAmountModalOpen(false); }}>
           <div className="mapping-modal-overlay" style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}></div>
           <div className="mapping-modal-content" style={{ position: 'relative', zIndex: 1, backgroundColor: '#fff', width: '90%', maxWidth: '800px', borderRadius: '8px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
-             <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#f8fafc', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
+            <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#f8fafc', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' }}>
                 <span>เลือก Payment Types สำหรับ Amount</span>
                 {activeScan.paymentTypes.size > 0 && (
@@ -949,7 +881,7 @@ export default function Mapping() {
                 <div>Account Code</div>
                 <div></div>
               </div>
-               {/* ── Required for Scan ── */}
+              {/* ── Required for Scan ── */}
               {activeScan.paymentTypes.size > 0 && (
                 <>
                   <div style={{ padding: '0.5rem', background: '#fef2f2', color: '#991b1b', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', marginBottom: '0.75rem', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1009,105 +941,105 @@ export default function Mapping() {
               {allPaymentTypes
                 .filter(t => !activeScan.paymentTypes.has(t))
                 .map(type => {
-                const pAmt = paymentAmount[type] || { dept: '', acc: '' };
-                const isCustom = !activeScan.paymentTypes.has(type);
-                const suggestion = paymentSuggestions[type] || null;
+                  const pAmt = paymentAmount[type] || { dept: '', acc: '' };
+                  const isCustom = !activeScan.paymentTypes.has(type);
+                  const suggestion = paymentSuggestions[type] || null;
 
-                // Resolve robust option objects for topChoice (even if not in master)
-                const deptFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
-                const deptTopChoice = suggestion?.dept
-                  ? {
-                    code: suggestion.dept,
-                    name: deptFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
-                    name2: deptFromMaster?.name2,
-                    source: suggestion.source
-                  }
-                  : null;
+                  // Resolve robust option objects for topChoice (even if not in master)
+                  const deptFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
+                  const deptTopChoice = suggestion?.dept
+                    ? {
+                      code: suggestion.dept,
+                      name: deptFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
+                      name2: deptFromMaster?.name2,
+                      source: suggestion.source
+                    }
+                    : null;
 
-                const accFromMaster = suggestion?.acc ? masterAccounts.find(a => a.code === suggestion.acc) : null;
-                const accTopChoice = suggestion?.acc
-                  ? {
-                    code: suggestion.acc,
-                    name: accFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
-                    name2: accFromMaster?.name2,
-                    source: suggestion.source
-                  }
-                  : null;
+                  const accFromMaster = suggestion?.acc ? masterAccounts.find(a => a.code === suggestion.acc) : null;
+                  const accTopChoice = suggestion?.acc
+                    ? {
+                      code: suggestion.acc,
+                      name: accFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
+                      name2: accFromMaster?.name2,
+                      source: suggestion.source
+                    }
+                    : null;
 
-                return (
-                  <div key={type} style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr auto',
-                    gap: '1rem',
-                    marginBottom: '0.5rem',
-                    alignItems: 'center',
-                    padding: '0.4rem',
-                    borderRadius: '8px',
-                    background: 'transparent',
-                    border: '1px solid transparent',
-                    transition: 'all 0.2s'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <div style={{
-                        background: isCustom ? '#f0fdf4' : 'var(--blue-light)',
-                        color: isCustom ? '#16a34a' : 'var(--blue)',
-                        padding: '0.4rem 0.5rem',
-                        borderRadius: '4px',
-                        border: `1px solid ${isCustom ? '#86efac' : 'var(--blue-mid)'}`,
-                        fontSize: '0.85rem',
-                        fontWeight: 600,
-                        textAlign: 'center',
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}>
-                        {type}
+                  return (
+                    <div key={type} style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr auto',
+                      gap: '1rem',
+                      marginBottom: '0.5rem',
+                      alignItems: 'center',
+                      padding: '0.4rem',
+                      borderRadius: '8px',
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{
+                          background: isCustom ? '#f0fdf4' : 'var(--blue-light)',
+                          color: isCustom ? '#16a34a' : 'var(--blue)',
+                          padding: '0.4rem 0.5rem',
+                          borderRadius: '4px',
+                          border: `1px solid ${isCustom ? '#86efac' : 'var(--blue-mid)'}`,
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          textAlign: 'center',
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}>
+                          {type}
+                        </div>
+                        {isCustom && (
+                          <button onClick={() => handleRemoveCustomType(type)} title="ลบ" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.9rem', padding: '0.2rem', lineHeight: 1 }}>
+                            <i className="fas fa-times-circle"></i>
+                          </button>
+                        )}
                       </div>
-                      {isCustom && (
-                        <button onClick={() => handleRemoveCustomType(type)} title="ลบ" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.9rem', padding: '0.2rem', lineHeight: 1 }}>
-                          <i className="fas fa-times-circle"></i>
-                        </button>
+                      <CustomSearchSelect
+                        value={pAmt.dept}
+                        onChange={(val) => handlePaymentMappingChange(type, 'dept', val)}
+                        options={masterDepartments}
+                        placeholder="Dept..."
+                        topChoice={deptTopChoice?.code ? deptTopChoice : null}
+                        suggestedValue={suggestion?.dept || null}
+                      />
+                      <CustomSearchSelect
+                        value={pAmt.acc}
+                        onChange={(val) => handlePaymentMappingChange(type, 'acc', val)}
+                        options={masterAccounts}
+                        placeholder="Acc..."
+                        topChoice={accTopChoice?.code ? accTopChoice : null}
+                        suggestedValue={suggestion?.acc || null}
+                      />
+                      {suggestion && (
+                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                          <button
+                            onClick={() => confirmPaymentSuggestion(type)}
+                            title="ยอมรับค่าแนะนำ"
+                            style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                          >
+                            <i className="fas fa-check"></i>
+                          </button>
+                          <button
+                            onClick={() => rejectPaymentSuggestion(type)}
+                            title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
+                            style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <CustomSearchSelect
-                      value={pAmt.dept}
-                      onChange={(val) => handlePaymentMappingChange(type, 'dept', val)}
-                      options={masterDepartments}
-                      placeholder="Dept..."
-                      topChoice={deptTopChoice?.code ? deptTopChoice : null}
-                      suggestedValue={suggestion?.dept || null}
-                    />
-                    <CustomSearchSelect
-                      value={pAmt.acc}
-                      onChange={(val) => handlePaymentMappingChange(type, 'acc', val)}
-                      options={masterAccounts}
-                      placeholder="Acc..."
-                      topChoice={accTopChoice?.code ? accTopChoice : null}
-                      suggestedValue={suggestion?.acc || null}
-                    />
-                    {suggestion && (
-                      <div style={{ display: 'flex', gap: '0.3rem' }}>
-                        <button
-                          onClick={() => confirmPaymentSuggestion(type)}
-                          title="ยอมรับค่าแนะนำ"
-                          style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
-                        >
-                          <i className="fas fa-check"></i>
-                        </button>
-                        <button
-                          onClick={() => rejectPaymentSuggestion(type)}
-                          title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                          style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
               {/* Add custom type row */}
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr auto', gap: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px dashed var(--border)', alignItems: 'center' }}>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>

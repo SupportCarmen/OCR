@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
+import Home from './pages/Home'
 import App from './App'
 import Mapping from './pages/Mapping'
 import './index.css'
 
+function getRoute() {
+  // Normalize: "#/CreditCardOCR" → "creditcardocr"
+  return window.location.hash.replace(/^#\/?/, '').toLowerCase()
+}
+
 function Router() {
-  const [hash, setHash] = useState(window.location.hash);
+  const [route, setRoute] = useState(getRoute());
 
   useEffect(() => {
-    const onHashChange = () => setHash(window.location.hash);
+    const onHashChange = () => setRoute(getRoute());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  return hash === '#mapping' ? <Mapping /> : <App />;
+  if (route.startsWith('creditcardocr')) {
+    // Sub-routes under CreditCardOCR
+    const sub = route.replace('creditcardocr', '').replace(/^\//, '')
+    if (sub === 'mapping') return <Mapping />
+    return <App />
+  }
+  return <Home />
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

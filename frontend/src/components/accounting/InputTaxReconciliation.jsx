@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { submitInputTax } from '../lib/api/carmen'
+import { submitInputTax } from '../../lib/api/carmen'
 
 function toNum(v) {
   return parseFloat(String(v ?? '').replace(/,/g, '')) || 0
@@ -134,19 +134,19 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Tax Invoice No.</th>
-                  <th>Tax Invoice Date</th>
-                  <th>Vendor Name</th>
-                  <th>TAX ID.</th>
-                  <th>Branch No.</th>
-                  <th>Description</th>
-                  <th>Tax Profile</th>
-                  <th className="text-right">Tax Rate %</th>
-                  <th className="text-right">Net Amount</th>
-                  <th className="text-right">Tax</th>
-                  <th className="text-right">Total</th>
+                <tr style={{ backgroundColor: '#2b4d81', color: '#fff' }}>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>Source</th>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>Tax Invoice No.</th>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>Tax Invoice Date</th>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>Vendor Name</th>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>TAX ID.</th>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>Branch No.</th>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>Description</th>
+                  <th style={{ color: '#fff', background: '#2b4d81' }}>Tax Profile</th>
+                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Tax Rate %</th>
+                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Net Amount</th>
+                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Tax</th>
+                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Total</th>
                 </tr>
               </thead>
               <tbody>

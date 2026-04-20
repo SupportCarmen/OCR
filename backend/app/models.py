@@ -123,7 +123,7 @@ class MappingHistory(Base):
     confirmed_count = Column(Integer, default=1)
     updated_at = Column(DateTime, server_default=func.now())
 
-    __table_args__ = (UniqueConstraint("bank_name", "field_type", name="uq_mapping_bank_field"),)
+    __table_args__ = (UniqueConstraint("bank_name", "field_type", "dept_code", "acc_code", name="uq_mapping_bank_field_choice"),)
 
 
 class CorrectionFeedback(Base):

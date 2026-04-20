@@ -6,17 +6,17 @@ import { submitToCarmen } from './lib/api/carmen'
 import { logCorrections, diffCorrections } from './lib/api/feedback'
 import { useToast } from './hooks/useToast'
 import { useModal } from './hooks/useModal'
-import StepWizard from './components/StepWizard'
-import UploadSection from './components/UploadSection'
-import ActionBar from './components/ActionBar'
-import HeaderCard from './components/HeaderCard'
-import DetailTable from './components/DetailTable'
-import FormActions from './components/FormActions'
-import DocumentPreview from './components/DocumentPreview'
-import CustomModal from './components/CustomModal'
-import AccountingReview from './components/AccountingReview'
-import JournalVoucher from './components/JournalVoucher'
-import InputTaxReconciliation from './components/InputTaxReconciliation'
+import StepWizard from './components/common/StepWizard'
+import UploadSection from './components/ocr/UploadSection'
+import ActionBar from './components/ocr/ActionBar'
+import HeaderCard from './components/ocr/HeaderCard'
+import DetailTable from './components/ocr/DetailTable'
+import FormActions from './components/common/FormActions'
+import DocumentPreview from './components/ocr/DocumentPreview'
+import CustomModal from './components/common/CustomModal'
+import AccountingReview from './components/accounting/AccountingReview'
+import JournalVoucher from './components/accounting/JournalVoucher'
+import InputTaxReconciliation from './components/accounting/InputTaxReconciliation'
 
 export default function App() {
   const initialState = (() => {
@@ -282,6 +282,12 @@ export default function App() {
   function deleteRow(index)  { setDetails(prev => prev.filter((_, i) => i !== index)) }
 
   async function handleSubmitFinal(rows) {
+    if (submittedDocNos.current.has(headerData.DocNo)) {
+      showToast('เอกสารนี้ถูกบันทึกไปแล้ว ไม่สามารถส่งซ้ำได้', 'warning')
+      setStep(5)
+      return
+    }
+
     setSubmitting(true)
     setJvRows(rows)
     const docNo = headerData.DocNo
@@ -506,10 +512,9 @@ export default function App() {
                 />
                 <FormActions
                   onCancel={handleCancel}
-                  onBack={goBack}
                   onSubmit={() => setStep(4)}
                   submitLabel="ถัดไป (Review Accounting)"
-                  showBack={step >= 3}
+                  showBack={false}
                 />
               </div>
             )}
@@ -521,7 +526,7 @@ export default function App() {
                   headerData={headerData}
                   onBack={() => setStep(3)}
                   onSubmit={handleSubmitFinal}
-                  onGoMapping={() => { window.open('#mapping', '_blank') }}
+                  onGoMapping={() => { window.open('#/CreditCardOCR/mapping', '_blank') }}
                   submitting={submitting}
                 />
               </div>
@@ -537,7 +542,6 @@ export default function App() {
                   description={jvDescription}
                   carmenJvId={carmenJvId}
                   onFinish={() => setStep(6)}
-                  onBack={() => setStep(4)}
                 />
               </div>
             )}
@@ -547,7 +551,6 @@ export default function App() {
                 <InputTaxReconciliation
                   details={details}
                   headerData={headerData}
-                  onBack={() => setStep(5)}
                   onFinish={resetAll}
                   showToast={showToast}
                 />

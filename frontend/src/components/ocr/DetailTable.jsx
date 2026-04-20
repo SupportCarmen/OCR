@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DETAIL_COLUMNS, DETAIL_LABELS } from '../constants'
+import { DETAIL_COLUMNS, DETAIL_LABELS } from '../../constants'
 
 const formatAmount = (value) => {
   const str = String(value ?? '').replace(/,/g, '').trim()
