@@ -1,7 +1,7 @@
 import { useOcrWizard } from '../hooks/useOcrWizard'
 import { StepWizard, FormActions, CustomModal } from '../components/common'
-import { UploadSection, ActionBar, HeaderCard, DetailTable, DocumentPreview } from '../components/ocr'
-import { AccountingReview, InputTaxReconciliation } from '../components/accounting'
+import { UploadSection, ActionBar, HeaderCard, DetailTable, AccountingReview, InputTaxReconciliation } from '../components/credit-card'
+import { DocumentPreview } from '../components/common'
 
 export default function CreditCardOCR() {
   const {

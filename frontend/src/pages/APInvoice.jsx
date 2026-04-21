@@ -1,4 +1,4 @@
-import DocumentPreview from '../components/ocr/DocumentPreview'
+import DocumentPreview from '../components/common/DocumentPreview'
 import CustomModal from '../components/common/CustomModal'
 import StepWizard from '../components/common/StepWizard'
 import APUploadStep from '../components/ap-invoice/APUploadStep'
