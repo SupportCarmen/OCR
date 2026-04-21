@@ -307,6 +307,7 @@ export function useOcrWizard() {
       }
 
       let carmenError = null
+      let jvId = null
       try {
         const carmenConfig = (() => {
           try { return JSON.parse(localStorage.getItem('accountingConfig') || '{}') } catch { return {} }
@@ -341,7 +342,10 @@ export function useOcrWizard() {
         }
         console.log('[Carmen GL JV] payload:', JSON.stringify(carmenPayload, null, 2))
         const carmenRes = await submitToCarmen(carmenPayload)
-        if (carmenRes?.InternalMessage) setCarmenJvId(carmenRes.InternalMessage)
+        if (carmenRes?.InternalMessage) {
+          jvId = carmenRes.InternalMessage
+          setCarmenJvId(jvId)
+        }
         showToast('ส่งข้อมูลเข้า Carmen GL JV สำเร็จ', 'success')
       } catch (err) {
         carmenError = err.message
@@ -349,13 +353,16 @@ export function useOcrWizard() {
       }
 
       showModal({
-        title:   carmenError ? 'บันทึกสำเร็จ (Carmen มีปัญหา)' : 'บันทึกสำเร็จ!',
+        title:   carmenError ? 'บันทึกสำเร็จ (Carmen มีปัญหา)' : 'บันทึก JV สำเร็จ!',
         message: carmenError
           ? `เอกสารหมายเลข ${docNo} บันทึกลงฐานข้อมูลแล้ว\n\nแต่การส่ง Carmen GL JV ล้มเหลว:\n${carmenError}`
           : `เอกสารหมายเลข ${docNo} ได้ถูกบันทึกและส่ง Carmen GL JV เรียบร้อยแล้ว`,
         type:        carmenError ? 'warning' : 'success',
-        confirmText: 'ดูรายการรายวัน (JV)',
-        onConfirm: () => { closeModal(); setStep(5) },
+        confirmText: 'ไปยัง Input Tax Reconciliation',
+        cancelText:  jvId ? 'เปิดดู JV' : undefined,
+        cancelStyle: jvId ? { background: 'var(--teal)', color: 'white', border: '1px solid var(--teal)' } : undefined,
+        onConfirm:   () => { closeModal(); setStep(5) },
+        onCancel:    jvId ? () => window.open(`https://dev.carmen4.com/#/glJv/${jvId}/show`, '_blank') : undefined,
       })
     } catch (err) {
       if (err.code === 'DUPLICATE_DOC_NO') {

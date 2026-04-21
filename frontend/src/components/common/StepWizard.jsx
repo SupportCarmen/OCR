@@ -3,8 +3,7 @@ const DEFAULT_STEPS = [
   { n: 2, label: 'AI อ่านข้อมูล', sub: '' },
   { n: 3, label: 'ตรวจสอบข้อมูล', sub: '' },
   { n: 4, label: 'Accounting', sub: 'Review' },
-  { n: 5, label: 'Journal Voucher', sub: '' },
-  { n: 6, label: 'Input Tax', sub: 'Reconciliation' },
+  { n: 5, label: 'Input Tax', sub: 'Reconciliation' },
 ]
 
 export default function StepWizard({ step, steps }) {

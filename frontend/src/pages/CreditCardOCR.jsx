@@ -1,16 +1,15 @@
 import { useOcrWizard } from '../hooks/useOcrWizard'
 import { StepWizard, FormActions, CustomModal } from '../components/common'
 import { UploadSection, ActionBar, HeaderCard, DetailTable, DocumentPreview } from '../components/ocr'
-import { AccountingReview, JournalVoucher, InputTaxReconciliation } from '../components/accounting'
+import { AccountingReview, InputTaxReconciliation } from '../components/accounting'
 
 export default function CreditCardOCR() {
   const {
     step, bank, files, previewUrl, previewType,
     loading, submitting, status,
     headerData, receiptMeta, details,
-    jvRows, filePrefix, fileSource, jvDescription, carmenJvId,
     fileInputRef,
-    toasts, modal, closeModal,
+    toasts, modal, showToast, showModal, closeModal,
     setBank, setStep,
     handleFileChange, processFile,
     updateHeader, updateDetail, addRow, deleteRow,
@@ -26,6 +25,7 @@ export default function CreditCardOCR() {
         type={modal.type}
         confirmText={modal.confirmText}
         cancelText={modal.cancelText}
+        cancelStyle={modal.cancelStyle}
         onConfirm={modal.onConfirm}
         onCancel={modal.onCancel}
       />
@@ -63,9 +63,23 @@ export default function CreditCardOCR() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <a href="#/" className="btn btn-sm btn-outline" style={{ textDecoration: 'none' }}>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => {
+                if (step <= 1) { window.location.hash = '/'; return }
+                showModal({
+                  title: 'ออกจากหน้านี้?',
+                  message: 'ข้อมูลที่กรอกทั้งหมดจะหายไป คุณต้องการกลับหน้าหลักใช่ไหม?',
+                  type: 'warning',
+                  confirmText: 'กลับหน้าหลัก',
+                  cancelText: 'อยู่หน้านี้ต่อ',
+                  onConfirm: () => { closeModal(); window.location.hash = '/' },
+                  onCancel: closeModal,
+                })
+              }}
+            >
               <i className="fas fa-arrow-left" /> กลับหน้าหลัก
-            </a>
+            </button>
           </div>
         </div>
 
@@ -122,7 +136,7 @@ export default function CreditCardOCR() {
                   headerData={headerData}
                   onBack={() => setStep(3)}
                   onSubmit={handleSubmitFinal}
-                  onGoMapping={() => { window.open('#/CreditCardOCR/mapping', '_blank') }}
+                  onGoMapping={() => { showToast('เปิด tab ใหม่สำหรับตั้งค่า Mapping แล้ว', 'info'); window.open('#/CreditCardOCR/mapping', '_blank') }}
                   submitting={submitting}
                 />
               </div>
@@ -130,24 +144,11 @@ export default function CreditCardOCR() {
 
             {step === 5 && (
               <div id="step5">
-                <JournalVoucher
-                  jvRows={jvRows}
-                  headerData={headerData}
-                  filePrefix={filePrefix}
-                  fileSource={fileSource}
-                  description={jvDescription}
-                  carmenJvId={carmenJvId}
-                  onFinish={() => setStep(6)}
-                />
-              </div>
-            )}
-
-            {step === 6 && (
-              <div id="step6">
                 <InputTaxReconciliation
                   details={details}
                   headerData={headerData}
                   onFinish={resetAll}
+                  showToast={showToast}
                 />
               </div>
             )}

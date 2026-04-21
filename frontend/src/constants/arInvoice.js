@@ -1,0 +1,155 @@
+export const AR_STEPS = [
+  { n: 1, label: 'อัปโหลด',  sub: 'เอกสาร' },
+  { n: 2, label: 'จับคู่',   sub: 'Field Mapping' },
+  { n: 3, label: 'ตรวจสอบ', sub: 'Review' },
+  { n: 4, label: 'ผังบัญชี', sub: 'Account' },
+  { n: 5, label: 'สำเร็จ',  sub: 'Result' },
+]
+
+export const MOCK_VENDOR_DB = {
+  '0105555059298': { code: 'V-10023', name: 'บริษัท บี 47 เซอร์วิส จำกัด สำนักงานใหญ่' },
+  '0105562202751': { code: 'V-10045', name: 'บริษัท คาร์เมน ซอฟต์แวร์ จำกัด' },
+  '0105545000000': { code: 'V-10088', name: 'บริษัท ตัวอย่าง ซัพพลายเออร์ จำกัด' },
+}
+
+export const VENDOR_LIST = Object.entries(MOCK_VENDOR_DB).map(([taxId, d]) => ({ taxId, ...d }))
+
+export const EMPTY_HEADER = {
+  vendorName: '', vendorTaxId: '', vendorBranch: '',
+  documentName: '', documentDate: '', documentNumber: '',
+  subTotal: '0.00', taxAmount: '0.00', totalDiscount: '0.00', grandTotal: '0.00',
+}
+
+export const DEFAULT_MAPPINGS = {
+  col1: 'category', col2: 'description', col3: 'qty',  col4: 'unitPrice',
+  col5: 'discountPct', col6: 'discountAmt', col7: 'lineSubTotal',
+  col8: 'taxPct', col9: 'taxType', col10: 'taxAmt', col11: 'lineTotal',
+}
+
+export const NUMERIC_FIELDS = [
+  'qty', 'unitPrice', 'discountPct', 'discountAmt',
+  'lineSubTotal', 'taxPct', 'taxAmt', 'lineTotal',
+]
+
+export const parseNum = (v) => {
+  if (typeof v === 'number') return v
+  const n = Number(String(v || '').replace(/,/g, ''))
+  return isNaN(n) ? 0 : n
+}
+
+export const fmt = (v) =>
+  parseNum(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+export const round2 = (v) => Math.round(parseNum(v) * 100) / 100
+
+export const isNumFld = (f) => NUMERIC_FIELDS.includes(f)
+
+export const getAvailableFields = (t) => [
+  { value: 'ignore',       label: t.ignore },
+  { value: 'category',     label: t.category },
+  { value: 'description',  label: t.description },
+  { value: 'qty',          label: t.qty },
+  { value: 'unitPrice',    label: t.unitPrice },
+  { value: 'discountPct',  label: t.discountPct },
+  { value: 'discountAmt',  label: t.discountAmt },
+  { value: 'lineSubTotal', label: t.lineSubTotal },
+  { value: 'taxPct',       label: t.taxPct },
+  { value: 'taxType',      label: t.taxType },
+  { value: 'taxAmt',       label: t.taxAmt },
+  { value: 'lineTotal',    label: t.lineTotal },
+]
+
+export const AR_I18N = {
+  th: {
+    appTitle: 'Carmen ERP', appSub: 'AR Invoice OCR',
+    uploadTitle: 'อัปโหลดเอกสารใบแจ้งหนี้',
+    uploadDesc: 'รองรับไฟล์รูปภาพ JPG, PNG และ PDF (สูงสุด 20 MB)',
+    uploadBtn: 'เลือกไฟล์เอกสาร',
+    mapTitle: 'ตรวจสอบและจับคู่ Field (Field Mapping)',
+    confirmMap: 'ยืนยัน Field Mapping',
+    reviewTitle: 'ตรวจสอบข้อมูล (Review Data)',
+    headerTitle: 'ข้อมูลทั่วไป (Header Info)',
+    systemVendor: 'ข้อมูลผู้ขาย (ระบบ ERP)',
+    vendorNotFound: 'ไม่พบในระบบ (ตรวจสอบ Tax ID)',
+    vendorName: 'ชื่อผู้ขาย', vendorTaxId: 'เลขผู้เสียภาษี',
+    vendorBranch: 'สาขา', docName: 'ประเภทเอกสาร',
+    docNo: 'เลขที่เอกสาร', docDate: 'วันที่เอกสาร',
+    subTotal: 'มูลค่าก่อนภาษี', discount: 'ส่วนลดรวม',
+    tax: 'ภาษีมูลค่าเพิ่ม', grandTotal: 'ยอดรวมทั้งสิ้น',
+    summaryAccount: 'รายการสรุปบัญชี', sumFromTable: 'ยอดจากตาราง',
+    sumFromDoc: 'ยอดตามเอกสาร', adjust: 'Adjust',
+    validOk: 'ยอดรวมบัญชีตรงกัน', validOkDesc: 'ข้อมูลยอดรวมตรงกัน 100%',
+    validErr: 'พบข้อผิดพลาดด้านตัวเลข', validErrPrefix: 'ส่วนต่าง:',
+    acctTitle: 'ผังบัญชี (Account Mapping)', aiSuggest: 'AI แนะนำบัญชี',
+    debitTax: 'Debit — ภาษีซื้อ (Tax 1)', creditAp: 'Credit — เจ้าหนี้ (A/P)',
+    debitExpense: 'Debit — ค่าใช้จ่าย (Expense)',
+    taxProfile: 'Tax Profile', deptCode: 'Dept. Code',
+    accountCode: 'Account Code', vendorGroup: 'Vendor Group',
+    expenseDesc: 'จับคู่ผังบัญชีค่าใช้จ่ายตามรายการสินค้า',
+    generateInv: 'Generate AR Invoice',
+    successTitle: 'บันทึกข้อมูลสำเร็จ!',
+    successDesc: 'AR Invoice เลขที่', successDesc2: 'ถูกสร้างและผูกผังบัญชีเรียบร้อยแล้ว',
+    uploadNew: 'อัปโหลดเอกสารใหม่',
+    ignore: 'ไม่นำเข้า (Ignore)',
+    category: 'ประเภท (Account)', description: 'รายละเอียดสินค้า',
+    qty: 'จำนวน', unitPrice: 'ราคา/หน่วย',
+    discountPct: 'ส่วนลด%', discountAmt: 'มูลค่าส่วนลด',
+    lineSubTotal: 'มูลค่าก่อนภาษี', taxPct: 'อัตราภาษี%',
+    taxType: 'ประเภทภาษี', taxAmt: 'มูลค่าภาษี', lineTotal: 'รวม',
+    backUpload: 'กลับ', backMap: 'กลับแก้ Mapping',
+    backReview: 'กลับแก้ไข', processing: 'AI กำลังประมวลผล...',
+    retry: 'ลองใหม่',
+    searchVendor: 'ค้นหา รหัส หรือ ชื่อผู้ขาย...',
+    searchDept: 'รหัส/ชื่อแผนก', searchAcc: 'รหัส/ชื่อบัญชี',
+    warnMismatch: 'ยอดเงินไม่สัมพันธ์กัน — ดำเนินการต่อข้ามคำเตือนนี้?',
+    errProcess: 'เกิดข้อผิดพลาดในการประมวลผล OCR กรุณาลองใหม่อีกครั้ง',
+    itemCount: 'จำนวนรายการ', items: 'รายการ',
+    tableTotal: 'ยอดรวมตาราง',
+  },
+  en: {
+    appTitle: 'Carmen ERP', appSub: 'AR Invoice OCR',
+    uploadTitle: 'Upload Invoice Document',
+    uploadDesc: 'Supports JPG, PNG, and PDF files (max 20 MB)',
+    uploadBtn: 'Select Document',
+    mapTitle: 'Review and Field Mapping',
+    confirmMap: 'Confirm Field Mapping',
+    reviewTitle: 'Review Data',
+    headerTitle: 'Header Info',
+    systemVendor: 'System Vendor (ERP)',
+    vendorNotFound: 'Not found in system (check Tax ID)',
+    vendorName: 'Vendor Name', vendorTaxId: 'Tax ID',
+    vendorBranch: 'Branch', docName: 'Document Type',
+    docNo: 'Document No.', docDate: 'Document Date',
+    subTotal: 'Sub Total', discount: 'Total Discount',
+    tax: 'VAT Amount', grandTotal: 'Grand Total',
+    summaryAccount: 'Account Summary', sumFromTable: 'From Table',
+    sumFromDoc: 'From Document', adjust: 'Adjust',
+    validOk: 'Totals matched', validOkDesc: 'Table and document totals are 100% synchronized.',
+    validErr: 'Number mismatch', validErrPrefix: 'Difference:',
+    acctTitle: 'Account Mapping', aiSuggest: 'AI Suggest',
+    debitTax: 'Debit — Input Tax (Tax 1)', creditAp: 'Credit — Account Payable (A/P)',
+    debitExpense: 'Debit — Expense',
+    taxProfile: 'Tax Profile', deptCode: 'Dept. Code',
+    accountCode: 'Account Code', vendorGroup: 'Vendor Group',
+    expenseDesc: 'Map expense accounts based on extracted items',
+    generateInv: 'Generate AR Invoice',
+    successTitle: 'Saved Successfully!',
+    successDesc: 'AR Invoice No.', successDesc2: 'has been created and mapped to ERP.',
+    uploadNew: 'Upload New Document',
+    ignore: 'Ignore',
+    category: 'Category (Account)', description: 'Description',
+    qty: 'Qty', unitPrice: 'Unit Price',
+    discountPct: 'Discount%', discountAmt: 'Discount Amt',
+    lineSubTotal: 'Line Sub Total', taxPct: 'Tax%',
+    taxType: 'Tax Type', taxAmt: 'Tax Amount', lineTotal: 'Line Total',
+    backUpload: 'Back', backMap: 'Back to Mapping',
+    backReview: 'Back to Review', processing: 'AI is processing...',
+    retry: 'Retry',
+    searchVendor: 'Search by code or name...',
+    searchDept: 'Dept code/name', searchAcc: 'Account code/name',
+    warnMismatch: 'Totals do not match. Are you sure you want to proceed?',
+    errProcess: 'OCR processing error. Please try again.',
+    itemCount: 'Total Items', items: 'items',
+    tableTotal: 'Table Total',
+  },
+}

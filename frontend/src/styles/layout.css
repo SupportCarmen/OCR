@@ -58,21 +58,6 @@
     box-shadow: var(--shadow-primary);
 }
 
-/* System Online badge */
-.app-header::after {
-    content: '● ONLINE';
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    color: var(--emerald);
-    background: var(--emerald-light);
-    border: 1px solid #6ee7b7;
-    border-radius: 100px;
-    padding: 0.35rem 0.85rem;
-    animation: blink 4s ease-in-out infinite;
-    flex-shrink: 0;
-}
-
 /* ─── MAIN LAYOUT ─── */
 .main-grid {
     display: grid;

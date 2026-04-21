@@ -101,17 +101,15 @@ async def extract_from_image(
         max_tokens=8192,
     )
 
-    # Log usage in the background
     if response.usage:
-        import asyncio
-        asyncio.create_task(log_llm_usage(
+        await log_llm_usage(
             model=settings.openrouter_ocr_model,
             prompt_tokens=response.usage.prompt_tokens,
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,
             task_id=task_id,
             usage_type="BANK_OCR"
-        ))
+        )
 
     raw_content = response.choices[0].message.content if (response.choices and response.choices[0].message) else None
     if raw_content is None:

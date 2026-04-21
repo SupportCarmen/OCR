@@ -11,6 +11,7 @@ const fmt = n => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximum
 export default function InputTaxReconciliation({ details, headerData, onBack, onFinish, showToast }) {
   const [config, setConfig] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
 
@@ -222,10 +223,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
             <i className="fas fa-arrow-left" /> ย้อนกลับ
           </button>
 
-          <button className="btn-danger" onClick={() => {
-            showToast?.('จบกระบวนการโดยไม่เพิ่ม Input Tax', 'info')
-            onFinish()
-          }}>
+          <button className="btn-danger" onClick={() => setShowDiscardConfirm(true)}>
             <i className="fas fa-times" /> Discard
           </button>
           <div className="form-actions-sep" />
@@ -251,11 +249,19 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
             <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.65rem' }}>
               เพิ่ม Input Tax Reconciliation
             </div>
-            <p style={{ color: 'var(--text-2)', fontSize: '0.92rem', marginBottom: '1.5rem', lineHeight: 1.7 }}>
+            <p style={{ color: 'var(--text-2)', fontSize: '0.92rem', marginBottom: '1rem', lineHeight: 1.7 }}>
               รายการนี้จะถูกเพิ่มเข้าสู่ระบบ<br />
               <strong>Input Tax Reconciliation</strong> โดยอัตโนมัติ<br />
               ต้องการดำเนินการต่อใช่ไหม?
             </p>
+            <div style={{
+              background: 'var(--teal-light)', border: '1px solid #99f6e4', borderRadius: '6px',
+              padding: '0.55rem 0.85rem', marginBottom: '1.25rem',
+              color: 'var(--teal)', fontSize: '0.82rem', textAlign: 'left', display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
+            }}>
+              <i className="fas fa-flag-checkered" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
+              <span>หลังยืนยัน ระบบจะ<strong>จบกระบวนการทั้งหมด</strong>และกลับสู่หน้าเริ่มต้นโดยอัตโนมัติ</span>
+            </div>
             {submitError && (
               <div style={{
                 background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px',
@@ -283,6 +289,54 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
                   ? <><i className="fas fa-spinner fa-spin" /> กำลังส่ง...</>
                   : <><i className="fas fa-check" /> ยืนยัน</>
                 }
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showDiscardConfirm && createPortal(
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '12px', padding: '2rem 2.25rem',
+            maxWidth: '420px', width: '90%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem', color: 'var(--rose)' }}>
+              <i className="fas fa-flag-checkered" />
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+              ข้ามขั้นตอน Input Tax?
+            </div>
+            <p style={{ color: 'var(--text-2)', fontSize: '0.92rem', marginBottom: '1rem', lineHeight: 1.7 }}>
+              คุณเลือกที่จะ<strong>ไม่เพิ่ม Input Tax</strong> เข้าระบบ
+            </p>
+            <div style={{
+              background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px',
+              padding: '0.55rem 0.85rem', marginBottom: '1.5rem',
+              color: '#b91c1c', fontSize: '0.82rem', textAlign: 'left', display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
+            }}>
+              <i className="fas fa-flag-checkered" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
+              <span>การดำเนินการนี้จะ<strong>จบกระบวนการทั้งหมด</strong>และกลับสู่หน้าเริ่มต้น</span>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button className="btn-cancel" onClick={() => setShowDiscardConfirm(false)}>
+                <i className="fas fa-arrow-left" /> กลับไปตรวจสอบ
+              </button>
+              <button
+                className="btn-danger"
+                style={{ background: 'var(--rose)', color: 'white' }}
+                onClick={() => {
+                  setShowDiscardConfirm(false)
+                  showToast?.('จบกระบวนการโดยไม่เพิ่ม Input Tax', 'info')
+                  onFinish()
+                }}
+              >
+                <i className="fas fa-times" /> ยืนยัน Discard
               </button>
             </div>
           </div>

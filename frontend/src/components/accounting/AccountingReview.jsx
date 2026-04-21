@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react'
 import CustomModal from '../common/CustomModal'
+import Card from '../common/Card'
+import Badge from '../common/Badge'
+import { fetchAccountCodes } from '../../lib/api/carmen'
+
+let _accCache = null
 
 function toNum(v) {
   return parseFloat(String(v ?? '').replace(/,/g, '')) || 0
@@ -9,32 +14,25 @@ function buildRows(details, config) {
   const { mappings = {}, paymentAmount = {} } = config
   const rows = []
 
-  const addRow = (cfg, amount, desc, defaultIsDebit) => {
+  const addRow = (cfg, amount, desc, isDebit) => {
     if (!amount) return
-    const isDebit = defaultIsDebit
-    if (isDebit) {
-      rows.push({ dept: cfg.dept, acc: cfg.acc, desc, debit: amount, credit: 0 })
-    } else {
-      rows.push({ dept: cfg.dept, acc: cfg.acc, desc, debit: 0, credit: amount })
-    }
+    rows.push(isDebit
+      ? { dept: cfg.dept, acc: cfg.acc, desc, debit: amount, credit: 0 }
+      : { dept: cfg.dept, acc: cfg.acc, desc, debit: 0, credit: amount }
+    )
   }
 
   details.forEach(detail => {
     const payType = detail.Transaction || 'UNKNOWN'
     const amtCfg  = paymentAmount[payType] || { dept: '', acc: '' }
-    const commCfg = mappings.commission  || { dept: '', acc: '' }
-    const taxCfg  = mappings.tax         || { dept: '', acc: '' }
-    const netCfg  = mappings.net         || { dept: '', acc: '' }
+    const commCfg = mappings.commission    || { dept: '', acc: '' }
+    const taxCfg  = mappings.tax           || { dept: '', acc: '' }
+    const netCfg  = mappings.net           || { dept: '', acc: '' }
 
-    const payAmt    = toNum(detail.PayAmt)
-    const commisAmt = toNum(detail.CommisAmt)
-    const taxAmt    = toNum(detail.TaxAmt)
-    const total     = toNum(detail.Total)
-
-    addRow(amtCfg, payAmt, payType, false)
-    addRow(commCfg, commisAmt, 'Commission', true)
-    addRow(taxCfg, taxAmt, 'Tax Amount', true)
-    addRow(netCfg, total, 'Net Payment', true)
+    addRow(amtCfg,  toNum(detail.PayAmt),    payType,      false)
+    addRow(commCfg, toNum(detail.CommisAmt), 'Commission', true)
+    addRow(taxCfg,  toNum(detail.TaxAmt),    'Tax Amount', true)
+    addRow(netCfg,  toNum(detail.Total),     'Net Payment',true)
   })
   return rows
 }
@@ -44,59 +42,70 @@ const fmt = n => n ? n.toLocaleString(undefined, { minimumFractionDigits: 2 }) :
 export default function AccountingReview({ details, headerData = {}, onBack, onSubmit, onGoMapping, submitting = false }) {
   const [config, setConfig] = useState(null)
   const [warningModal, setWarningModal] = useState(false)
+  const [accNameMap, setAccNameMap] = useState(_accCache || {})
+  const [accLoading, setAccLoading] = useState(!_accCache)
+  const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    if (_accCache) return
+    setAccLoading(true)
+    fetchAccountCodes()
+      .then(list => {
+        const map = {}
+        list.forEach(a => { if (a.AccCode) map[a.AccCode] = a.Description || '' })
+        _accCache = map
+        setAccNameMap(map)
+      })
+      .catch(() => {})
+      .finally(() => setAccLoading(false))
+  }, [])
+
+  const getAccName = acc => accNameMap[acc] || ''
 
   const loadConfig = () => {
     try {
       const raw = localStorage.getItem('accountingConfig')
-      let parsedConfig = raw ? JSON.parse(raw) : null;
-      
-      const rawAmt = localStorage.getItem('accountMappingAmount');
+      let cfg = raw ? JSON.parse(raw) : null
+      const rawAmt = localStorage.getItem('accountMappingAmount')
       if (rawAmt) {
-        const parsedAmt = JSON.parse(rawAmt);
-        if (!parsedConfig) parsedConfig = { paymentAmount: parsedAmt };
-        else parsedConfig.paymentAmount = { ...parsedConfig.paymentAmount, ...parsedAmt };
+        const amt = JSON.parse(rawAmt)
+        cfg = cfg ? { ...cfg, paymentAmount: { ...cfg.paymentAmount, ...amt } } : { paymentAmount: amt }
       }
-      
-      if (parsedConfig) setConfig(parsedConfig);
-    } catch (e) {}
-  };
+      if (cfg) setConfig(cfg)
+    } catch {}
+  }
 
   useEffect(() => {
     loadConfig()
-
-    // ฟังเหตุการณ์การเปลี่ยนแปลง localStorage จาก tab อื่น (Auto-Sync)
-    const handleStorageChange = (e) => {
-      if (e.key === 'accountingConfig' || e.key === 'accountMappingAmount') {
-        loadConfig()
-      }
-    }
-
-    window.addEventListener('storage', handleStorageChange)
+    const sync = (e) => { if (e.key === 'accountingConfig' || e.key === 'accountMappingAmount') loadConfig() }
+    window.addEventListener('storage', sync)
     window.addEventListener('focus', loadConfig)
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      window.removeEventListener('focus', loadConfig)
-    }
+    return () => { window.removeEventListener('storage', sync); window.removeEventListener('focus', loadConfig) }
   }, [])
 
-  const rows = config ? buildRows(details, config) : []
+  const rows    = config ? buildRows(details, config) : []
   const totalDr = rows.reduce((s, r) => s + r.debit,  0)
   const totalCr = rows.reduce((s, r) => s + r.credit, 0)
 
-  // Check unmapped fields directly from config (not dependent on row amounts)
   const unmappedFields = []
   if (config) {
     if (!config.filePrefix) unmappedFields.push('File Prefix')
     const m = config.mappings || {}
     if (!m.commission?.acc) unmappedFields.push('Commission')
-    if (!m.tax?.acc) unmappedFields.push('Tax Amount')
-    if (!m.net?.acc) unmappedFields.push('Net Amount')
+    if (!m.tax?.acc)        unmappedFields.push('Tax Amount')
+    if (!m.net?.acc)        unmappedFields.push('Net Amount')
     const detailTypes = [...new Set(details.map(d => d.Transaction).filter(Boolean))]
-    detailTypes.forEach(pt => {
-      if (!config.paymentAmount?.[pt]?.acc) unmappedFields.push(pt)
-    })
+    detailTypes.forEach(pt => { if (!config.paymentAmount?.[pt]?.acc) unmappedFields.push(pt) })
   }
   const hasMissing = !config || unmappedFields.length > 0
+
+  const configBadges = config
+    ? [
+        { label: `Prefix: ${config.filePrefix || '-'}`,     variant: 'info' },
+        { label: `Source: ${config.fileSource || '-'}`,     variant: 'gray' },
+        { label: `Description: ${config.description ? `${config.description}${headerData.DocDate ? ` - ${headerData.DocDate}` : ''}` : '-'}`, variant: 'gray' },
+      ]
+    : []
 
   return (
     <div>
@@ -106,13 +115,11 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
 
       {hasMissing && (
         <div className="mapping-alert">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
-            <i className="fas fa-exclamation-triangle" />
-            <span>
-              ยังไม่ได้ตั้งรหัสบัญชีสำหรับ: <strong>{unmappedFields.join(', ')}</strong>
-            </span>
-          </div>
-          <button className="btn-cancel" style={{ padding: '0.4rem 0.8rem', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', whiteSpace: 'nowrap' }} onClick={onGoMapping}>
+          <i className="fas fa-exclamation-triangle" />
+          <span style={{ flex: 1 }}>
+            ยังไม่ได้ตั้งรหัสบัญชีสำหรับ: <strong>{unmappedFields.join(', ')}</strong>
+          </span>
+          <button className="btn btn-sm btn-danger" onClick={onGoMapping}>
             แก้ไข Mapping
           </button>
         </div>
@@ -121,45 +128,51 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
       {!config && (
         <div className="mapping-alert">
           <i className="fas fa-info-circle" />
-          <span>ยังไม่มีการตั้งค่า Account Mapping</span>
-          <button className="btn-cancel" style={{ padding: '0.4rem 0.8rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }} onClick={onGoMapping}>
+          <span style={{ flex: 1 }}>ยังไม่มีการตั้งค่า Account Mapping</span>
+          <button className="btn btn-sm btn-primary" onClick={onGoMapping}>
             ไปตั้งค่า Mapping
           </button>
         </div>
       )}
 
-      <div className="data-card">
-        <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="card-title-left">
-            <i className="fas fa-file-invoice" /> รายละเอียดรายการรายวัน (Journal Details)
+      <Card
+        icon="fas fa-file-invoice"
+        title={
+          <>
+            รายละเอียดรายการรายวัน (Journal Details)
+            {accLoading && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-4)', fontWeight: 400, marginLeft: '0.5rem' }}>
+                <i className="fas fa-spinner fa-spin" /> โหลดชื่อบัญชี...
+              </span>
+            )}
+          </>
+        }
+        right={
+          <div style={{ display: 'flex', gap: '0.5rem', marginRight: '2rem' }}>
+            {configBadges.map(({ label, variant }) => (
+              <Badge key={label} variant={variant} pill={false}>{label}</Badge>
+            ))}
           </div>
-          <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.8rem', marginRight: '2rem' }}>
-            <span style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--primary-mid)', fontWeight: 600 }}>
-              Prefix: {config?.filePrefix || '-'}
-            </span>
-            <span style={{ background: 'var(--gray-100)', color: 'var(--text-2)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 500 }}>
-              Source: {config?.fileSource || '-'}
-            </span>
-            <span style={{ background: 'var(--gray-100)', color: 'var(--text-2)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 500 }}>
-              Description: {config?.description ? `${config.description}${headerData.DocDate ? ` - ${headerData.DocDate}` : ''}` : '-'}
-            </span>
-          </div>
-        </div>
+        }
+      >
         <div className="card-body-flush table-wrapper">
           <table className="data-table">
             <thead>
               <tr>
-                <th width="150">Dept. Code</th>
-                <th width="150">Acc Code</th>
+                <th width="120">Dept. Code</th>
+                <th width="120">Acc Code</th>
+                <th>Account Name</th>
                 <th>Description</th>
-                <th width="150" className="text-right">Debit</th>
-                <th width="150" className="text-right">Credit</th>
+                <th width="90" className="text-center">Currency</th>
+                <th width="110" className="text-right">Rate</th>
+                <th width="140" className="text-right">Debit</th>
+                <th width="140" className="text-right">Credit</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-500)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-500)' }}>
                     ไม่มีข้อมูล — กรุณาตั้งค่า Account Mapping ก่อน
                   </td>
                 </tr>
@@ -168,7 +181,10 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
                 <tr key={i}>
                   <td className={!r.dept ? 'missing-cell animate-pulse' : ''}>{r.dept || <span><i className="fas fa-exclamation-circle" /> MISSING</span>}</td>
                   <td className={!r.acc  ? 'missing-cell animate-pulse' : ''}>{r.acc  || <span><i className="fas fa-exclamation-circle" /> MISSING</span>}</td>
+                  <td style={{ color: 'var(--text-3)', fontSize: '0.85rem' }}>{getAccName(r.acc)}</td>
                   <td>{r.desc}</td>
+                  <td className="text-center">THB</td>
+                  <td className="text-right text-mono">1.00000000</td>
                   <td className="text-right">{fmt(r.debit)}</td>
                   <td className="text-right">{fmt(r.credit)}</td>
                 </tr>
@@ -177,9 +193,9 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
             {rows.length > 0 && (
               <tfoot>
                 <tr className="jv-total-row">
-                  <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700 }}>ยอดรวม (TOTAL):</td>
-                  <td className="text-right" style={{ fontWeight: 700 }}>{fmt(totalDr)}</td>
-                  <td className="text-right" style={{ fontWeight: 700 }}>{fmt(totalCr)}</td>
+                  <td colSpan={6} className="text-right">ยอดรวม (TOTAL):</td>
+                  <td className="text-right">{fmt(totalDr)}</td>
+                  <td className="text-right">{fmt(totalCr)}</td>
                 </tr>
               </tfoot>
             )}
@@ -193,15 +209,24 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
           <button className="btn-cancel" onClick={onGoMapping} style={{ marginRight: 'auto' }}>
             <i className="fas fa-cog" /> ตั้งค่า Mapping
           </button>
-          <button className="btn-icon" onClick={loadConfig} title="รีเฟรชข้อมูล Mapping" style={{ position: 'relative' }}>
-            <i className="fas fa-sync-alt" />
+          <button
+            className="btn-icon"
+            title="รีเฟรชข้อมูล Mapping"
+            onClick={() => { setRefreshing(true); loadConfig(); setTimeout(() => setRefreshing(false), 700) }}
+          >
+            <i className={`fas fa-sync-alt${refreshing ? ' fa-spin' : ''}`} />
           </button>
           <div className="form-actions-sep" />
-          <button className="btn-submit" disabled={rows.length === 0 || submitting} onClick={() => hasMissing ? setWarningModal(true) : onSubmit(rows)}>
-            <i className={`fas ${submitting ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'}`} /> {submitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันและส่งข้อมูล'}
+          <button
+            className="btn-submit"
+            disabled={rows.length === 0 || submitting}
+            onClick={() => hasMissing ? setWarningModal(true) : onSubmit(rows)}
+          >
+            <i className={`fas ${submitting ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'}`} />
+            {submitting ? 'กำลังส่งข้อมูล...' : 'ยืนยันและส่งข้อมูล'}
           </button>
         </div>
-      </div>
+      </Card>
 
       <CustomModal
         show={warningModal}
@@ -210,7 +235,7 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
         message={`กรุณาตั้งรหัสบัญชีให้ครบก่อนยืนยัน:\n${unmappedFields.join(', ')}`}
         confirmText="ไปตั้งค่า Mapping"
         cancelText="ปิด"
-        onConfirm={() => { setWarningModal(false); onGoMapping(); }}
+        onConfirm={() => { setWarningModal(false); onGoMapping() }}
         onCancel={() => setWarningModal(false)}
       />
     </div>

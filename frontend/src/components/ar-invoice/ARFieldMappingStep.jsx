@@ -1,0 +1,74 @@
+import { isNumFld, fmt } from '../../constants/arInvoice'
+
+export default function ARFieldMappingStep({ t, lineItems, fieldMappings, availableFields, onMappingChange, onBack, onConfirm }) {
+  const COLS = [1,2,3,4,5,6,7,8,9,10,11]
+
+  return (
+    <div className="data-card">
+      <div className="card-title">
+        <div className="card-title-left">
+          <i className="fas fa-sliders" />
+          {t.mapTitle}
+        </div>
+      </div>
+
+      <div className="card-body-flush">
+        <div className="mapping-table-wrap" style={{ padding: '1rem' }}>
+          <table className="mapping-table">
+            <thead>
+              <tr>
+                {COLS.map(c => {
+                  const val = fieldMappings[`col${c}`]
+                  return (
+                    <th key={c}>
+                      <div className="col-label">Column {c}</div>
+                      <select
+                        value={val}
+                        onChange={e => onMappingChange(c, e.target.value)}
+                        className={val === 'ignore' ? 'ignored' : 'mapped'}
+                      >
+                        {availableFields.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {lineItems.slice(0, 3).map((item, ri) => (
+                <tr key={ri}>
+                  {COLS.map(c => {
+                    const fld = fieldMappings[`col${c}`]
+                    const ignored = fld === 'ignore'
+                    const numeric = isNumFld(fld)
+                    return (
+                      <td key={c} className={ignored ? 'is-ignored' : numeric ? 'is-numeric' : ''}>
+                        {ignored ? '(ละเว้น)' : (numeric && item[fld] !== undefined ? fmt(item[fld]) : (item[fld] || '—'))}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+              {lineItems.length > 3 && (
+                <tr>
+                  <td colSpan={11} style={{ textAlign: 'center', color: 'var(--text-4)', fontStyle: 'italic', fontSize: '0.8rem', padding: '0.75rem' }}>
+                    … ดูเพิ่มอีก {lineItems.length - 3} รายการในขั้นตอนถัดไป
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="ar-step-nav">
+        <button className="btn btn-outline" onClick={onBack}>
+          <i className="fas fa-arrow-left" /> {t.backUpload}
+        </button>
+        <button className="btn btn-primary" onClick={onConfirm}>
+          {t.confirmMap} <i className="fas fa-arrow-right" />
+        </button>
+      </div>
+    </div>
+  )
+}

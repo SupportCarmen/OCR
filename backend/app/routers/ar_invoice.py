@@ -112,18 +112,16 @@ async def extract_ar_invoice(
         logger.error(f"LLM API Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to LLM service")
 
-    # Log usage
     if response.usage:
         from app.services.usage_service import log_llm_usage
-        import asyncio
-        asyncio.create_task(log_llm_usage(
+        await log_llm_usage(
             model=settings.openrouter_ocr_model,
             prompt_tokens=response.usage.prompt_tokens,
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,
             task_id=task_id,
             usage_type="AR_INVOICE"
-        ))
+        )
 
     raw_content = response.choices[0].message.content if (response.choices and response.choices[0].message) else None
     if not raw_content:

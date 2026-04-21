@@ -39,7 +39,6 @@ async def call_text_llm(
     Uses settings.openrouter_suggestion_model by default.
     """
     from app.services.usage_service import log_llm_usage
-    import asyncio
 
     client = get_client()
     target_model = model or settings.openrouter_suggestion_model
@@ -50,16 +49,15 @@ async def call_text_llm(
         max_tokens=2048,
     )
 
-    # Log usage in the background
     if response.usage:
-        asyncio.create_task(log_llm_usage(
+        await log_llm_usage(
             model=target_model,
             prompt_tokens=response.usage.prompt_tokens,
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,
             task_id=task_id,
             usage_type=usage_type
-        ))
+        )
 
     content = (
         response.choices[0].message.content

@@ -22,6 +22,7 @@ export default function CustomModal({
   onCancel,
   confirmText = 'ตกลง',
   cancelText = 'ยกเลิก',
+  cancelStyle,
 }) {
   if (!show) return null
 
@@ -45,13 +46,13 @@ export default function CustomModal({
 
         <div className="modal-actions">
           {onCancel && (
-            <button className="btn btn-outline" onClick={onCancel}>
+            <button className="btn btn-outline" style={cancelStyle} onClick={onCancel}>
               {cancelText}
             </button>
           )}
           <button
             className={`btn ${type === 'error' ? 'btn-danger' : type === 'warning' ? 'btn-primary' : 'btn-primary'}`}
-            style={type === 'error' ? { background: 'var(--rose)' } : type === 'warning' ? { background: 'var(--amber)' } : {}}
+            style={type === 'error' ? { background: 'var(--rose)', color: 'white' } : type === 'warning' ? { background: 'var(--amber)', color: 'white' } : {}}
             onClick={onConfirm}
           >
             {confirmText}
