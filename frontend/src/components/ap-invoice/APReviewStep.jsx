@@ -21,12 +21,30 @@ export default function APReviewStep({ ctrl }) {
     sumLineSubTotal, sumLineTotal, sumDiscount, sumTax,
     tgtSubTotal, tgtDiscount, tgtTax,
     isSubDiff, isDiscDiff, isTaxDiff, isGrandDiff,
+    isInclude,
     updateHeader, blurHeader, updateItem, blurItem,
     adjustField, setStep, goToAccount,
   } = ctrl
 
   return (
     <>
+      {/* Tax Type Badge */}
+      {headerData.taxType && (
+        <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>ประเภทภาษีมูลค่าเพิ่ม:</span>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+            padding: '0.2rem 0.7rem', borderRadius: '99px', fontWeight: 700, fontSize: '0.8rem',
+            background: isInclude ? 'var(--amber-50, #fffbeb)' : 'var(--blue-50, #eff6ff)',
+            color: isInclude ? 'var(--amber-700, #b45309)' : 'var(--blue-700, #1d4ed8)',
+            border: `1px solid ${isInclude ? 'var(--amber-300, #fcd34d)' : 'var(--blue-300, #93c5fd)'}`,
+          }}>
+            <i className={`fas fa-${isInclude ? 'circle-dot' : 'circle-plus'}`} />
+            {isInclude ? 'Tax Include — ราคารวมภาษีแล้ว' : 'Tax Exclude — ราคายังไม่รวมภาษี'}
+          </span>
+        </div>
+      )}
+
       {/* Header Info */}
       <Card icon="fas fa-building" title={t.headerTitle}>
         <div className="card-body">

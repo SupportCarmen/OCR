@@ -62,30 +62,93 @@ async def extract_ap_invoice(
     prompt = '''คุณเป็น AI สำหรับดึงข้อมูลจากใบกำกับภาษี/ใบแจ้งหนี้ ส่งกลับ JSON เท่านั้น (ไม่มี markdown):
 {
   "vendorName": "ชื่อบริษัทผู้ขาย",
-  "vendorTaxId": "เลขผู้เสียภาษี",
-  "vendorBranch": "สาขา",
-  "documentName": "ชื่อเอกสาร",
+  "vendorTaxId": "เลขผู้เสียภาษี 13 หลัก",
+  "vendorBranch": "สาขา เช่น สำนักงานใหญ่ หรือ 00001",
+  "documentName": "ชื่อเอกสาร เช่น ใบกำกับภาษี / Invoice",
   "documentDate": "DD/MM/YYYY",
   "documentNumber": "เลขที่เอกสาร",
+  "taxType": "Include หรือ Exclude",
   "items": [{
-    "category": "หมวดบัญชี (เช่น วัสดุสำนักงาน)",
-    "description": "รายละเอียด",
-    "qty": 0, "unitPrice": 0,
-    "discountPct": 0, "discountAmt": 0,
-    "lineSubTotal": 0, "taxPct": 0,
+    "category": "หมวดบัญชี เช่น วัสดุสำนักงาน",
+    "description": "รายละเอียดสินค้า/บริการ",
+    "qty": 0,
+    "unitPrice": 0,
+    "discountPct": 0,
+    "discountAmt": 0,
+    "lineSubTotal": 0,
+    "taxPct": 7,
     "taxType": "Include หรือ Exclude",
-    "taxAmt": 0, "lineTotal": 0
+    "taxAmt": 0,
+    "lineTotal": 0
   }],
-  "subTotal": 0, "taxAmount": 0, "totalDiscount": 0, "grandTotal": 0
+  "subTotal": 0,
+  "taxAmount": 0,
+  "totalDiscount": 0,
+  "grandTotal": 0
 }
+
+== คำจำกัดความ taxType ==
+Exclude (ภาษีนอก — พบบ่อยในใบกำกับภาษีทั่วไป):
+  - ราคาสินค้าบนเอกสารยังไม่รวมภาษี
+  - lineSubTotal = ราคาก่อนภาษีของรายการนั้น
+  - taxAmt = lineSubTotal × taxPct% (ภาษีที่บวกเพิ่ม)
+  - lineTotal = lineSubTotal - discountAmt + taxAmt
+  - grandTotal = subTotal - totalDiscount + taxAmount
+
+Include (ภาษีใน — พบในใบเสร็จรับเงิน/ราคาขายปลีก):
+  - ราคาสินค้าบนเอกสารรวมภาษีแล้ว
+  - lineSubTotal = ราคารวมภาษีของรายการนั้น
+  - taxAmt = lineSubTotal × taxPct ÷ (100 + taxPct)  [ถอยกลับออกจากราคา]
+  - lineTotal = lineSubTotal - discountAmt  [ไม่บวก taxAmt ซ้ำ]
+  - grandTotal = subTotal - totalDiscount  [ไม่บวก taxAmount ซ้ำ]
+
+== วิธีพิจารณา taxType (ทำตามลำดับนี้เท่านั้น) ==
+
+ขั้นตอนที่ 1: บวกยอดเงินทุกบรรทัดในคอลัมน์ "รวม/Amount/จำนวนเงิน" → ได้ LINE_SUM
+  (ใช้ค่าจากคอลัมน์ line items โดยตรง ไม่ใช่ค่าจาก footer)
+
+ขั้นตอนที่ 2: อ่าน grandTotal (ยอดรวมทั้งสิ้น/Net Total/ทั้งหมด) และ VAT จาก footer
+
+ขั้นตอนที่ 3: เปรียบเทียบ
+  - LINE_SUM ≈ grandTotal → taxType = "Include"
+    (ราคาในบรรทัดรวม VAT ไว้แล้ว footer แสดง net แบบ back-calculate เพื่ออ้างอิง)
+  - LINE_SUM + VAT ≈ grandTotal → taxType = "Exclude"
+    (ราคาในบรรทัดยังไม่รวม VAT ต้องบวก VAT จึงจะได้ grandTotal)
+
+ตัวอย่าง Include: LINE_SUM=110, VAT=7.20, grandTotal=110
+  → 110 ≈ 110 ✓ → Include
+  → footer "ผลรวม" 102.80 คือ back-calculate (110÷1.07) แสดงเพื่ออ้างอิงเท่านั้น ห้ามใช้ตัดสิน taxType
+
+ตัวอย่าง Exclude: LINE_SUM=3800, VAT=266, grandTotal=4066
+  → 3800 + 266 = 4066 ✓ → Exclude
+
+คำเตือน: footer บางเอกสารแสดง "ผลรวม/net" ที่น้อยกว่า LINE_SUM (เพราะเป็น back-calculated net)
+  อย่านำค่า "ผลรวม/net" จาก footer มาใช้ในการเปรียบเทียบเพื่อตัดสิน taxType
+
+== กฎกรอกค่า field ของแต่ละรายการ ==
+
+กรณี Exclude:
+  - lineSubTotal = ราคาก่อนภาษีของบรรทัด (ค่าในคอลัมน์ Amount/จำนวนเงิน)
+  - taxAmt = lineSubTotal × taxPct ÷ 100
+  - lineTotal = lineSubTotal - discountAmt + taxAmt  ← บวก taxAmt เข้าไป
+
+กรณี Include:
+  - lineSubTotal = ราคารวมภาษีของบรรทัด (ค่าในคอลัมน์ Amount/จำนวนเงิน)
+  - taxAmt = lineSubTotal × taxPct ÷ (100 + taxPct)  ← ถอยกลับออก
+  - lineTotal = lineSubTotal - discountAmt  ← ห้ามบวก taxAmt ซ้ำ เพราะอยู่ใน lineSubTotal แล้ว
+
+subTotal (header) กรณี Exclude = sum(lineSubTotal)  [ก่อนภาษี]
+subTotal (header) กรณี Include = sum(lineSubTotal) ÷ (1 + taxPct/100)  [net back-calculated]
+
 หากไม่พบค่าใดให้ใส่ "" สำหรับข้อความ หรือ 0 สำหรับตัวเลข'''
 
-    logger.info(f"Extracting AP Invoice: {file.filename}")
+    ap_model = settings.openrouter_ap_invoice_model or settings.openrouter_ocr_model
+    logger.info(f"Extracting AP Invoice: {file.filename} (model: {ap_model})")
     client = get_client()
 
     try:
         response = await client.chat.completions.create(
-            model=settings.openrouter_ocr_model,
+            model=ap_model,
             messages=[
                 {
                     "role": "system",
@@ -115,7 +178,7 @@ async def extract_ap_invoice(
     if response.usage:
         from app.services.usage_service import log_llm_usage
         await log_llm_usage(
-            model=settings.openrouter_ocr_model,
+            model=ap_model,
             prompt_tokens=response.usage.prompt_tokens,
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,

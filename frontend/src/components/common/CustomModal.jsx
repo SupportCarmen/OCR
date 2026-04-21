@@ -35,6 +35,19 @@ export default function CustomModal({
     }
   }
 
+  if (type === 'loading') {
+    return createPortal(
+      <div className="ocr-loading-overlay">
+        <div className="ocr-loading-box">
+          <div className="ocr-loading-spinner" />
+          <div className="ocr-loading-title">{title}</div>
+          {message && <div className="ocr-loading-status">{message}</div>}
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
   return createPortal(
     <div className="modal-overlay">
       <div className="modal-box">

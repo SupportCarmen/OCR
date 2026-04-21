@@ -1,6 +1,4 @@
-import DocumentPreview from '../components/common/DocumentPreview'
-import CustomModal from '../components/common/CustomModal'
-import StepWizard from '../components/common/StepWizard'
+import { DocumentPreview, CustomModal, StepWizard, LoadingOverlay } from '../components/common'
 import APUploadStep from '../components/ap-invoice/APUploadStep'
 import APFieldMappingStep from '../components/ap-invoice/APFieldMappingStep'
 import APReviewStep from '../components/ap-invoice/APReviewStep'
@@ -15,7 +13,7 @@ export default function APInvoice() {
     t, lang, setLang,
     step, setStep,
     file, previewUrl, previewType, fileInputRef,
-    loading, error, setError,
+    loading, status, error, setError,
     lineItems, fieldMappings, setFieldMappings, headerData,
     availableFields,
     handleFileChange, confirmMapping,
@@ -35,6 +33,8 @@ export default function APInvoice() {
         onConfirm={modal.onConfirm}
         onCancel={modal.onCancel}
       />
+
+      <LoadingOverlay show={loading} status={status} />
 
       <div className="app-container" style={{ padding: '1.5rem' }}>
 
@@ -65,15 +65,6 @@ export default function APInvoice() {
         {/* Step 1 — Upload */}
         {step === 1 && !loading && !error && (
           <APUploadStep t={t} fileInputRef={fileInputRef} onFileChange={handleFileChange} />
-        )}
-
-        {/* Loading */}
-        {loading && (
-          <div className="ap-loading">
-            <div className="ap-spinner" />
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>{t.processing}</div>
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>Gemini AI กำลังวิเคราะห์โครงสร้างเอกสาร</div>
-          </div>
         )}
 
         {/* Error */}

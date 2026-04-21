@@ -14,6 +14,7 @@ export function useAPInvoice() {
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewType, setPreviewType] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState('')
   const [error, setError] = useState(null)
 
   const [headerData, setHeaderData] = useState(EMPTY_HEADER)
@@ -60,10 +61,15 @@ export function useAPInvoice() {
   const tgtTax      = round2(headerData.taxAmount)
   const tgtGrand    = round2(headerData.grandTotal)
 
+  const isInclude = headerData.taxType === 'Include'
+
   const isSubDiff   = sumLineSubTotal !== tgtSubTotal
   const isDiscDiff  = sumDiscount !== tgtDiscount
   const isTaxDiff   = sumTax !== tgtTax
-  const isGrandDiff = ((Math.round(sumLineSubTotal * 100) + Math.round(sumTax * 100)) / 100) !== tgtGrand
+  const calcGrandFromLines = isInclude
+    ? (Math.round(sumLineSubTotal * 100) - Math.round(sumDiscount * 100)) / 100
+    : (Math.round(sumLineSubTotal * 100) - Math.round(sumDiscount * 100) + Math.round(sumTax * 100)) / 100
+  const isGrandDiff = calcGrandFromLines !== tgtGrand
 
   const validationErrors = [
     isSubDiff  && t.subTotal,
@@ -101,6 +107,7 @@ export function useAPInvoice() {
 
   const runOCR = async (fileObj) => {
     setLoading(true)
+    setStatus('AI กำลังอ่านข้อมูลจากเอกสาร...')
     setError(null)
     try {
       let retries = 3, delay = 800
@@ -119,6 +126,7 @@ export function useAPInvoice() {
             documentName:   data.documentName   || '',
             documentDate:   data.documentDate   || '',
             documentNumber: data.documentNumber || '',
+            taxType:        data.taxType        || '',
             subTotal:       fmt(data.subTotal),
             taxAmount:      fmt(data.taxAmount),
             totalDiscount:  fmt(data.totalDiscount),
@@ -138,17 +146,20 @@ export function useAPInvoice() {
             const saved = localStorage.getItem(`ap_mapping_${data.vendorTaxId}`)
             if (saved) setFieldMappings(JSON.parse(saved))
           }
+          setStatus('อ่านข้อมูลสำเร็จ ✓')
           setStep(2)
           return
         } catch (err) {
           retries--
           if (retries === 0) throw err
+          setStatus('กำลังลองใหม่...')
           await new Promise(r => setTimeout(r, delay))
           delay *= 2
         }
       }
     } catch (err) {
       console.error(err)
+      setStatus(err.message)
       setError(t.errProcess)
     } finally {
       setLoading(false)
@@ -208,7 +219,7 @@ export function useAPInvoice() {
     step, setStep,
     // File & preview
     file, previewUrl, previewType, fileInputRef,
-    loading, error, setError,
+    loading, status, error, setError,
     // Data
     headerData, lineItems, fieldMappings, setFieldMappings,
     // Vendor search
@@ -220,6 +231,7 @@ export function useAPInvoice() {
     sumLineSubTotal, sumLineTotal, sumDiscount, sumTax,
     tgtSubTotal, tgtDiscount, tgtTax, tgtGrand,
     isSubDiff, isDiscDiff, isTaxDiff, isGrandDiff,
+    isInclude, calcGrandFromLines,
     validationErrors, isValid,
     availableFields, activeCols,
     // Handlers

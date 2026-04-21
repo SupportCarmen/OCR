@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # OpenRouter API
     openrouter_api_key: str = ""
     openrouter_ocr_model: str
+    openrouter_ap_invoice_model: str = ""
     openrouter_suggestion_model: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 

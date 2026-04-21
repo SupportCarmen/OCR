@@ -1,7 +1,6 @@
 import { useOcrWizard } from '../hooks/useOcrWizard'
-import { StepWizard, FormActions, CustomModal } from '../components/common'
+import { StepWizard, FormActions, CustomModal, LoadingOverlay, DocumentPreview } from '../components/common'
 import { UploadSection, ActionBar, HeaderCard, DetailTable, AccountingReview, InputTaxReconciliation } from '../components/credit-card'
-import { DocumentPreview } from '../components/common'
 
 export default function CreditCardOCR() {
   const {
@@ -30,15 +29,7 @@ export default function CreditCardOCR() {
         onCancel={modal.onCancel}
       />
 
-      {loading && (
-        <div className="ocr-loading-overlay">
-          <div className="ocr-loading-box">
-            <div className="ocr-loading-spinner" />
-            <div className="ocr-loading-title">AI กำลังอ่านเอกสาร</div>
-            <div className="ocr-loading-status">{status || 'กรุณารอสักครู่...'}</div>
-          </div>
-        </div>
-      )}
+      <LoadingOverlay show={loading} status={status} />
 
       <div className="app-container">
         <div className="toast-container" id="toastContainer">
