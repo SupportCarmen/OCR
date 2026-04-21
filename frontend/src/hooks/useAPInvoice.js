@@ -66,9 +66,7 @@ export function useAPInvoice() {
   const isSubDiff   = sumLineSubTotal !== tgtSubTotal
   const isDiscDiff  = sumDiscount !== tgtDiscount
   const isTaxDiff   = sumTax !== tgtTax
-  const calcGrandFromLines = isInclude
-    ? (Math.round(sumLineSubTotal * 100) - Math.round(sumDiscount * 100)) / 100
-    : (Math.round(sumLineSubTotal * 100) - Math.round(sumDiscount * 100) + Math.round(sumTax * 100)) / 100
+  const calcGrandFromLines = (Math.round(sumLineSubTotal * 100) - Math.round(sumDiscount * 100) + Math.round(sumTax * 100)) / 100
   const isGrandDiff = calcGrandFromLines !== tgtGrand
 
   const validationErrors = [
