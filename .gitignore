@@ -41,3 +41,6 @@ venv/
 # Claude Code
 .claude/
 CLAUDE.md
+
+# Documentation
+docs/SECURITY_PDPA_CHECKLIST.md
