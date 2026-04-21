@@ -1,4 +1,4 @@
-import { isNumFld, fmt } from '../../constants/arInvoice'
+import { isNumFld, fmt } from '../../constants/apInvoice'
 import Card from '../common/Card'
 import VendorSearch from './VendorSearch'
 import AmountSummary from './AmountSummary'
@@ -12,7 +12,7 @@ const HEADER_FIELDS = (t) => [
   { key: 'documentDate',   label: t.docDate },
 ]
 
-export default function ARReviewStep({ ctrl }) {
+export default function APReviewStep({ ctrl }) {
   const {
     t, headerData, lineItems, fieldMappings, activeCols, availableFields,
     systemVendor, setSystemVendor, vendorSearch, setVendorSearch,
@@ -62,7 +62,7 @@ export default function ARReviewStep({ ctrl }) {
         right={<span className="row-count">{lineItems.length} รายการ</span>}
       >
         <div className="table-wrapper">
-          <table className="ar-review-table">
+          <table className="ap-review-table">
             <thead>
               <tr>
                 {activeCols.map(c => (
@@ -80,7 +80,7 @@ export default function ARReviewStep({ ctrl }) {
                       <td key={c}>
                         <input
                           type="text"
-                          className={`ar-edit-input ${numeric ? 'numeric' : ''} ${fld === 'category' ? 'category' : ''}`}
+                          className={`ap-edit-input ${numeric ? 'numeric' : ''} ${fld === 'category' ? 'category' : ''}`}
                           value={item[fld] || ''}
                           onChange={e => updateItem(ri, fld, e.target.value)}
                           onBlur={e => numeric && blurItem(ri, fld, e.target.value)}
@@ -110,7 +110,7 @@ export default function ARReviewStep({ ctrl }) {
 
       {/* Validation + Amount Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-        <div className={isValid ? 'ar-valid-ok' : 'ar-valid-err'}>
+        <div className={isValid ? 'ap-valid-ok' : 'ap-valid-err'}>
           <i className={`fas fa-${isValid ? 'circle-check' : 'circle-exclamation'}`} style={{ fontSize: '1.3rem', flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700 }}>{isValid ? t.validOk : t.validErr}</div>
@@ -132,7 +132,7 @@ export default function ARReviewStep({ ctrl }) {
         />
       </div>
 
-      <div className="ar-step-nav">
+      <div className="ap-step-nav">
         <button className="btn btn-outline" onClick={() => setStep(2)}>
           <i className="fas fa-arrow-left" /> {t.backMap}
         </button>

@@ -13,7 +13,7 @@ from app.models.orm import OCRTask, TaskStatus
 import uuid
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/ar-invoice", tags=["AR Invoice"])
+router = APIRouter(prefix="/api/v1/ap-invoice", tags=["AP Invoice"])
 
 def _get_mime_type(filename: str) -> str:
     ext = os.path.splitext(filename)[1].lower()
@@ -26,12 +26,12 @@ def _get_mime_type(filename: str) -> str:
     }.get(ext, "image/jpeg")
 
 @router.post("/extract")
-async def extract_ar_invoice(
-    file: UploadFile = File(..., description="รูปใบแจ้งหนี้/ใบกำกับภาษี AR (JPG, PNG, PDF)"),
+async def extract_ap_invoice(
+    file: UploadFile = File(..., description="รูปใบแจ้งหนี้/ใบกำกับภาษี AP (JPG, PNG, PDF)"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Stateless AR Invoice OCR extraction using Vision LLM (OpenRouter).
+    Stateless AP Invoice OCR extraction using Vision LLM (OpenRouter).
     Passes the file to Gemini 2.5 Flash/Claude to extract structured item lines.
     """
     if not settings.openrouter_api_key:
@@ -50,7 +50,7 @@ async def extract_ar_invoice(
     task = OCRTask(
         id=str(uuid.uuid4()),
         original_filename=file.filename,
-        file_path="STATLESS_AR_INVOICE",
+        file_path="STATLESS_AP_INVOICE",
         status=TaskStatus.COMPLETED,
         ocr_engine=settings.ocr_engine,
     )
@@ -80,7 +80,7 @@ async def extract_ar_invoice(
 }
 หากไม่พบค่าใดให้ใส่ "" สำหรับข้อความ หรือ 0 สำหรับตัวเลข'''
 
-    logger.info(f"Extracting AR Invoice: {file.filename}")
+    logger.info(f"Extracting AP Invoice: {file.filename}")
     client = get_client()
 
     try:
@@ -120,7 +120,7 @@ async def extract_ar_invoice(
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,
             task_id=task_id,
-            usage_type="AR_INVOICE"
+            usage_type="AP_INVOICE"
         )
 
     raw_content = response.choices[0].message.content if (response.choices and response.choices[0].message) else None

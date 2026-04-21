@@ -1,6 +1,6 @@
-import { isNumFld, fmt } from '../../constants/arInvoice'
+import { isNumFld, fmt } from '../../constants/apInvoice'
 
-export default function ARFieldMappingStep({ t, lineItems, fieldMappings, availableFields, onMappingChange, onBack, onConfirm }) {
+export default function APFieldMappingStep({ t, lineItems, fieldMappings, availableFields, onMappingChange, onBack, onConfirm }) {
   const COLS = [1,2,3,4,5,6,7,8,9,10,11]
 
   return (
@@ -61,7 +61,7 @@ export default function ARFieldMappingStep({ t, lineItems, fieldMappings, availa
         </div>
       </div>
 
-      <div className="ar-step-nav">
+      <div className="ap-step-nav">
         <button className="btn btn-outline" onClick={onBack}>
           <i className="fas fa-arrow-left" /> {t.backUpload}
         </button>

@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   MOCK_VENDOR_DB, VENDOR_LIST, EMPTY_HEADER, DEFAULT_MAPPINGS,
-  fmt, round2, isNumFld, getAvailableFields, AR_I18N,
-} from '../constants/arInvoice'
-import { parseNum } from '../constants/arInvoice'
+  fmt, round2, isNumFld, getAvailableFields, AP_I18N,
+} from '../constants/apInvoice'
+import { parseNum } from '../constants/apInvoice'
 
-export function useARInvoice() {
+export function useAPInvoice() {
   const [lang, setLang] = useState('th')
-  const t = AR_I18N[lang]
+  const t = AP_I18N[lang]
 
   const [step, setStep] = useState(1)
   const [file, setFile] = useState(null)
@@ -108,7 +108,7 @@ export function useARInvoice() {
         try {
           const formData = new FormData()
           formData.append('file', fileObj)
-          const res = await fetch('/api/v1/ar-invoice/extract', { method: 'POST', body: formData })
+          const res = await fetch('/api/v1/ap-invoice/extract', { method: 'POST', body: formData })
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const data = await res.json()
 
@@ -135,7 +135,7 @@ export function useARInvoice() {
           setLineItems(formattedItems)
 
           if (data.vendorTaxId) {
-            const saved = localStorage.getItem(`ar_mapping_${data.vendorTaxId}`)
+            const saved = localStorage.getItem(`ap_mapping_${data.vendorTaxId}`)
             if (saved) setFieldMappings(JSON.parse(saved))
           }
           setStep(2)
@@ -162,7 +162,7 @@ export function useARInvoice() {
 
   const confirmMapping = () => {
     if (headerData.vendorTaxId) {
-      localStorage.setItem(`ar_mapping_${headerData.vendorTaxId}`, JSON.stringify(fieldMappings))
+      localStorage.setItem(`ap_mapping_${headerData.vendorTaxId}`, JSON.stringify(fieldMappings))
     }
     setStep(3)
   }

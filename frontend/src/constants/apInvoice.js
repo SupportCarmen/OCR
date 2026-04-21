@@ -1,4 +1,4 @@
-export const AR_STEPS = [
+export const AP_STEPS = [
   { n: 1, label: 'อัปโหลด',  sub: 'เอกสาร' },
   { n: 2, label: 'จับคู่',   sub: 'Field Mapping' },
   { n: 3, label: 'ตรวจสอบ', sub: 'Review' },
@@ -59,9 +59,9 @@ export const getAvailableFields = (t) => [
   { value: 'lineTotal',    label: t.lineTotal },
 ]
 
-export const AR_I18N = {
+export const AP_I18N = {
   th: {
-    appTitle: 'Carmen ERP', appSub: 'AR Invoice OCR',
+    appTitle: 'Carmen ERP', appSub: 'AP Invoice OCR',
     uploadTitle: 'อัปโหลดเอกสารใบแจ้งหนี้',
     uploadDesc: 'รองรับไฟล์รูปภาพ JPG, PNG และ PDF (สูงสุด 20 MB)',
     uploadBtn: 'เลือกไฟล์เอกสาร',
@@ -86,9 +86,9 @@ export const AR_I18N = {
     taxProfile: 'Tax Profile', deptCode: 'Dept. Code',
     accountCode: 'Account Code', vendorGroup: 'Vendor Group',
     expenseDesc: 'จับคู่ผังบัญชีค่าใช้จ่ายตามรายการสินค้า',
-    generateInv: 'Generate AR Invoice',
+    generateInv: 'Generate AP Invoice',
     successTitle: 'บันทึกข้อมูลสำเร็จ!',
-    successDesc: 'AR Invoice เลขที่', successDesc2: 'ถูกสร้างและผูกผังบัญชีเรียบร้อยแล้ว',
+    successDesc: 'AP Invoice เลขที่', successDesc2: 'ถูกสร้างและผูกผังบัญชีเรียบร้อยแล้ว',
     uploadNew: 'อัปโหลดเอกสารใหม่',
     ignore: 'ไม่นำเข้า (Ignore)',
     category: 'ประเภท (Account)', description: 'รายละเอียดสินค้า',
@@ -107,7 +107,7 @@ export const AR_I18N = {
     tableTotal: 'ยอดรวมตาราง',
   },
   en: {
-    appTitle: 'Carmen ERP', appSub: 'AR Invoice OCR',
+    appTitle: 'Carmen ERP', appSub: 'AP Invoice OCR',
     uploadTitle: 'Upload Invoice Document',
     uploadDesc: 'Supports JPG, PNG, and PDF files (max 20 MB)',
     uploadBtn: 'Select Document',

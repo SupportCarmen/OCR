@@ -114,7 +114,7 @@ class LLMUsageLog(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     task_id = Column(String(36), ForeignKey("ocr_tasks.id"), nullable=True)
-    usage_type = Column(String(50), nullable=True) # e.g. BANK_OCR, AR_INVOICE, MAPPING_SUGGESTION
+    usage_type = Column(String(50), nullable=True) # e.g. BANK_OCR, AP_INVOICE, MAPPING_SUGGESTION
     model = Column(String(100), nullable=False)
     prompt_tokens = Column(Integer, default=0)
     completion_tokens = Column(Integer, default=0)

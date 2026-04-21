@@ -35,7 +35,7 @@ from app.routers.mapping import router as mapping_router
 from app.routers.carmen import router as carmen_router
 from app.routers.tools import router as tools_router
 from app.routers.feedback import router as feedback_router
-from app.routers.ar_invoice import router as ar_invoice_router
+from app.routers.ap_invoice import router as ap_invoice_router
 
 
 # ── Logging Setup (uses the reconfigured UTF-8 stderr) ──
@@ -114,7 +114,7 @@ app.include_router(mapping_router)
 app.include_router(carmen_router)
 app.include_router(tools_router)
 app.include_router(feedback_router)
-app.include_router(ar_invoice_router)
+app.include_router(ap_invoice_router)
 
 
 # Root endpoint ──

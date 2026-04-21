@@ -1,16 +1,16 @@
 import DocumentPreview from '../components/ocr/DocumentPreview'
 import CustomModal from '../components/common/CustomModal'
 import StepWizard from '../components/common/StepWizard'
-import ARUploadStep from '../components/ar-invoice/ARUploadStep'
-import ARFieldMappingStep from '../components/ar-invoice/ARFieldMappingStep'
-import ARReviewStep from '../components/ar-invoice/ARReviewStep'
-import ARAccountMappingStep from '../components/ar-invoice/ARAccountMappingStep'
-import ARSuccessStep from '../components/ar-invoice/ARSuccessStep'
-import { useARInvoice } from '../hooks/useARInvoice'
-import { AR_STEPS } from '../constants/arInvoice'
+import APUploadStep from '../components/ap-invoice/APUploadStep'
+import APFieldMappingStep from '../components/ap-invoice/APFieldMappingStep'
+import APReviewStep from '../components/ap-invoice/APReviewStep'
+import APAccountMappingStep from '../components/ap-invoice/APAccountMappingStep'
+import APSuccessStep from '../components/ap-invoice/APSuccessStep'
+import { useAPInvoice } from '../hooks/useAPInvoice'
+import { AP_STEPS } from '../constants/apInvoice'
 
-export default function ARInvoice() {
-  const ctrl = useARInvoice()
+export default function APInvoice() {
+  const ctrl = useAPInvoice()
   const {
     t, lang, setLang,
     step, setStep,
@@ -39,7 +39,7 @@ export default function ARInvoice() {
       <div className="app-container" style={{ padding: '1.5rem' }}>
 
         {/* Page Header */}
-        <div className="app-header ar-header">
+        <div className="app-header ap-header">
           <div className="brand">
             <div className="logo-box"><i className="fas fa-receipt" /></div>
             <div>
@@ -60,17 +60,17 @@ export default function ARInvoice() {
           </div>
         </div>
 
-        <StepWizard step={step} steps={AR_STEPS} />
+        <StepWizard step={step} steps={AP_STEPS} />
 
         {/* Step 1 — Upload */}
         {step === 1 && !loading && !error && (
-          <ARUploadStep t={t} fileInputRef={fileInputRef} onFileChange={handleFileChange} />
+          <APUploadStep t={t} fileInputRef={fileInputRef} onFileChange={handleFileChange} />
         )}
 
         {/* Loading */}
         {loading && (
-          <div className="ar-loading">
-            <div className="ar-spinner" />
+          <div className="ap-loading">
+            <div className="ap-spinner" />
             <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>{t.processing}</div>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-3)' }}>Gemini AI กำลังวิเคราะห์โครงสร้างเอกสาร</div>
           </div>
@@ -79,11 +79,11 @@ export default function ARInvoice() {
         {/* Error */}
         {error && (
           <div style={{ maxWidth: 480, margin: '0 auto', padding: '2rem 0' }}>
-            <div className="ar-error-box">
+            <div className="ap-error-box">
               <i className="fas fa-circle-exclamation" />
               <div>
-                <div className="ar-error-title">OCR Processing Error</div>
-                <div className="ar-error-msg">{error}</div>
+                <div className="ap-error-title">OCR Processing Error</div>
+                <div className="ap-error-msg">{error}</div>
                 <button className="btn btn-sm btn-outline" style={{ marginTop: '0.75rem' }} onClick={() => setError(null)}>
                   <i className="fas fa-rotate-right" /> {t.retry}
                 </button>
@@ -94,12 +94,12 @@ export default function ARInvoice() {
 
         {/* Steps 2 & 3 — Split layout with document preview */}
         {(step === 2 || step === 3) && previewUrl && !loading && (
-          <div className="ar-split-layout">
+          <div className="ap-split-layout">
             <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={file?.name} />
 
-            <div className="ar-work-area">
+            <div className="ap-work-area">
               {step === 2 && (
-                <ARFieldMappingStep
+                <APFieldMappingStep
                   t={t}
                   lineItems={lineItems}
                   fieldMappings={fieldMappings}
@@ -109,14 +109,14 @@ export default function ARInvoice() {
                   onConfirm={confirmMapping}
                 />
               )}
-              {step === 3 && <ARReviewStep ctrl={ctrl} />}
+              {step === 3 && <APReviewStep ctrl={ctrl} />}
             </div>
           </div>
         )}
 
         {/* Step 4 — Account Mapping */}
         {step === 4 && (
-          <ARAccountMappingStep
+          <APAccountMappingStep
             t={t}
             lineItems={lineItems}
             updateItem={updateItem}
@@ -128,7 +128,7 @@ export default function ARInvoice() {
 
         {/* Step 5 — Success */}
         {step === 5 && (
-          <ARSuccessStep
+          <APSuccessStep
             t={t}
             headerData={headerData}
             lineItems={lineItems}

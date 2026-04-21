@@ -1,4 +1,4 @@
-export default function ARAccountMappingStep({ t, lineItems, updateItem, onBack, onGenerate, onAISuggest }) {
+export default function APAccountMappingStep({ t, lineItems, updateItem, onBack, onGenerate, onAISuggest }) {
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
@@ -43,7 +43,7 @@ export default function ARAccountMappingStep({ t, lineItems, updateItem, onBack,
           </div>
         </div>
         <div className="table-wrapper">
-          <table className="ar-acct-table">
+          <table className="ap-acct-table">
             <thead>
               <tr>
                 <th style={{ width: '20%' }}>{t.category}</th>
@@ -55,10 +55,10 @@ export default function ARAccountMappingStep({ t, lineItems, updateItem, onBack,
             <tbody>
               {lineItems.map((item, ri) => (
                 <tr key={ri}>
-                  <td><span className="ar-acct-table cat-badge">{item.category || '—'}</span></td>
+                  <td><span className="ap-acct-table cat-badge">{item.category || '—'}</span></td>
                   <td style={{ fontSize: '0.83rem', color: 'var(--text-2)' }}>{item.description || '—'}</td>
                   <td>
-                    <div className="ar-search-input-wrap">
+                    <div className="ap-search-input-wrap">
                       <i className="fas fa-magnifying-glass" />
                       <input
                         placeholder={t.searchDept}
@@ -68,7 +68,7 @@ export default function ARAccountMappingStep({ t, lineItems, updateItem, onBack,
                     </div>
                   </td>
                   <td>
-                    <div className="ar-search-input-wrap">
+                    <div className="ap-search-input-wrap">
                       <i className="fas fa-magnifying-glass" />
                       <input
                         placeholder={t.searchAcc}
@@ -84,7 +84,7 @@ export default function ARAccountMappingStep({ t, lineItems, updateItem, onBack,
         </div>
       </div>
 
-      <div className="ar-step-nav">
+      <div className="ap-step-nav">
         <button className="btn btn-outline" onClick={onBack}>
           <i className="fas fa-arrow-left" /> {t.backReview}
         </button>
@@ -99,24 +99,24 @@ export default function ARAccountMappingStep({ t, lineItems, updateItem, onBack,
 function GLAccountCard({ title, iconColor, rows }) {
   const [firstRow, ...pairRows] = rows
   return (
-    <div className="ar-account-card">
-      <div className="ar-account-card-header">
-        <div className={`ar-account-icon ${iconColor}`}><i className="fas fa-database" /></div>
+    <div className="ap-account-card">
+      <div className="ap-account-card-header">
+        <div className={`ap-account-icon ${iconColor}`}><i className="fas fa-database" /></div>
         <div style={{ fontWeight: 700, fontSize: '0.87rem', color: 'var(--text)' }}>{title}</div>
       </div>
-      <div className="ar-account-body">
+      <div className="ap-account-body">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.6rem' }}>
           {firstRow && (
             <div>
               <div className="field-label" style={{ marginBottom: '0.3rem' }}>{firstRow.label}</div>
-              <div className="ar-static-field">{firstRow.value}</div>
+              <div className="ap-static-field">{firstRow.value}</div>
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
             {pairRows.map(({ label, value, highlight }) => (
               <div key={label}>
                 <div className="field-label" style={{ marginBottom: '0.3rem' }}>{label}</div>
-                <div className="ar-static-field" style={highlight ? { color: highlight, fontWeight: 700 } : undefined}>
+                <div className="ap-static-field" style={highlight ? { color: highlight, fontWeight: 700 } : undefined}>
                   {value}
                 </div>
               </div>

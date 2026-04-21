@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import Home from './pages/Home'
 import CreditCardOCR from './pages/CreditCardOCR'
 import Mapping from './pages/Mapping'
-import ARInvoice from './pages/ARInvoice'
+import APInvoice from './pages/APInvoice'
 import './index.css'
 
 function getRoute() {
@@ -26,7 +26,7 @@ function Router() {
     if (sub === 'mapping') return <Mapping />
     return <CreditCardOCR />
   }
-  if (route.startsWith('arinvoice')) return <ARInvoice />
+  if (route.startsWith('apinvoice')) return <APInvoice />
   
   return <Home />
 }

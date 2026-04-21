@@ -14,15 +14,15 @@ const MODULES = [
     features: ['OCR AI', 'Carmen GL', 'Input Tax'],
   },
   {
-    id: 'ar-invoice',
-    route: '#/ARInvoice', // Activated AR Invoice route
-    name: 'AR Invoice Processing',
-    description: 'ระบบจัดการใบแจ้งหนี้ลูกค้า (AR Invoice) อ่านข้อมูลอัตโนมัติ และบันทึกเข้าระบบบัญชี',
+    id: 'ap-invoice',
+    route: '#/APInvoice', // Activated AP Invoice route
+    name: 'AP Invoice Processing',
+    description: 'ระบบจัดการใบแจ้งหนี้ผู้จัดจำหน่าย (AP Invoice) อ่านข้อมูลอัตโนมัติ และบันทึกเข้าระบบบัญชี',
     icon: 'fa-receipt',
     iconBg: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
     iconColor: '#fff',
     accent: '#7c3aed',
-    tag: { label: 'COMING SOON', bg: '#faf5ff', color: '#7c3aed', border: '#d8b4fe' },
+    tag: { label: 'ACTIVE', bg: '#f0fdf4', color: '#16a34a', border: '#86efac' },
     features: ['Invoice OCR', 'Auto Matching'],
   },
   {

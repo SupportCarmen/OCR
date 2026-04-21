@@ -1,6 +1,6 @@
 import Badge from '../common/Badge'
 import Card from '../common/Card'
-import { fmt } from '../../constants/arInvoice'
+import { fmt } from '../../constants/apInvoice'
 
 export default function AmountSummary({ t, sums, targets, diffs, headerData, updateHeader, blurHeader, adjustField }) {
   const { lineSubTotal, discount, tax } = sums
@@ -26,14 +26,14 @@ export default function AmountSummary({ t, sums, targets, diffs, headerData, upd
           tableStyle={{ color: isDiscDiff ? undefined : 'var(--rose)' }} />
         <SummaryRow t={t} label={t.tax}       isDiff={isTaxDiff}  tableVal={fmt(tax)}          docVal={headerData.taxAmount}      onAdjust={() => adjustField(tgtTax,  tax,          'taxAmt',       true)}                onChange={v => updateHeader('taxAmount', v)}      onBlur={v => blurHeader('taxAmount', v)} />
 
-        <div className="ar-grand-total-row">
+        <div className="ap-grand-total-row">
           <span style={{ fontWeight: 800, fontSize: '1rem' }}>{t.grandTotal}</span>
-          <div className="ar-summary-values">
+          <div className="ap-summary-values">
             <span style={{ fontFamily: 'IBM Plex Mono', fontWeight: 800, fontSize: '1rem', color: isGrandDiff ? 'var(--rose)' : 'var(--text)' }}>
               {fmt(calcGrand)}
             </span>
             <input
-              className={`ar-sum-from-doc ${isGrandDiff ? 'diff' : ''}`}
+              className={`ap-sum-from-doc ${isGrandDiff ? 'diff' : ''}`}
               style={{ fontSize: '0.95rem', fontWeight: 800 }}
               value={headerData.grandTotal}
               onChange={e => updateHeader('grandTotal', e.target.value)}
@@ -48,11 +48,11 @@ export default function AmountSummary({ t, sums, targets, diffs, headerData, upd
 
 function SummaryRow({ t, label, isDiff, tableVal, tableStyle, docVal, onAdjust, onChange, onBlur }) {
   return (
-    <div className="ar-summary-row">
-      <span className="ar-summary-label">{label}</span>
-      <div className="ar-summary-values">
+    <div className="ap-summary-row">
+      <span className="ap-summary-label">{label}</span>
+      <div className="ap-summary-values">
         {isDiff && (
-          <button className="ar-adjust-btn" onClick={onAdjust}>
+          <button className="ap-adjust-btn" onClick={onAdjust}>
             <i className="fas fa-arrows-rotate" /> {t.adjust}
           </button>
         )}

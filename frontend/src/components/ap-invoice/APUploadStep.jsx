@@ -1,4 +1,4 @@
-export default function ARUploadStep({ t, fileInputRef, onFileChange }) {
+export default function APUploadStep({ t, fileInputRef, onFileChange }) {
   const handleDrop = (e) => {
     e.preventDefault()
     const f = e.dataTransfer.files[0]
@@ -34,7 +34,7 @@ export default function ARUploadStep({ t, fileInputRef, onFileChange }) {
       </div>
 
       <div className="panel-card" style={{ marginTop: '1rem' }}>
-        <div className="field-label"><i className="fas fa-circle-info" /> วิธีใช้งาน AR Invoice OCR</div>
+        <div className="field-label"><i className="fas fa-circle-info" /> วิธีใช้งาน AP Invoice OCR</div>
         <div className="how-to-list">
           {INSTRUCTIONS.map(({ n, c, text }) => (
             <div key={n} className="how-to-item">

@@ -1,6 +1,6 @@
-import { fmt } from '../../constants/arInvoice'
+import { fmt } from '../../constants/apInvoice'
 
-export default function ARSuccessStep({ t, headerData, lineItems, onReset }) {
+export default function APSuccessStep({ t, headerData, lineItems, onReset }) {
   const SUMMARY_ROWS = [
     { label: t.subTotal, val: fmt(headerData.subTotal) },
     { label: t.discount, val: fmt(headerData.totalDiscount), color: 'var(--rose)' },
@@ -9,29 +9,29 @@ export default function ARSuccessStep({ t, headerData, lineItems, onReset }) {
 
   return (
     <div style={{ padding: '2rem 0' }}>
-      <div className="ar-success-wrap">
-        <div className="ar-success-icon">
+      <div className="ap-success-wrap">
+        <div className="ap-success-icon">
           <i className="fas fa-circle-check" />
         </div>
         <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text)', marginBottom: '0.75rem' }}>
           {t.successTitle}
         </h2>
         <p style={{ color: 'var(--text-3)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-          {t.successDesc} <span className="ar-success-doc-no">{headerData.documentNumber}</span> {t.successDesc2}
+          {t.successDesc} <span className="ap-success-doc-no">{headerData.documentNumber}</span> {t.successDesc2}
         </p>
 
-        <div className="ar-success-grid">
+        <div className="ap-success-grid">
           <div>
-            <div className="ar-success-field-label">{t.vendorName}</div>
-            <div className="ar-success-field-val">{headerData.vendorName || '—'}</div>
+            <div className="ap-success-field-label">{t.vendorName}</div>
+            <div className="ap-success-field-val">{headerData.vendorName || '—'}</div>
           </div>
           <div>
-            <div className="ar-success-field-label">{t.docDate}</div>
-            <div className="ar-success-field-val">{headerData.documentDate || '—'}</div>
+            <div className="ap-success-field-label">{t.docDate}</div>
+            <div className="ap-success-field-val">{headerData.documentDate || '—'}</div>
           </div>
           <div>
-            <div className="ar-success-field-label">{t.itemCount}</div>
-            <div className="ar-success-field-val" style={{ color: 'var(--primary)', fontWeight: 700 }}>
+            <div className="ap-success-field-label">{t.itemCount}</div>
+            <div className="ap-success-field-val" style={{ color: 'var(--primary)', fontWeight: 700 }}>
               {lineItems.length} {t.items}
             </div>
           </div>
