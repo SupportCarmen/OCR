@@ -90,3 +90,45 @@ Rules:
 - Use null if no suitable code is found — never invent a code.
 - All payment types typically map to the same asset/receivable account since they are all bank settlement amounts.
 """
+
+
+def build_ap_expense_prompt(
+    items: List[dict],
+    dept_lines: str,
+    expense_acc_lines: str,
+    expense_acc_count: int,
+) -> str:
+    """Build the prompt for suggesting dept/acc for AP invoice expense line items."""
+    items_block = "\n".join(
+        f'  {i["index"]}: category="{i["category"]}", description="{i["description"]}"'
+        for i in items
+    )
+    keys_list = ", ".join(f'"{i["index"]}"' for i in items)
+    return f"""You are an expert accounting assistant for a Thai company. Map each AP invoice expense line to the correct Department Code and Account Code.
+
+Line items to map (index: category, description):
+{items_block}
+
+Available Department Codes (use ONLY codes from this list):
+{dept_lines if dept_lines else "  (none available)"}
+
+Available Expense Account Codes (type=E, {expense_acc_count} codes):
+{expense_acc_lines if expense_acc_lines else "  (none available)"}
+
+Instructions:
+- Use the category and description together to find the best matching expense account.
+- Common Thai expense categories: ค่าบริการ (service fee), ยานพาหนะ/น้ำมัน (vehicle/fuel), ไอที/ซอฟต์แวร์ (IT), อาหาร/วัตถุดิบ (food/raw material), ค่าเช่า (rent), สาธารณูปโภค (utilities), ค่าโฆษณา (advertising), ค่าซ่อมแซม (repair), ค่าจ้างแรงงาน (labor).
+- Pick the department that best fits the expense type (IT dept for software, admin for general services, etc.).
+- If no suitable expense account exists, return null for acc.
+- If no suitable department exists, return null for dept.
+
+Return ONLY a valid JSON object with string keys matching the item index — no markdown, no explanation:
+{{
+  {', '.join(f'"{i["index"]}": {{"dept": "<dept_code or null>", "acc": "<acc_code or null>"}}' for i in items)}
+}}
+
+Rules:
+- Only use codes that exist EXACTLY in the lists above.
+- Use null if no suitable code is found — never invent a code.
+- Keys must be: {keys_list}
+"""

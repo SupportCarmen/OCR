@@ -14,9 +14,9 @@ export default function APInvoice() {
     t, lang, setLang,
     step, setStep,
     file, previewUrl, previewType, fileInputRef,
-    loading, status, error, setError,
+    loading, status, error, setError, suggestLoading,
     lineItems, fieldMappings, setFieldMappings, headerData,
-    availableFields,
+    availableFields, systemVendor, masterAccounts, masterDepts,
     handleFileChange, confirmMapping,
     handleAISuggest, handleReset,
     updateItem, modal,
@@ -127,9 +127,13 @@ export default function APInvoice() {
             t={t}
             lineItems={lineItems}
             updateItem={updateItem}
+            systemVendor={systemVendor}
+            masterAccounts={masterAccounts}
+            masterDepts={masterDepts}
             onBack={() => setStep(3)}
             onGenerate={() => setStep(5)}
             onAISuggest={handleAISuggest}
+            suggestLoading={suggestLoading}
           />
         )}
 

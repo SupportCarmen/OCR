@@ -84,13 +84,27 @@ async def put_gljv(jvh_seq: int, body: dict) -> Any:
             raise CarmenAPIError(resp.status_code, resp.text)
 
 
+_VENDOR_FIELDS = frozenset({
+    'VnCode', 'VnName', 'Active', 'VnTaxNo', 'VnCateCode', 'VnCateDesc',
+    'VnVat1DrAccCode', 'VnVat1DrAccDesc', 'VnVat1DrDeptCode', 'VnVat1DrDeptDesc',
+    'VnVatCrAccCode', 'VnVatCrAccDesc', 'VnCrDeptCode', 'VnCrDeptDesc',
+    'TaxProfileCode1', 'TaxProfileDesc1', 'BranchNo',
+})
+
+
 async def get_vendors() -> Any:
-    """Fetch vendor list from Carmen API."""
+    """Fetch vendor list from Carmen API, returning only the required fields per vendor."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(f"{_BASE_URL}/vendor", headers=_headers())
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
-        return resp.json()
+        data = resp.json()
+        if isinstance(data, dict) and isinstance(data.get('Data'), list):
+            data['Data'] = [
+                {k: v for k, v in item.items() if k in _VENDOR_FIELDS}
+                for item in data['Data']
+            ]
+        return data
 
 
 async def get_tax_profiles() -> Any:

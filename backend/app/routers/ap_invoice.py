@@ -2,13 +2,16 @@ import logging
 import json
 import base64
 import os
-from typing import Optional, List
+from typing import List
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
-from app.llm.client import get_client
+from app.llm.client import get_client, call_text_llm
 from app.llm.prompts.ap_invoice import PROMPT as AP_INVOICE_PROMPT
+from app.llm.prompts.mapping import build_ap_expense_prompt
+from app.services.carmen_service import get_account_codes, get_departments, CarmenAPIError
 from app.database import get_db
 from app.models.orm import OCRTask, TaskStatus
 import uuid
@@ -124,3 +127,72 @@ async def extract_ap_invoice(
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
 
     return data
+
+
+class SuggestGLItem(BaseModel):
+    index: int
+    category: str = ""
+    description: str = ""
+
+class SuggestGLRequest(BaseModel):
+    items: List[SuggestGLItem]
+
+
+@router.post("/suggest-gl")
+async def suggest_gl(body: SuggestGLRequest):
+    """
+    AI-suggest dept/acc for AP invoice expense line items using category + description.
+    Fetches Carmen account codes and departments, then calls the LLM.
+    """
+    if not settings.openrouter_api_key:
+        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY is not configured")
+    if not body.items:
+        return {"suggestions": {}}
+
+    try:
+        accounts_raw = await get_account_codes()
+        depts_raw = await get_departments()
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=f"Carmen API error: {e.detail}")
+
+    accounts = [
+        {"code": a["AccCode"], "name": a.get("Description") or "", "type": (a.get("Type") or "").lower()}
+        for a in (accounts_raw.get("Data") or [])
+        if a.get("AccCode") and a.get("AccCode") != "AccCode"
+    ]
+    departments = [
+        {"code": d["DeptCode"], "name": d.get("Description") or ""}
+        for d in (depts_raw.get("Data") or [])
+        if d.get("DeptCode") and d.get("DeptCode") != "CodeDep"
+    ]
+
+    expense_accounts = [a for a in accounts if a["type"] in ("e", "expense")] or accounts
+
+    dept_lines = "\n".join(f"  {d['code']} — {d['name']}" for d in departments[:100])
+    expense_acc_lines = "\n".join(f"  {a['code']} — {a['name']}" for a in expense_accounts[:500])
+
+    items_payload = [{"index": item.index, "category": item.category, "description": item.description} for item in body.items]
+
+    prompt = build_ap_expense_prompt(
+        items=items_payload,
+        dept_lines=dept_lines,
+        expense_acc_lines=expense_acc_lines,
+        expense_acc_count=len(expense_accounts),
+    )
+
+    data = await call_text_llm(prompt, usage_type="AP_GL_SUGGESTION")
+    if data is None:
+        return {"suggestions": {}}
+
+    valid_acc = {a["code"] for a in accounts}
+    valid_dept = {d["code"] for d in departments}
+
+    suggestions = {}
+    for item in body.items:
+        key = str(item.index)
+        mapping = data.get(key) or data.get(item.index, {})
+        dept = mapping.get("dept") if mapping.get("dept") in valid_dept else None
+        acc = mapping.get("acc") if mapping.get("acc") in valid_acc else None
+        suggestions[item.index] = {"deptCode": dept, "accountCode": acc}
+
+    return {"suggestions": suggestions}

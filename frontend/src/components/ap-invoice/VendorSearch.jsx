@@ -35,16 +35,21 @@ export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorS
           {filteredVendors.length > 0
             ? filteredVendors.map(v => (
                 <div
-                  key={v.taxId}
+                  key={`${v.taxId}-${v.branchNo}`}
                   className="vendor-dropdown-item"
                   onMouseDown={() => {
-                    setSystemVendor({ code: v.code, name: v.name })
+                    setSystemVendor(v)
                     setVendorSearch(`${v.code} — ${v.name}`)
                     setShowVendorDrop(false)
                   }}
                 >
                   <div className="vd-name">{v.code} — {v.name}</div>
-                  <div className="vd-tax">Tax ID: {v.taxId}</div>
+                  <div className="vd-meta">
+                    <span className="vd-tax">Tax ID: {v.taxId}</span>
+                    {v.branchNo != null && v.branchNo !== '' && (
+                      <span className="vd-branch">BranchNo: {v.branchNo}</span>
+                    )}
+                  </div>
                 </div>
               ))
             : (

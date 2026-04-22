@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // ─── CUSTOM SEARCH SELECT ───
 // topChoice: { code, name, name2?, source: 'ai'|'history' } | null

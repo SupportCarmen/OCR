@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  MOCK_VENDOR_DB, VENDOR_LIST, EMPTY_HEADER, DEFAULT_MAPPINGS,
+  EMPTY_HEADER, DEFAULT_MAPPINGS,
   fmt, round2, isNumFld, getAvailableFields, AP_I18N,
 } from '../constants/apInvoice'
 import { parseNum } from '../constants/apInvoice'
+import { fetchAccountCodes, fetchDepartments } from '../lib/api/carmen'
 
 export function useAPInvoice() {
   const [lang, setLang] = useState('th')
@@ -24,17 +25,72 @@ export function useAPInvoice() {
   const [systemVendor, setSystemVendor] = useState({ code: '', name: '' })
   const [vendorSearch, setVendorSearch] = useState('')
   const [showVendorDrop, setShowVendorDrop] = useState(false)
+  const [vendors, setVendors] = useState([])
+  const [vendorDbByTax, setVendorDbByTax] = useState({})
 
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [masterAccounts, setMasterAccounts] = useState([])
+  const [masterDepts, setMasterDepts] = useState([])
+  const [glLoaded, setGlLoaded] = useState(false)
   const [modal, setModal] = useState({ show: false })
 
   const fileInputRef = useRef(null)
 
   useEffect(() => {
+    fetch('/api/v1/ocr/carmen/vendors')
+      .then(r => r.json())
+      .then(data => {
+        const list = (data.Data || []).map(v => ({
+          code:            v.VnCode          || '',
+          name:            v.VnName          || '',
+          taxId:           String(v.VnTaxNo  || '').replace(/\D/g, ''),
+          active:          v.Active,
+          catCode:         v.VnCateCode,
+          catDesc:         v.VnCateDesc,
+          vat1DrAccCode:   v.VnVat1DrAccCode,
+          vat1DrAccDesc:   v.VnVat1DrAccDesc,
+          vat1DrDeptCode:  v.VnVat1DrDeptCode,
+          vat1DrDeptDesc:  v.VnVat1DrDeptDesc,
+          vatCrAccCode:    v.VnVatCrAccCode,
+          vatCrAccDesc:    v.VnVatCrAccDesc,
+          crDeptCode:      v.VnCrDeptCode,
+          crDeptDesc:      v.VnCrDeptDesc,
+          taxProfileCode1: v.TaxProfileCode1,
+          taxProfileDesc1: v.TaxProfileDesc1,
+          branchNo:        v.BranchNo,
+        }))
+        setVendors(list)
+        const db = {}
+        list.forEach(v => { if (v.taxId) db[v.taxId] = v })
+        setVendorDbByTax(db)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (step !== 4 || glLoaded) return
+    setGlLoaded(true)
+    Promise.all([fetchAccountCodes(), fetchDepartments()])
+      .then(([accs, depts]) => {
+        setMasterAccounts(
+          accs.filter(a => a.AccCode && a.AccCode !== 'AccCode')
+              .map(a => ({ code: a.AccCode, name: a.Description || '', name2: a.Description2 || '' }))
+        )
+        setMasterDepts(
+          depts.filter(d => d.DeptCode && d.DeptCode !== 'CodeDep')
+               .map(d => ({ code: d.DeptCode, name: d.Description || '', name2: d.Description2 || '' }))
+        )
+      })
+      .catch(() => {})
+  }, [step])
+
+  useEffect(() => {
     if (showVendorDrop) return
     const raw = String(headerData.vendorTaxId).replace(/\D/g, '')
-    if (MOCK_VENDOR_DB[raw]) {
-      setSystemVendor(MOCK_VENDOR_DB[raw])
-      setVendorSearch(`${MOCK_VENDOR_DB[raw].code} — ${MOCK_VENDOR_DB[raw].name}`)
+    const found = vendorDbByTax[raw]
+    if (found) {
+      setSystemVendor(found)
+      setVendorSearch(`${found.code} — ${found.name}`)
     } else if (raw.length >= 10) {
       setSystemVendor({ code: '', name: t.vendorNotFound })
       setVendorSearch('')
@@ -42,13 +98,17 @@ export function useAPInvoice() {
       setSystemVendor({ code: '', name: '' })
       setVendorSearch('')
     }
-  }, [headerData.vendorTaxId, lang])
+  }, [headerData.vendorTaxId, lang, vendorDbByTax])
 
-  const filteredVendors = VENDOR_LIST.filter(v =>
-    v.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
-    v.code.toLowerCase().includes(vendorSearch.toLowerCase()) ||
-    v.taxId.includes(vendorSearch)
-  )
+  const filteredVendors = vendors.filter(v => {
+    const q = vendorSearch.toLowerCase()
+    return (
+      v.name.toLowerCase().includes(q) ||
+      v.code.toLowerCase().includes(q) ||
+      v.taxId.includes(vendorSearch) ||
+      String(v.branchNo || '').includes(vendorSearch)
+    )
+  })
 
   // Computed totals
   const sumLineSubTotal = lineItems.reduce((s, i) => s + Math.round(parseNum(i.lineSubTotal) * 100), 0) / 100
@@ -66,7 +126,7 @@ export function useAPInvoice() {
   const isSubDiff   = sumLineSubTotal !== tgtSubTotal
   const isDiscDiff  = sumDiscount !== tgtDiscount
   const isTaxDiff   = sumTax !== tgtTax
-  const calcGrandFromLines = (Math.round(sumLineSubTotal * 100) - Math.round(sumDiscount * 100) + Math.round(sumTax * 100)) / 100
+  const calcGrandFromLines = sumLineTotal
   const isGrandDiff = calcGrandFromLines !== tgtGrand
 
   const validationErrors = [
@@ -166,7 +226,11 @@ export function useAPInvoice() {
 
   const updateHeader = (key, val) => setHeaderData(p => ({ ...p, [key]: val }))
   const blurHeader   = (key, val) => { if (val) setHeaderData(p => ({ ...p, [key]: fmt(val) })) }
-  const updateItem   = (idx, key, val) => setLineItems(items => items.map((r, i) => i === idx ? { ...r, [key]: val } : r))
+  const updateItem   = (idx, key, val) => setLineItems(items => items.map((r, i) => {
+    if (i !== idx) return r
+    const clearSuggest = key === 'deptCode' ? { _suggestDept: undefined } : key === 'accountCode' ? { _suggestAcc: undefined } : {}
+    return { ...r, [key]: val, ...clearSuggest }
+  }))
   const blurItem     = (idx, key, val) => { if (val) setLineItems(items => items.map((r, i) => i === idx ? { ...r, [key]: fmt(val) } : r)) }
 
   const confirmMapping = () => {
@@ -192,22 +256,48 @@ export function useAPInvoice() {
     }
   }
 
-  const handleAISuggest = () => {
-    setLineItems(lineItems.map(item => {
-      if (item.deptCode && item.accountCode) return item
-      const cat = item.category || ''
-      let dept = '000 — Head Office', acct = '5100-00 — General Expense'
-      if      (cat.match(/ยานพาหนะ|น้ำมัน|vehicle/i))       { acct = '5200-10 — Vehicle Expense'; dept = '200 — Admin Dept' }
-      else if (cat.match(/ไอที|ซอฟต์แวร์|IT|software/i))    { acct = '5300-20 — IT Software';     dept = '300 — IT Dept' }
-      else if (cat.match(/อาหาร|วัตถุดิบ|food/i))            { acct = '4100-00 — Cost of Food';    dept = '150 — F&B Dept' }
-      return { ...item, deptCode: item.deptCode || dept, accountCode: item.accountCode || acct }
-    }))
+  const handleAISuggest = async () => {
+    const itemsToSuggest = lineItems
+      .map((item, idx) => ({ index: idx, category: item.category || '', description: item.description || '' }))
+      .filter((_, idx) => !lineItems[idx].deptCode || !lineItems[idx].accountCode)
+
+    if (!itemsToSuggest.length) return
+
+    setSuggestLoading(true)
+    try {
+      const res = await fetch('/api/v1/ap-invoice/suggest-gl', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsToSuggest }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const suggestions = data.suggestions || {}
+      setLineItems(prev => prev.map((item, idx) => {
+        const s = suggestions[idx]
+        if (!s) return item
+        const newDept = !item.deptCode    && s.deptCode    ? s.deptCode    : null
+        const newAcc  = !item.accountCode && s.accountCode ? s.accountCode : null
+        return {
+          ...item,
+          deptCode:    newDept ?? item.deptCode,
+          accountCode: newAcc  ?? item.accountCode,
+          _suggestDept: newDept || undefined,
+          _suggestAcc:  newAcc  || undefined,
+        }
+      }))
+    } catch (err) {
+      console.error('AI suggest error:', err)
+    } finally {
+      setSuggestLoading(false)
+    }
   }
 
   const handleReset = () => {
     setFile(null); setPreviewUrl(null); setPreviewType(null)
-    setHeaderData(EMPTY_HEADER); setSystemVendor({ code: '', name: '' })
+    setHeaderData(EMPTY_HEADER); setSystemVendor({ code: '', name: '' }); setVendorSearch('')
     setLineItems([]); setFieldMappings(DEFAULT_MAPPINGS); setStep(1)
+    setGlLoaded(false)
   }
 
   return {
@@ -217,11 +307,12 @@ export function useAPInvoice() {
     step, setStep,
     // File & preview
     file, previewUrl, previewType, fileInputRef,
-    loading, status, error, setError,
+    loading, status, error, setError, suggestLoading,
     // Data
     headerData, lineItems, fieldMappings, setFieldMappings,
+    masterAccounts, masterDepts,
     // Vendor search
-    systemVendor, vendorSearch, setVendorSearch,
+    systemVendor, setSystemVendor, vendorSearch, setVendorSearch,
     showVendorDrop, setShowVendorDrop, filteredVendors,
     // Modal
     modal, setModal,

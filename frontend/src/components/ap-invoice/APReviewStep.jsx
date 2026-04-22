@@ -46,7 +46,7 @@ export default function APReviewStep({ ctrl }) {
       )}
 
       {/* Header Info */}
-      <Card icon="fas fa-building" title={t.headerTitle}>
+      <Card icon="fas fa-building" title={t.headerTitle} className="card-vendor">
         <div className="card-body">
           <VendorSearch
             t={t}
