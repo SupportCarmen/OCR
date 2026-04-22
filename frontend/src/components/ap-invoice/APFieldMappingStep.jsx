@@ -13,7 +13,7 @@ export default function APFieldMappingStep({ t, lineItems, fieldMappings, availa
       </div>
 
       <div className="card-body-flush">
-        <div className="mapping-table-wrap" style={{ padding: '1rem' }}>
+        <div className="mapping-table-wrap" style={{ padding: '0.5rem' }}>
           <table className="mapping-table">
             <thead>
               <tr>

@@ -219,10 +219,6 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
         </div>
 
         <div className="form-actions">
-          <button className="btn-cancel" onClick={onBack} style={{ marginRight: 'auto' }}>
-            <i className="fas fa-arrow-left" /> ย้อนกลับ
-          </button>
-
           <button className="btn-danger" onClick={() => setShowDiscardConfirm(true)}>
             <i className="fas fa-times" /> Discard
           </button>

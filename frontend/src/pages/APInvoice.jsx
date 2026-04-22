@@ -1,3 +1,4 @@
+import React, { useState } from 'react'
 import { DocumentPreview, CustomModal, StepWizard, LoadingOverlay } from '../components/common'
 import APUploadStep from '../components/ap-invoice/APUploadStep'
 import APFieldMappingStep from '../components/ap-invoice/APFieldMappingStep'
@@ -20,6 +21,8 @@ export default function APInvoice() {
     handleAISuggest, handleReset,
     updateItem, modal,
   } = ctrl
+
+  const [showPreview, setShowPreview] = useState(false)
 
   return (
     <>
@@ -83,10 +86,23 @@ export default function APInvoice() {
           </div>
         )}
 
-        {/* Steps 2 & 3 — Split layout with document preview */}
+        {/* Steps 2 & 3 — Split layout with toggleable document preview */}
         {(step === 2 || step === 3) && previewUrl && !loading && (
-          <div className="ap-split-layout">
-            <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={file?.name} />
+          <div className={`ap-split-layout ${!showPreview ? 'full-width' : ''}`}>
+            {showPreview && (
+              <div className="ap-preview-side">
+                <DocumentPreview previewUrl={previewUrl} previewType={previewType} fileName={file?.name} />
+                <button className="preview-toggle-btn hide" onClick={() => setShowPreview(false)}>
+                  <i className="fas fa-chevron-left" /> ซ่อนเอกสาร
+                </button>
+              </div>
+            )}
+
+            {!showPreview && (
+              <button className="preview-toggle-btn show" onClick={() => setShowPreview(true)}>
+                <i className="fas fa-file-invoice" /> {t.showDoc || 'แสดงเอกสาร'}
+              </button>
+            )}
 
             <div className="ap-work-area">
               {step === 2 && (
