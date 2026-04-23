@@ -9,6 +9,7 @@ function fmt(code, desc) {
 export default function APAccountMappingStep({
   t, lineItems, updateItem,
   systemVendor = {},
+  headerData = {},
   masterAccounts = [], masterDepts = [],
   onBack, onGenerate,
   onAISuggest, onAcceptAll, hasSuggestions = false, suggestLoading = false,
@@ -21,8 +22,49 @@ export default function APAccountMappingStep({
   const creditDept  = fmt(systemVendor.crDeptCode,      systemVendor.crDeptDesc)
   const creditAcc   = fmt(systemVendor.vatCrAccCode,    systemVendor.vatCrAccDesc)
 
+  const vendorDisplayName = systemVendor.name || headerData.vendorName || '—'
+  const vendorCode        = systemVendor.code || '—'
+  const vendorTaxId       = headerData.vendorTaxId || '—'
+  const branchNo          = systemVendor.branchNo != null ? String(systemVendor.branchNo) : (headerData.vendorBranch || '—')
+  const docNo             = headerData.documentNumber || '—'
+  const docDate           = headerData.documentDate || '—'
+
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+      {/* Vendor info bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0',
+        background: '#f5f3ff', border: '1.5px solid #c4b5fd',
+        borderRadius: '12px', padding: '0',
+        overflow: 'hidden',
+      }}>
+        {/* Vendor name block */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.6rem',
+          padding: '0.7rem 1.1rem', borderRight: '1.5px solid #c4b5fd', flexShrink: 0,
+        }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: '8px', background: '#7c3aed',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <i className="fas fa-building" style={{ color: '#fff', fontSize: '0.85rem' }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#3b0764' }}>{vendorDisplayName}</div>
+            <div style={{ fontSize: '0.75rem', color: '#7c3aed', marginTop: '0.05rem', fontWeight: 600 }}>
+              รหัส: {vendorCode}
+            </div>
+          </div>
+        </div>
+        {/* Pills */}
+        <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', gap: '0', flex: 1 }}>
+          <VendorInfoPill icon="fas fa-id-card"      label="Tax ID"       value={vendorTaxId} />
+          <VendorInfoPill icon="fas fa-code-branch"  label="Branch No"    value={branchNo} />
+          <VendorInfoPill icon="fas fa-file-invoice" label="เลขที่เอกสาร" value={docNo} />
+          <VendorInfoPill icon="fas fa-calendar-day" label="วันที่เอกสาร" value={docDate} last />
+        </div>
+      </div>
 
       {/* Fixed GL accounts */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
@@ -143,6 +185,26 @@ export default function APAccountMappingStep({
           <i className="fas fa-floppy-disk" /> {t.generateInv}
         </button>
       </div>
+    </div>
+  )
+}
+
+function VendorInfoPill({ icon, label, value, last = false }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.15rem',
+      padding: '0.55rem 1rem', borderRight: last ? 'none' : '1px solid #ddd6fe',
+      flex: 1,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.3rem',
+        fontSize: '0.68rem', color: '#7c3aed', fontWeight: 700,
+        textTransform: 'uppercase', letterSpacing: '0.05em',
+      }}>
+        <i className={icon} style={{ fontSize: '0.6rem' }} />
+        {label}
+      </div>
+      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e1b4b' }}>{value}</div>
     </div>
   )
 }

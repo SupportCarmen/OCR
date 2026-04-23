@@ -40,8 +40,8 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
       InvdSeq: -1,
       InvdDesc: item.description || '',
       InvdQty: parseNum(item.qty) || 1,
-      UnitCode: '',
-      InvdPrice: netAmt.toFixed(2),
+      UnitCode: 'UNIT',
+      InvdPrice: parseNum(item.unitPrice).toFixed(2),
       InvdTaxA1: taxAmt.toFixed(2),
       InvdTaxC1: taxAmt.toFixed(2),
       InvdTaxA2: '0.00',
@@ -75,7 +75,7 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
     VnCode: systemVendor.code || '',
     InvhDate: now,
     InvhDesc: headerData.vendorName || '',
-    InvhSource: '',
+    InvhSource: 'OAPI',
     InvhInvNo: headerData.documentNumber || '',
     InvhInvDate: invDate,
     InvhDueDate: dueDate,
@@ -186,7 +186,7 @@ export function useAPInvoice() {
     if (showVendorDrop) return
     const raw = String(headerData.vendorTaxId).replace(/\D/g, '')
     const found = vendorDbByTax[raw]
-    if (found) {
+    if (found && found.active !== false) {
       setSystemVendor(found)
       setVendorSearch(`${found.code} — ${found.name}`)
     } else if (raw.length >= 10) {

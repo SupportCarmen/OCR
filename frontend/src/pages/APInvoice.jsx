@@ -130,6 +130,7 @@ export default function APInvoice() {
             lineItems={lineItems}
             updateItem={updateItem}
             systemVendor={systemVendor}
+            headerData={headerData}
             masterAccounts={masterAccounts}
             masterDepts={masterDepts}
             onBack={() => setStep(3)}

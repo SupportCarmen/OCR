@@ -64,25 +64,36 @@ export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorS
       {showVendorDrop && (
         <div className="vendor-dropdown">
           {filteredVendors.length > 0
-            ? filteredVendors.map(v => (
-                <div
-                  key={`${v.taxId}-${v.branchNo}`}
-                  className="vendor-dropdown-item"
-                  onMouseDown={() => {
-                    setSystemVendor(v)
-                    setVendorSearch(`${v.code} — ${v.name}`)
-                    setShowVendorDrop(false)
-                  }}
-                >
-                  <div className="vd-name">{v.code} — {v.name}</div>
-                  <div className="vd-meta">
-                    <span className="vd-tax">Tax ID: {v.taxId}</span>
-                    {v.branchNo != null && v.branchNo !== '' && (
-                      <span className="vd-branch">BranchNo: {v.branchNo}</span>
-                    )}
+            ? filteredVendors.map(v => {
+                const isInactive = v.active === false
+                return (
+                  <div
+                    key={`${v.taxId}-${v.branchNo}`}
+                    className={`vendor-dropdown-item${isInactive ? ' vendor-dropdown-item--inactive' : ''}`}
+                    style={isInactive ? { opacity: 0.45, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
+                    onMouseDown={isInactive ? undefined : () => {
+                      setSystemVendor(v)
+                      setVendorSearch(`${v.code} — ${v.name}`)
+                      setShowVendorDrop(false)
+                    }}
+                  >
+                    <div className="vd-name" style={isInactive ? { color: 'var(--text-4)' } : undefined}>
+                      {v.code} — {v.name}
+                      {isInactive && (
+                        <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', borderRadius: '4px', padding: '0 4px' }}>
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <div className="vd-meta">
+                      <span className="vd-tax">Tax ID: {v.taxId}</span>
+                      {v.branchNo != null && v.branchNo !== '' && (
+                        <span className="vd-branch">BranchNo: {v.branchNo}</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             : (
                 <div style={{ padding: '0.75rem 1rem', fontSize: '0.83rem', color: 'var(--text-4)', textAlign: 'center' }}>
                   ไม่พบข้อมูลผู้ขาย
