@@ -22,6 +22,7 @@ from app.services.carmen_service import (
     get_vendors,
     post_gljv,
     post_input_tax,
+    post_invoice,
     put_gljv,
     put_input_tax,
 )
@@ -128,3 +129,13 @@ async def proxy_update_input_tax(rec_seq: int, request: Request):
         return await put_input_tax(rec_seq, body)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen Input Tax update ล้มเหลว: {e.detail}")
+
+
+@router.post("/invoice")
+async def proxy_create_invoice(request: Request):
+    _require_auth()
+    body = await request.json()
+    try:
+        return await post_invoice(body)
+    except CarmenAPIError as e:
+        raise HTTPException(status_code=e.status_code, detail=f"Carmen Invoice ล้มเหลว: {e.detail}")

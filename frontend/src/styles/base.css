@@ -74,14 +74,44 @@ html { scroll-behavior: smooth; }
 
 body {
     font-family: 'IBM Plex Sans', 'Sarabun', -apple-system, sans-serif;
-    background: var(--gray-50);
-    background-image:
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,70,229,0.05) 0%, transparent 70%);
+    background-color: #eaecf7;
     color: var(--text);
     min-height: 100vh;
     padding: 2.5rem 2rem 6rem;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    position: relative;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: -15%;
+    width: 65vw;
+    height: 65vw;
+    background: radial-gradient(circle, rgba(79, 70, 229, 0.18) 0%, transparent 65%);
+    filter: blur(70px);
+    animation: aurora1 13s ease-in-out infinite alternate;
+    will-change: transform;
+    pointer-events: none;
+    z-index: -1;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    bottom: -20%;
+    right: -15%;
+    width: 60vw;
+    height: 60vw;
+    background: radial-gradient(circle, rgba(8, 145, 178, 0.16) 0%, transparent 65%);
+    filter: blur(80px);
+    animation: aurora2 16s ease-in-out infinite alternate;
+    will-change: transform;
+    pointer-events: none;
+    z-index: -1;
 }
 
 ::-webkit-scrollbar          { width: 5px; height: 5px; }
@@ -115,6 +145,14 @@ button { font-family: 'IBM Plex Sans', 'Sarabun', sans-serif; cursor: pointer; b
 @keyframes shimmer {
     from { background-position: -200% center; }
     to   { background-position: 200% center; }
+}
+@keyframes aurora1 {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(10%, 15%) scale(1.2); }
+}
+@keyframes aurora2 {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(-12%, -10%) scale(1.15); }
 }
 
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }

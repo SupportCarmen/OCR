@@ -54,6 +54,24 @@ export async function submitToCarmen(payload) {
 }
 
 /**
+ * Submit an AP Invoice to Carmen (via backend proxy).
+ * @param {object} payload - AP Invoice payload
+ * @returns {Promise<object>}
+ */
+export async function submitAPInvoiceToCarmen(payload) {
+  const res = await fetch('/api/v1/ocr/carmen/invoice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const errTxt = await res.text()
+    throw new Error(`Carmen Invoice ล้มเหลว (${res.status}): ${errTxt}`)
+  }
+  return res.json()
+}
+
+/**
  * Submit an Input Tax record to Carmen (via backend proxy).
  * @param {object} payload - Input tax payload
  * @returns {Promise<object>}

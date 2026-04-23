@@ -88,7 +88,7 @@ _VENDOR_FIELDS = frozenset({
     'VnCode', 'VnName', 'Active', 'VnTaxNo', 'VnCateCode', 'VnCateDesc',
     'VnVat1DrAccCode', 'VnVat1DrAccDesc', 'VnVat1DrDeptCode', 'VnVat1DrDeptDesc',
     'VnVatCrAccCode', 'VnVatCrAccDesc', 'VnCrDeptCode', 'VnCrDeptDesc',
-    'TaxProfileCode1', 'TaxProfileDesc1', 'BranchNo',
+    'TaxProfileCode1', 'TaxProfileDesc1', 'BranchNo', 'VnTerm',
 })
 
 
@@ -141,6 +141,17 @@ async def put_input_tax(rec_seq: int, body: dict) -> Any:
     hdrs = {**_headers(), "Content-Type": "application/json"}
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.put(f"{_BASE_URL}/inputTaxRec/{rec_seq}", json=body, headers=hdrs)
+        try:
+            return resp.json()
+        except Exception:
+            raise CarmenAPIError(resp.status_code, resp.text)
+
+
+async def post_invoice(body: dict) -> Any:
+    """Submit an AP Invoice to Carmen API."""
+    hdrs = {**_headers(), "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.post(f"{_BASE_URL}/invoice", json=body, headers=hdrs)
         try:
             return resp.json()
         except Exception:

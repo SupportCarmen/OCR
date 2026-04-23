@@ -17,6 +17,7 @@ export default function APReviewStep({ ctrl }) {
     t, headerData, lineItems, fieldMappings, activeCols, availableFields,
     systemVendor, setSystemVendor, vendorSearch, setVendorSearch,
     showVendorDrop, setShowVendorDrop, filteredVendors,
+    refreshVendors, vendorRefreshing,
     isValid, validationErrors,
     sumLineSubTotal, sumLineTotal, sumDiscount, sumTax,
     tgtSubTotal, tgtDiscount, tgtTax,
@@ -57,6 +58,8 @@ export default function APReviewStep({ ctrl }) {
             showVendorDrop={showVendorDrop}
             setShowVendorDrop={setShowVendorDrop}
             filteredVendors={filteredVendors}
+            onRefresh={refreshVendors}
+            refreshing={vendorRefreshing}
           />
           <div className="header-form">
             {HEADER_FIELDS(t).map(({ key, label }) => (

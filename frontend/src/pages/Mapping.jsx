@@ -4,6 +4,7 @@ import { fetchAccountCodes, fetchDepartments, fetchGLPrefixes } from '../lib/api
 import { suggestMapping, suggestPaymentTypes, saveMappingHistory, fetchMappingHistory } from '../lib/api/mapping';
 import CustomModal from '../components/common/CustomModal';
 import CustomSearchSelect from '../components/common/CustomSearchSelect';
+import AISuggestBar from '../components/common/AISuggestBar';
 import '../styles/pages/mapping.css';
 
 
@@ -661,27 +662,15 @@ export default function Mapping() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <span>ACCOUNT CODE MAPPING {loadingOpts && <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: 'var(--primary)' }}><i className="fas fa-spinner fa-spin"></i> กำลังโหลดรหัสบัญชี...</span>}</span>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-              {(Object.values(mainSuggestions).some(s => s) || Object.values(paymentSuggestions).some(s => s)) && (
-                <button
-                  onClick={() => setAcceptAllModal(true)}
-                  style={{ padding: '0.4rem 0.8rem', background: '#d97706', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 500 }}
-                >
-                  <i className="fas fa-check-double"></i> Accept All
-                </button>
-              )}
-              <button
-                onClick={() => autoSuggest(masterAccounts, masterDepartments)}
-                disabled={masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading}
-                title={masterAccounts.length === 0 ? 'Loading account codes...' : masterDepartments.length === 0 ? 'Loading departments...' : suggestLoading ? 'Suggesting...' : 'Click to get AI suggestions'}
-                style={{ padding: '0.4rem 0.8rem', background: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'var(--gray-100)' : 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'var(--gray-400)' : 'white', fontWeight: 500, boxShadow: (masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts || suggestLoading) ? 'none' : '0 2px 10px rgba(79,70,229,0.25)' }}
-              >
-                <i className={`fas fa-wand-magic-sparkles ${suggestLoading ? 'fa-spin' : ''}`} style={{ color: 'inherit' }}></i> AI Suggest
-              </button>
-              <button onClick={loadInitialData} disabled={loadingOpts} style={{ padding: '0.4rem 0.8rem', background: 'white', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-2)' }}>
-                <i className={`fas fa-sync-alt ${loadingOpts ? 'fa-spin' : ''}`}></i> Refresh
-              </button>
-            </div>
+            <AISuggestBar
+              onSuggest={() => autoSuggest(masterAccounts, masterDepartments)}
+              onAcceptAll={() => setAcceptAllModal(true)}
+              hasSuggestions={Object.values(mainSuggestions).some(s => s) || Object.values(paymentSuggestions).some(s => s)}
+              loading={suggestLoading}
+              disabled={masterAccounts.length === 0 || masterDepartments.length === 0 || loadingOpts}
+              onRefresh={loadInitialData}
+              refreshLoading={loadingOpts}
+            />
           </div>
 
           <div className="mapping-container" style={{ display: 'grid', gridTemplateColumns: '95px 150px 1fr 1fr auto', gap: '1rem', alignItems: 'center' }}>
@@ -852,23 +841,13 @@ export default function Mapping() {
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    onClick={() => autoSuggestPaymentTypes(masterAccounts, masterDepartments)}
-                    disabled={loadingOpts || paymentSuggestLoading}
-                    style={{ padding: '0.4rem 0.8rem', background: paymentSuggestLoading ? 'var(--gray-100)' : 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: paymentSuggestLoading ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: paymentSuggestLoading ? 'var(--gray-400)' : 'white', fontWeight: 500, boxShadow: paymentSuggestLoading ? 'none' : '0 2px 10px rgba(79,70,229,0.25)' }}
-                  >
-                    <i className={`fas fa-wand-magic-sparkles ${paymentSuggestLoading ? 'fa-spin' : ''}`} style={{ color: 'inherit' }}></i> AI Suggest
-                  </button>
-                  {Object.values(paymentSuggestions).some(s => s) && (
-                    <button
-                      onClick={() => setAcceptAllModal(true)}
-                      style={{ padding: '0.4rem 0.8rem', background: '#d97706', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 500 }}
-                    >
-                      <i className="fas fa-check-double"></i> Accept All
-                    </button>
-                  )}
-                </div>
+                <AISuggestBar
+                  onSuggest={() => autoSuggestPaymentTypes(masterAccounts, masterDepartments)}
+                  onAcceptAll={() => setAcceptAllModal(true)}
+                  hasSuggestions={Object.values(paymentSuggestions).some(s => s)}
+                  loading={paymentSuggestLoading}
+                  disabled={loadingOpts}
+                />
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-3)', fontWeight: 500 }}>
                   ({amountMappedCount}/{allPaymentTypes.length} mapped)
                 </span>

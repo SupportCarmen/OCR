@@ -21,10 +21,12 @@
     min-width: max-content;
     width: 100%;
     padding: 0.6rem 1.25rem;
-    background: white;
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     position: relative;
     overflow: hidden;
 }
@@ -112,17 +114,19 @@
 }
 
 .panel-card {
-    background: white;
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
-    box-shadow: var(--shadow-xs);
+    box-shadow: var(--shadow-md);
     transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s var(--ease);
 }
 
 .panel-card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--border-hi);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(255, 255, 255, 0.8);
     transform: translateY(-1px);
 }
 
@@ -628,17 +632,19 @@
 
 /* ─── DATA CARDS ─── */
 .data-card {
-    background: white;
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow-xs);
+    box-shadow: var(--shadow-md);
     transition: box-shadow 0.2s, border-color 0.2s;
 }
 
 .data-card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--border-hi);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(255, 255, 255, 0.8);
 }
 
 .card-title {

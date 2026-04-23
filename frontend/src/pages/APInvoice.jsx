@@ -18,7 +18,9 @@ export default function APInvoice() {
     lineItems, fieldMappings, setFieldMappings, headerData,
     availableFields, systemVendor, masterAccounts, masterDepts,
     handleFileChange, confirmMapping,
-    handleAISuggest, handleReset,
+    handleAISuggest, handleAcceptAll, hasSuggestions,
+    handleConfirmSuggest, handleRejectSuggest, handleReset,
+    handleGenerate, invoiceSeq,
     updateItem, modal,
   } = ctrl
 
@@ -131,8 +133,12 @@ export default function APInvoice() {
             masterAccounts={masterAccounts}
             masterDepts={masterDepts}
             onBack={() => setStep(3)}
-            onGenerate={() => setStep(5)}
+            onGenerate={handleGenerate}
             onAISuggest={handleAISuggest}
+            onAcceptAll={handleAcceptAll}
+            hasSuggestions={hasSuggestions}
+            onConfirmSuggest={handleConfirmSuggest}
+            onRejectSuggest={handleRejectSuggest}
             suggestLoading={suggestLoading}
           />
         )}
@@ -143,6 +149,7 @@ export default function APInvoice() {
             t={t}
             headerData={headerData}
             lineItems={lineItems}
+            invoiceSeq={invoiceSeq}
             onReset={handleReset}
           />
         )}

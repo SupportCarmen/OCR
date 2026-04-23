@@ -1,4 +1,5 @@
 import CustomSearchSelect from '../common/CustomSearchSelect'
+import AISuggestBar from '../common/AISuggestBar'
 
 function fmt(code, desc) {
   if (code && desc) return `${code} — ${desc}`
@@ -9,7 +10,9 @@ export default function APAccountMappingStep({
   t, lineItems, updateItem,
   systemVendor = {},
   masterAccounts = [], masterDepts = [],
-  onBack, onGenerate, onAISuggest, suggestLoading = false,
+  onBack, onGenerate,
+  onAISuggest, onAcceptAll, hasSuggestions = false, suggestLoading = false,
+  onConfirmSuggest, onRejectSuggest,
 }) {
   const taxProfile  = fmt(systemVendor.taxProfileCode1, systemVendor.taxProfileDesc1)
   const debitDept   = fmt(systemVendor.vat1DrDeptCode,  systemVendor.vat1DrDeptDesc)
@@ -52,29 +55,28 @@ export default function APAccountMappingStep({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>{t.expenseDesc}</span>
-            <button
-              className="btn btn-sm btn-primary"
-              style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}
-              onClick={onAISuggest}
-              disabled={suggestLoading}
-            >
-              <i className={suggestLoading ? 'fas fa-spinner fa-spin' : 'fas fa-wand-magic-sparkles'} />
-              {suggestLoading ? ' กำลังแนะนำ...' : ` ${t.aiSuggest}`}
-            </button>
+            <AISuggestBar
+              onSuggest={onAISuggest}
+              onAcceptAll={onAcceptAll}
+              hasSuggestions={hasSuggestions}
+              loading={suggestLoading}
+            />
           </div>
         </div>
         <div className="table-wrapper">
           <table className="ap-acct-table">
             <thead>
               <tr>
-                <th style={{ width: '18%' }}>{t.category}</th>
-                <th style={{ width: '28%' }}>{t.description}</th>
-                <th style={{ width: '27%' }}>{t.deptCode}</th>
-                <th style={{ width: '27%' }}>{t.accountCode}</th>
+                <th style={{ width: '16%' }}>{t.category}</th>
+                <th style={{ width: '24%' }}>{t.description}</th>
+                <th style={{ width: '26%' }}>{t.deptCode}</th>
+                <th style={{ width: '26%' }}>{t.accountCode}</th>
+                {hasSuggestions && <th style={{ width: '8%' }}></th>}
               </tr>
             </thead>
             <tbody>
               {lineItems.map((item, ri) => {
+                const hasSuggest = !!(item._suggestDept || item._suggestAcc)
                 const deptChoice = item._suggestDept
                   ? { code: item._suggestDept, name: masterDepts.find(d => d.code === item._suggestDept)?.name || '', source: 'ai' }
                   : null
@@ -82,7 +84,7 @@ export default function APAccountMappingStep({
                   ? { code: item._suggestAcc, name: masterAccounts.find(a => a.code === item._suggestAcc)?.name || '', source: 'ai' }
                   : null
                 return (
-                  <tr key={ri}>
+                  <tr key={ri} style={hasSuggest ? { background: '#f5f3ff' } : undefined}>
                     <td><span className="ap-acct-table cat-badge">{item.category || '—'}</span></td>
                     <td style={{ fontSize: '0.83rem', color: 'var(--text-2)' }}>{item.description || '—'}</td>
                     <td style={{ padding: '0.35rem 0.5rem' }}>
@@ -103,6 +105,28 @@ export default function APAccountMappingStep({
                         onChange={val => updateItem(ri, 'accountCode', val)}
                       />
                     </td>
+                    {hasSuggestions && (
+                      <td style={{ padding: '0.35rem 0.25rem', textAlign: 'center' }}>
+                        {hasSuggest && (
+                          <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => onConfirmSuggest(ri)}
+                              title="ยืนยัน"
+                              style={{ padding: '3px 8px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center' }}
+                            >
+                              <i className="fas fa-check" style={{ background: 'none', width: 'auto', height: 'auto', display: 'inline', padding: 0, color: 'inherit' }} />
+                            </button>
+                            <button
+                              onClick={() => onRejectSuggest(ri)}
+                              title="ปฏิเสธ"
+                              style={{ padding: '3px 8px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center' }}
+                            >
+                              <i className="fas fa-times" style={{ background: 'none', width: 'auto', height: 'auto', display: 'inline', padding: 0, color: 'inherit' }} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })}

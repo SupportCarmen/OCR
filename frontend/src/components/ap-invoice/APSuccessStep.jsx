@@ -1,6 +1,6 @@
 import { fmt } from '../../constants/apInvoice'
 
-export default function APSuccessStep({ t, headerData, lineItems, onReset }) {
+export default function APSuccessStep({ t, headerData, lineItems, invoiceSeq, onReset }) {
   const SUMMARY_ROWS = [
     { label: t.subTotal, val: fmt(headerData.subTotal) },
     { label: t.discount, val: fmt(headerData.totalDiscount), color: 'var(--rose)' },
@@ -52,9 +52,21 @@ export default function APSuccessStep({ t, headerData, lineItems, onReset }) {
           </div>
         </div>
 
-        <button className="btn btn-primary" style={{ margin: '0 auto' }} onClick={onReset}>
-          <i className="fas fa-rotate-right" /> {t.uploadNew}
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+          {invoiceSeq && (
+            <a
+              href={`https://dev.carmen4.com/#/apInvoice/${invoiceSeq}/show`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-outline"
+            >
+              <i className="fas fa-arrow-up-right-from-square" /> เปิดดู AP Invoice
+            </a>
+          )}
+          <button className="btn btn-primary" onClick={onReset}>
+            <i className="fas fa-rotate-right" /> {t.uploadNew}
+          </button>
+        </div>
       </div>
     </div>
   )

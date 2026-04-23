@@ -1,16 +1,47 @@
 import Badge from '../common/Badge'
 
-export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorSearch, setVendorSearch, showVendorDrop, setShowVendorDrop, filteredVendors }) {
+export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorSearch, setVendorSearch, showVendorDrop, setShowVendorDrop, filteredVendors, onRefresh, refreshing }) {
   return (
     <div className="vendor-search-wrap">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
         <div className="field-label" style={{ marginBottom: 0 }}>
           <i className="fas fa-user-tie" /> {t.systemVendor}
         </div>
-        <Badge variant={systemVendor.code ? 'success' : 'warning'}>
-          <i className={`fas fa-${systemVendor.code ? 'circle-check' : 'triangle-exclamation'}`} />
-          {systemVendor.code ? 'Mapped' : 'Unmapped'}
-        </Badge>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Badge variant={systemVendor.code ? 'success' : 'warning'}>
+            <i className={`fas fa-${systemVendor.code ? 'circle-check' : 'triangle-exclamation'}`} />
+            {systemVendor.code ? 'Mapped' : 'Unmapped'}
+          </Badge>
+          <a
+            href="https://dev.carmen4.com/#/apVendor/create"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.25rem 0.65rem', fontSize: '0.75rem', fontWeight: 600,
+              color: 'var(--primary)', background: 'var(--primary-bg, #eff6ff)',
+              border: '1px solid var(--primary)', borderRadius: '999px',
+              textDecoration: 'none', whiteSpace: 'nowrap',
+            }}
+          >
+            <i className="fas fa-plus" style={{ fontSize: '0.65rem' }} />
+            เพิ่ม Vendor
+          </a>
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            title="Refresh รายชื่อผู้ขาย"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '1.75rem', height: '1.75rem',
+              background: 'white', border: '1px solid var(--border)',
+              borderRadius: '999px', cursor: refreshing ? 'not-allowed' : 'pointer',
+              color: 'var(--text-3)', opacity: refreshing ? 0.6 : 1,
+            }}
+          >
+            <i className={`fas fa-rotate-right${refreshing ? ' fa-spin' : ''}`} style={{ fontSize: '0.7rem' }} />
+          </button>
+        </div>
       </div>
 
       <div className="vendor-search-input-wrap">

@@ -4,7 +4,96 @@ import {
   fmt, round2, isNumFld, getAvailableFields, AP_I18N,
 } from '../constants/apInvoice'
 import { parseNum } from '../constants/apInvoice'
-import { fetchAccountCodes, fetchDepartments } from '../lib/api/carmen'
+import { fetchAccountCodes, fetchDepartments, submitAPInvoiceToCarmen } from '../lib/api/carmen'
+
+function parseDateToISO(dateStr) {
+  if (!dateStr) return new Date().toISOString()
+  const parts = dateStr.split('/')
+  if (parts.length !== 3) return new Date().toISOString()
+  const [dd, mm, yyyy] = parts
+  const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`)
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
+}
+
+function addDays(isoDate, days) {
+  const d = new Date(isoDate)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString()
+}
+
+function buildInvoicePayload(headerData, lineItems, systemVendor) {
+  const now = new Date().toISOString()
+  const invDate = parseDateToISO(headerData.documentDate)
+  const creditTerm = systemVendor.term ?? 0
+  const dueDate = creditTerm > 0 ? addDays(invDate, creditTerm) : invDate
+  const parts = (headerData.documentDate || '').split('/')
+  const taxPeriod = parts.length === 3 ? `${parts[1]}/${parts[2]}` : ''
+
+  const detail = lineItems.map(item => {
+    const netAmt = parseNum(item.lineSubTotal)
+    const taxAmt = parseNum(item.taxAmt)
+    const total  = parseNum(item.lineTotal)
+    const taxRate = parseNum(item.taxPct) || 7
+
+    return {
+      InvhSeq: -1,
+      InvdSeq: -1,
+      InvdDesc: item.description || '',
+      InvdQty: parseNum(item.qty) || 1,
+      UnitCode: '',
+      InvdPrice: netAmt.toFixed(2),
+      InvdTaxA1: taxAmt.toFixed(2),
+      InvdTaxC1: taxAmt.toFixed(2),
+      InvdTaxA2: '0.00',
+      InvdTaxC2: '0.00',
+      NetAmt: netAmt.toFixed(2),
+      NetBaseAmt: netAmt.toFixed(2),
+      UnPaid: total.toFixed(2),
+      TotalPrice: total.toFixed(2),
+      DeptCode: item.deptCode || '',
+      InvdBTaxCr1: systemVendor.vatCrAccCode || '',
+      InvdBTaxDr: systemVendor.vat1DrAccCode || '',
+      InvdT1Dr: item.accountCode || '',
+      InvdT2Dr: '',
+      InvdTaxT1: headerData.taxType === 'Include' ? 'Include' : 'Add',
+      InvdTaxR1: taxRate.toFixed(2),
+      InvdTaxT2: 'None',
+      InvdTaxR2: '0.00',
+      DimList: {},
+      LastModified: now,
+      InvdBTaxCr1DeptCode: systemVendor.crDeptCode || '',
+      InvdT1DrDeptCode: item.deptCode || '',
+      InvdT2DrDeptCode: item.deptCode || '',
+      TaxProfileCode1: systemVendor.taxProfileCode1 || null,
+      TaxProfileCode2: null,
+      Tax1Overwrite: false,
+      Tax2Overwrite: false,
+    }
+  })
+
+  return {
+    VnCode: systemVendor.code || '',
+    InvhDate: now,
+    InvhDesc: headerData.vendorName || '',
+    InvhSource: '',
+    InvhInvNo: headerData.documentNumber || '',
+    InvhInvDate: invDate,
+    InvhDueDate: dueDate,
+    InvhCredit: creditTerm,
+    CurCode: 'THB',
+    CurRate: 1,
+    InvhTInvNo: headerData.documentNumber || '',
+    InvhTInvDt: invDate,
+    TaxPeriod: taxPeriod,
+    TaxStatus: 'Pending',
+    InvhTotalAmt: parseNum(headerData.grandTotal),
+    InvWht: {},
+    DimHList: {},
+    Detail: detail,
+    InvhStatus: '',
+    VoidRemark: '',
+  }
+}
 
 export function useAPInvoice() {
   const [lang, setLang] = useState('th')
@@ -29,6 +118,8 @@ export function useAPInvoice() {
   const [vendorDbByTax, setVendorDbByTax] = useState({})
 
   const [suggestLoading, setSuggestLoading] = useState(false)
+  const [vendorRefreshing, setVendorRefreshing] = useState(false)
+  const [invoiceSeq, setInvoiceSeq] = useState(null)
   const [masterAccounts, setMasterAccounts] = useState([])
   const [masterDepts, setMasterDepts] = useState([])
   const [glLoaded, setGlLoaded] = useState(false)
@@ -36,8 +127,9 @@ export function useAPInvoice() {
 
   const fileInputRef = useRef(null)
 
-  useEffect(() => {
-    fetch('/api/v1/ocr/carmen/vendors')
+  const loadVendors = async (setRefreshing = false) => {
+    if (setRefreshing) setVendorRefreshing(true)
+    return fetch('/api/v1/ocr/carmen/vendors')
       .then(r => r.json())
       .then(data => {
         const list = (data.Data || []).map(v => ({
@@ -58,6 +150,7 @@ export function useAPInvoice() {
           taxProfileCode1: v.TaxProfileCode1,
           taxProfileDesc1: v.TaxProfileDesc1,
           branchNo:        v.BranchNo,
+          term:            v.VnTerm ?? 0,
         }))
         setVendors(list)
         const db = {}
@@ -65,7 +158,12 @@ export function useAPInvoice() {
         setVendorDbByTax(db)
       })
       .catch(() => {})
-  }, [])
+      .finally(() => { if (setRefreshing) setVendorRefreshing(false) })
+  }
+
+  const refreshVendors = () => loadVendors(true)
+
+  useEffect(() => { loadVendors() }, [])
 
   useEffect(() => {
     if (step !== 4 || glLoaded) return
@@ -280,8 +378,8 @@ export function useAPInvoice() {
         const newAcc  = !item.accountCode && s.accountCode ? s.accountCode : null
         return {
           ...item,
-          deptCode:    newDept ?? item.deptCode,
-          accountCode: newAcc  ?? item.accountCode,
+          deptCode:     newDept ?? item.deptCode,
+          accountCode:  newAcc  ?? item.accountCode,
           _suggestDept: newDept || undefined,
           _suggestAcc:  newAcc  || undefined,
         }
@@ -290,6 +388,68 @@ export function useAPInvoice() {
       console.error('AI suggest error:', err)
     } finally {
       setSuggestLoading(false)
+    }
+  }
+
+  const hasSuggestions = lineItems.some(i => i._suggestDept || i._suggestAcc)
+
+  const handleAcceptAll = () => {
+    setLineItems(prev => prev.map(item => ({
+      ...item,
+      _suggestDept: undefined,
+      _suggestAcc:  undefined,
+    })))
+  }
+
+  const handleConfirmSuggest = (idx) => {
+    setLineItems(prev => prev.map((item, i) =>
+      i !== idx ? item : { ...item, _suggestDept: undefined, _suggestAcc: undefined }
+    ))
+  }
+
+  const handleRejectSuggest = (idx) => {
+    setLineItems(prev => prev.map((item, i) =>
+      i !== idx ? item : {
+        ...item,
+        deptCode:    item._suggestDept ? '' : item.deptCode,
+        accountCode: item._suggestAcc  ? '' : item.accountCode,
+        _suggestDept: undefined,
+        _suggestAcc:  undefined,
+      }
+    ))
+  }
+
+  const handleGenerate = async () => {
+    setLoading(true)
+    setStatus('กำลังส่ง AP Invoice ไปยัง Carmen ERP...')
+    setError(null)
+    try {
+      const payload = buildInvoicePayload(headerData, lineItems, systemVendor)
+      const result = await submitAPInvoiceToCarmen(payload)
+      if (result?.Code < 0) {
+        setModal({
+          show: true, type: 'warning',
+          title: 'ไม่สามารถสร้าง AP Invoice ได้',
+          message: result.UserMessage || 'เกิดข้อผิดพลาดจาก Carmen ERP',
+          confirmText: 'ตกลง',
+          onConfirm: () => { setModal({ show: false }); handleReset() },
+        })
+        return
+      }
+      setInvoiceSeq(result?.InternalMessage ?? null)
+      setStep(5)
+    } catch (err) {
+      console.error('AP Invoice submit error:', err)
+      setModal({
+        show: true, type: 'warning',
+        title: 'ส่ง AP Invoice ล้มเหลว',
+        message: err.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง',
+        confirmText: 'ตกลง',
+        onConfirm: () => setModal({ show: false }),
+      })
+    } finally {
+      setLoading(false)
+      setStatus('')
     }
   }
 
@@ -328,7 +488,11 @@ export function useAPInvoice() {
     updateHeader, blurHeader,
     updateItem, blurItem,
     confirmMapping, goToAccount,
-    handleAISuggest, handleReset,
+    handleAISuggest, handleAcceptAll, hasSuggestions,
+    handleConfirmSuggest, handleRejectSuggest, handleReset,
+    handleGenerate,
+    refreshVendors, vendorRefreshing,
+    invoiceSeq,
     adjustField,
   }
 }
