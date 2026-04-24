@@ -21,7 +21,7 @@ export default function APInvoice() {
     handleAISuggest, handleAcceptAll, hasSuggestions,
     handleConfirmSuggest, handleRejectSuggest, handleReset,
     handleGenerate, invoiceSeq,
-    updateItem, modal,
+    updateItem, updateHeader, modal,
   } = ctrl
 
   const [showPreview, setShowPreview] = useState(false)
@@ -129,6 +129,7 @@ export default function APInvoice() {
             t={t}
             lineItems={lineItems}
             updateItem={updateItem}
+            updateHeader={updateHeader}
             systemVendor={systemVendor}
             headerData={headerData}
             masterAccounts={masterAccounts}

@@ -17,7 +17,7 @@ export const VENDOR_LIST = Object.entries(MOCK_VENDOR_DB).map(([taxId, d]) => ({
 export const EMPTY_HEADER = {
   vendorName: '', vendorTaxId: '', vendorBranch: '',
   documentName: '', documentDate: '', documentNumber: '',
-  taxType: '',
+  taxType: '', invhDesc: '',
   subTotal: '0.00', taxAmount: '0.00', totalDiscount: '0.00', grandTotal: '0.00',
 }
 

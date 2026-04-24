@@ -1,8 +1,4 @@
-"""
-Prompt builder functions for GL account mapping suggestions.
-
-Separates prompt text from the business logic in tools/map_gl.py.
-"""
+"""Prompt builders for GL account mapping suggestions."""
 
 from typing import List
 
@@ -14,42 +10,24 @@ def build_fixed_fields_prompt(
     commission_acc_count: int,
     balance_acc_count: int,
 ) -> str:
-    """Build the prompt for suggesting Commission / Tax Amount / Net Amount mappings."""
-    return f"""You are an expert accounting assistant for a Thai company. You are mapping bank transaction fields to internal Account Codes (Master Chart of Accounts).
+    return f"""Map 3 bank-statement fields to Thai accounting codes. Return JSON only — no markdown.
 
-Suggest the best Department Code and Account Code for each field.
+Fields:
+- Commission (ค่าธรรมเนียม): Income account — matches "commission", "credit card", "bank charge", "ค่าธรรมเนียม"
+- Tax Amount (ภาษีบนค่าธรรมเนียม): BalanceSheet account — matches "output tax undue", "ภาษีขายรอตัด"
+- Net Amount (ยอดรับสุทธิ): BalanceSheet account — matches "C/A", "S/A", "bank", "ธนาคาร", "กระแสรายวัน"
 
-Matching Rules (IMPORTANT):
-1. **Commission** (ค่าธรรมเนียม) — search Income (type=I) accounts only:
-   - Search for names containing: "credit card commission", "commission credit card", "เครดิตการ์ดคอมมิชชั่น", "ค่าคอมมิชชั่นเครดิตการ์ด", "Bank Charge", "ค่าธรรมเนียมธนาคาร".
+Departments:
+{dept_lines or "  (none)"}
 
-2. **Tax Amount** (ภาษีบนค่าธรรมเนียม) — search BalanceSheet (type=B) accounts only:
-   - Search for names containing: "output tax undue", "ภาษีขายรอตัด", "ภาษีขายยังไม่ถึงกำหนด", "output vat undue", "sale tax undue".
+Commission accounts (Income, {commission_acc_count}):
+{commission_acc_lines or "  (none)"}
 
-3. **Net Amount** (ยอดรับสุทธิ) — search BalanceSheet (type=B) accounts only:
-   - Search for names containing: "C/A", "S/A", "Bank", "ธนาคาร", "กระแสรายวัน", "ออมทรัพย์".
+Tax Amount + Net Amount accounts (BalanceSheet, {balance_acc_count}):
+{balance_acc_lines or "  (none)"}
 
-Available Department Codes:
-{dept_lines if dept_lines else "  (none available)"}
-
-Commission — Available Account Codes (type=I, {commission_acc_count} codes):
-{commission_acc_lines if commission_acc_lines else "  (none available)"}
-
-Tax Amount and Net Amount — Available Account Codes (type=B, {balance_acc_count} codes):
-{balance_acc_lines if balance_acc_lines else "  (none available)"}
-
-Return ONLY a valid JSON object — no markdown, no explanation:
-{{
-  "Commission":  {{"dept": "<dept_code or null>", "acc": "<acc_code or null>"}},
-  "Tax Amount":  {{"dept": "<dept_code or null>", "acc": "<acc_code or null>"}},
-  "Net Amount":  {{"dept": "<dept_code or null>", "acc": "<acc_code or null>"}}
-}}
-
-Rules:
-- Only use codes that exist EXACTLY in the lists provided for each field above.
-- Use null if no suitable code is found — never invent a code.
-- dept codes are optional; if departments list is empty set all dept to null.
-"""
+Rules: use codes exactly as listed; null if no match; dept optional.
+{{"Commission":{{"dept":null,"acc":null}},"Tax Amount":{{"dept":null,"acc":null}},"Net Amount":{{"dept":null,"acc":null}}}}"""
 
 
 def build_payment_types_prompt(
@@ -59,37 +37,23 @@ def build_payment_types_prompt(
     b_account_count: int,
     payment_types: List[str],
 ) -> str:
-    """Build the prompt for suggesting dept/acc for dynamic payment type rows."""
-    return f"""You are an accounting assistant for a Thai company receiving credit card settlement reports.
+    keys = ", ".join(f'"{t}"' for t in payment_types)
+    return f"""Map card/payment settlement types to Thai accounting codes. Return JSON only — no markdown.
 
-Each payment type below is a card payment channel in the bank's settlement report. Suggest the best Department Code and Account Code for each.
-
-Payment type naming conventions:
-- VSA = Visa, MCA = Mastercard, JCB = JCB, UP = UnionPay, AMEX = American Express
-- QR-VSA/QR-MCA/QR-JCB/QR-UPI = QR code payments, LCS = Local card scheme, TPN = Thai payment network
-- -P suffix = Premium/Priority card, -INT = International transaction, -DCC = Dynamic Currency Conversion, -AFF = Affiliate
-- These are all incoming payment amounts — mapped to a BalanceSheet (type=B) ASSET or RECEIVABLE account (เงินรับจากธนาคาร/ลูกหนี้ธนาคาร)
-
-Payment types to suggest:
+Payment types (all map to bank receivable/asset accounts):
 {types_list}
 
-Available Department Codes (choose from this list only):
-{dept_lines if dept_lines else "  (none available)"}
+VSA=Visa, MCA=Mastercard, QR-*=QR payments, -P=Premium, -INT=International, -DCC=DCC, -AFF=Affiliate
 
-Available Account Codes — BalanceSheet type=B only ({b_account_count} codes):
-{acc_lines if acc_lines else "  (none available)"}
+Departments:
+{dept_lines or "  (none)"}
 
-Return ONLY a valid JSON object — no markdown, no explanation:
-{{
-  "<payment_type>": {{"dept": "<dept_code or null>", "acc": "<acc_code or null>"}},
-  ...
-}}
+BalanceSheet accounts ({b_account_count}):
+{acc_lines or "  (none)"}
 
-Rules:
-- Only use codes that exist EXACTLY in the lists above.
-- Use null if no suitable code is found — never invent a code.
-- All payment types typically map to the same asset/receivable account since they are all bank settlement amounts.
-"""
+Rules: use codes exactly as listed; null if no match; all types typically share the same account.
+Keys must be: {keys}
+{{"{payment_types[0] if payment_types else ''}":{{"dept":null,"acc":null}},...}}"""
 
 
 def build_ap_expense_prompt(
@@ -98,37 +62,24 @@ def build_ap_expense_prompt(
     expense_acc_lines: str,
     expense_acc_count: int,
 ) -> str:
-    """Build the prompt for suggesting dept/acc for AP invoice expense line items."""
     items_block = "\n".join(
-        f'  {i["index"]}: category="{i["category"]}", description="{i["description"]}"'
+        f'  {i["index"]}: {i["category"]} — {i["description"]}'
         for i in items
     )
-    keys_list = ", ".join(f'"{i["index"]}"' for i in items)
-    return f"""You are an expert accounting assistant for a Thai company. Map each AP invoice expense line to the correct Department Code and Account Code.
+    keys = ", ".join(f'"{i["index"]}"' for i in items)
+    template = ", ".join(f'"{i["index"]}":{{"dept":null,"acc":null}}' for i in items)
+    return f"""Map AP invoice expense lines to Thai accounting codes. Return JSON only — no markdown.
 
-Line items to map (index: category, description):
+Items (index: category — description):
 {items_block}
 
-Available Department Codes (use ONLY codes from this list):
-{dept_lines if dept_lines else "  (none available)"}
+Departments:
+{dept_lines or "  (none)"}
 
-Available Expense Account Codes (type=E, {expense_acc_count} codes):
-{expense_acc_lines if expense_acc_lines else "  (none available)"}
+Expense accounts ({expense_acc_count}):
+{expense_acc_lines or "  (none)"}
 
-Instructions:
-- Use the category and description together to find the best matching expense account.
-- Common Thai expense categories: ค่าบริการ (service fee), ยานพาหนะ/น้ำมัน (vehicle/fuel), ไอที/ซอฟต์แวร์ (IT), อาหาร/วัตถุดิบ (food/raw material), ค่าเช่า (rent), สาธารณูปโภค (utilities), ค่าโฆษณา (advertising), ค่าซ่อมแซม (repair), ค่าจ้างแรงงาน (labor).
-- Pick the department that best fits the expense type (IT dept for software, admin for general services, etc.).
-- If no suitable expense account exists, return null for acc.
-- If no suitable department exists, return null for dept.
-
-Return ONLY a valid JSON object with string keys matching the item index — no markdown, no explanation:
-{{
-  {', '.join(f'"{i["index"]}": {{"dept": "<dept_code or null>", "acc": "<acc_code or null>"}}' for i in items)}
-}}
-
-Rules:
-- Only use codes that exist EXACTLY in the lists above.
-- Use null if no suitable code is found — never invent a code.
-- Keys must be: {keys_list}
-"""
+Match category+description to the best expense account and department.
+Rules: use codes exactly as listed; null if no match.
+Keys must be: {keys}
+{{{template}}}"""

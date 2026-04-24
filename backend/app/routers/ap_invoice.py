@@ -11,6 +11,7 @@ from app.config import settings
 from app.llm.client import get_client, call_text_llm
 from app.llm.prompts.ap_invoice import PROMPT as AP_INVOICE_PROMPT
 from app.llm.prompts.mapping import build_ap_expense_prompt
+from app.services.ap_invoice_postprocess import postprocess as postprocess_ap_invoice
 from app.services.carmen_service import get_account_codes, get_departments, CarmenAPIError
 from app.database import get_db
 from app.models.orm import OCRTask, TaskStatus
@@ -126,7 +127,7 @@ async def extract_ap_invoice(
         logger.error(f"JSON Decode Error. Raw text: {result_text}")
         raise HTTPException(status_code=500, detail="LLM returned invalid JSON")
 
-    return data
+    return postprocess_ap_invoice(data)
 
 
 class SuggestGLItem(BaseModel):
@@ -138,12 +139,55 @@ class SuggestGLRequest(BaseModel):
     items: List[SuggestGLItem]
 
 
+# Category → search keywords for pre-filtering expense accounts
+_CATEGORY_KW: dict[str, list[str]] = {
+    "ค่าบริการ":      ["บริการ", "service", "fee", "ค่าจ้าง"],
+    "ซอฟต์แวร์":     ["software", "ซอฟต์แวร์", "it", "ไอที", "license", "program"],
+    "อุปกรณ์ไอที":   ["it", "computer", "อุปกรณ์", "equipment", "ไอที"],
+    "วัสดุสำนักงาน": ["วัสดุ", "สำนักงาน", "office", "stationery"],
+    "ค่าโฆษณา":      ["โฆษณา", "advertis", "marketing", "promotion"],
+    "ค่าขนส่ง":      ["ขนส่ง", "transport", "delivery", "freight", "logistic"],
+    "ค่าเช่า":       ["เช่า", "rent", "lease"],
+    "วัตถุดิบ":      ["วัตถุดิบ", "raw material", "material"],
+    "บรรจุภัณฑ์":   ["บรรจุ", "packaging", "package"],
+    "ยา-เวชภัณฑ์":  ["ยา", "เวชภัณฑ์", "medical", "pharma"],
+    "เงินมัดจำ":     ["มัดจำ", "deposit", "advance"],
+}
+
+def _filter_expense_accounts(accounts: list[dict], items: list[dict], max_acc: int = 60) -> list[dict]:
+    """Return the most relevant expense accounts for the given items by
+    keyword-scoring against category + description. Falls back to the first
+    `max_acc` accounts when nothing matches."""
+    if not accounts:
+        return []
+    keywords: set[str] = set()
+    for item in items:
+        cat = (item.get("category") or "").lower()
+        desc = (item.get("description") or "").lower()
+        for cat_key, kws in _CATEGORY_KW.items():
+            if cat_key in cat or any(kw in cat for kw in kws):
+                keywords.update(kws)
+        keywords.update(w for w in desc.split() if len(w) >= 3)
+
+    if not keywords:
+        return accounts[:max_acc]
+
+    scored, unmatched = [], []
+    for acc in accounts:
+        name_lower = (acc.get("name") or "").lower()
+        score = sum(1 for kw in keywords if kw in name_lower)
+        (scored if score else unmatched).append((score, acc))
+
+    scored.sort(key=lambda x: -x[0])
+    result = [acc for _, acc in scored[:max_acc]]
+    if len(result) < max_acc:
+        result.extend(acc for _, acc in unmatched[:max_acc - len(result)])
+    return result
+
+
 @router.post("/suggest-gl")
 async def suggest_gl(body: SuggestGLRequest):
-    """
-    AI-suggest dept/acc for AP invoice expense line items using category + description.
-    Fetches Carmen account codes and departments, then calls the LLM.
-    """
+    """AI-suggest dept/acc for AP invoice expense items using category + description."""
     if not settings.openrouter_api_key:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY is not configured")
     if not body.items:
@@ -167,17 +211,19 @@ async def suggest_gl(body: SuggestGLRequest):
     ]
 
     expense_accounts = [a for a in accounts if a["type"] in ("e", "expense")] or accounts
+    items_payload = [{"index": i.index, "category": i.category, "description": i.description} for i in body.items]
 
-    dept_lines = "\n".join(f"  {d['code']} — {d['name']}" for d in departments[:100])
-    expense_acc_lines = "\n".join(f"  {a['code']} — {a['name']}" for a in expense_accounts[:500])
+    # Pre-filter to the most relevant accounts — avoids sending 500+ lines to LLM
+    filtered_accounts = _filter_expense_accounts(expense_accounts, items_payload)
 
-    items_payload = [{"index": item.index, "category": item.category, "description": item.description} for item in body.items]
+    dept_lines = "\n".join(f"  {d['code']} {d['name']}" for d in departments[:50])
+    expense_acc_lines = "\n".join(f"  {a['code']} {a['name']}" for a in filtered_accounts)
 
     prompt = build_ap_expense_prompt(
         items=items_payload,
         dept_lines=dept_lines,
         expense_acc_lines=expense_acc_lines,
-        expense_acc_count=len(expense_accounts),
+        expense_acc_count=len(filtered_accounts),
     )
 
     data = await call_text_llm(prompt, usage_type="AP_GL_SUGGESTION")

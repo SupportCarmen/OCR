@@ -36,6 +36,23 @@ def _filter_by_type(accounts: List[Dict], target_type: str) -> List[Dict]:
     return filtered if filtered else accounts
 
 
+def _filter_by_keywords(accounts: List[Dict], keywords: List[str], limit: int, fallback_limit: int = 30) -> List[Dict]:
+    """Score accounts by keyword hits in name, return top `limit` matches.
+    If fewer than fallback_limit match, pad with unmatched accounts up to limit."""
+    if not accounts:
+        return []
+    scored, unmatched = [], []
+    for acc in accounts:
+        name = (acc.get("name") or "").lower()
+        score = sum(1 for kw in keywords if kw in name)
+        (scored if score else unmatched).append((score, acc))
+    scored.sort(key=lambda x: -x[0])
+    result = [acc for _, acc in scored[:limit]]
+    if len(result) < fallback_limit:
+        result.extend(acc for _, acc in unmatched[:limit - len(result)])
+    return result
+
+
 def _validate_codes(
     data: dict,
     keys: List[str],
@@ -72,20 +89,33 @@ async def suggest_fixed_fields(
             return ToolResult(success=True, tool=TOOL_FIXED, input=tool_input,
                               output={"suggestions": {}, "source": "ai"})
 
-        acc_type_map    = {a["code"]: (a.get("type") or "").lower() for a in accounts}
-        commission_acc  = _filter_by_type(accounts, "income")
-        balance_acc     = _filter_by_type(accounts, "balancesheet")
+        acc_type_map   = {a["code"]: (a.get("type") or "").lower() for a in accounts}
+        commission_acc = _filter_by_type(accounts, "income")
+        balance_acc    = _filter_by_type(accounts, "balancesheet")
 
-        dept_lines           = "\n".join(f"  {d['code']} — {d['name']}" for d in departments[:100])
-        commission_acc_lines = "\n".join(f"  {a['code']} — {a['name']}" for a in commission_acc[:800])
-        balance_acc_lines    = "\n".join(f"  {a['code']} — {a['name']}" for a in balance_acc[:800])
+        # Pre-filter by domain keywords — reduces list from 800 → ~20 before sending to LLM
+        commission_filtered = _filter_by_keywords(
+            commission_acc,
+            ["commission", "credit card", "เครดิตการ์ด", "ค่าธรรมเนียม", "bank charge"],
+            limit=40,
+        )
+        balance_filtered = _filter_by_keywords(
+            balance_acc,
+            ["output tax", "ภาษีขาย", "undue", "รอตัด", "bank", "ธนาคาร", "c/a", "s/a",
+             "กระแสรายวัน", "ออมทรัพย์", "receivable", "ลูกหนี้"],
+            limit=50,
+        )
+
+        dept_lines           = "\n".join(f"  {d['code']} {d['name']}" for d in departments[:50])
+        commission_acc_lines = "\n".join(f"  {a['code']} {a['name']}" for a in commission_filtered)
+        balance_acc_lines    = "\n".join(f"  {a['code']} {a['name']}" for a in balance_filtered)
 
         prompt = build_fixed_fields_prompt(
             dept_lines=dept_lines,
             commission_acc_lines=commission_acc_lines,
             balance_acc_lines=balance_acc_lines,
-            commission_acc_count=len(commission_acc),
-            balance_acc_count=len(balance_acc),
+            commission_acc_count=len(commission_filtered),
+            balance_acc_count=len(balance_filtered),
         )
 
         data = await call_text_llm(prompt, usage_type="MAPPING_SUGGESTION")
@@ -135,15 +165,23 @@ async def suggest_payment_types(
         acc_type_map = {a["code"]: (a.get("type") or "").lower() for a in accounts}
         b_accounts   = _filter_by_type(accounts, "balancesheet")
 
-        dept_lines  = "\n".join(f"  {d['code']} — {d['name']}" for d in departments[:80])
-        acc_lines   = "\n".join(f"  {a['code']} — {a['name']}" for a in b_accounts[:200])
-        types_list  = "\n".join(f"  - {t}" for t in payment_types)
+        # Payment types are bank receivables — pre-filter to bank/receivable accounts
+        b_filtered = _filter_by_keywords(
+            b_accounts,
+            ["bank", "ธนาคาร", "receivable", "ลูกหนี้", "credit card", "เครดิตการ์ด",
+             "settlement", "c/a", "s/a", "กระแสรายวัน", "ออมทรัพย์"],
+            limit=40,
+        )
+
+        dept_lines = "\n".join(f"  {d['code']} {d['name']}" for d in departments[:50])
+        acc_lines  = "\n".join(f"  {a['code']} {a['name']}" for a in b_filtered)
+        types_list = "\n".join(f"  - {t}" for t in payment_types)
 
         prompt = build_payment_types_prompt(
             types_list=types_list,
             dept_lines=dept_lines,
             acc_lines=acc_lines,
-            b_account_count=len(b_accounts),
+            b_account_count=len(b_filtered),
             payment_types=payment_types,
         )
 

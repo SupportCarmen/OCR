@@ -74,7 +74,7 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
   return {
     VnCode: systemVendor.code || '',
     InvhDate: now,
-    InvhDesc: headerData.vendorName || '',
+    InvhDesc: headerData.invhDesc || headerData.vendorName || '',
     InvhSource: 'OAPI',
     InvhInvNo: headerData.documentNumber || '',
     InvhInvDate: invDate,
@@ -188,7 +188,7 @@ export function useAPInvoice() {
     const found = vendorDbByTax[raw]
     if (found && found.active !== false) {
       setSystemVendor(found)
-      setVendorSearch(`${found.code} — ${found.name}`)
+      setVendorSearch(`${found.code} — ${found.name} | TaxID : ${found.taxId || '—'} | Branch No. : ${String(found.branchNo ?? '—').padStart(5, '0')}`)
     } else if (raw.length >= 10) {
       setSystemVendor({ code: '', name: t.vendorNotFound })
       setVendorSearch('')

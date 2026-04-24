@@ -10,6 +10,7 @@ export default function APAccountMappingStep({
   t, lineItems, updateItem,
   systemVendor = {},
   headerData = {},
+  updateHeader,
   masterAccounts = [], masterDepts = [],
   onBack, onGenerate,
   onAISuggest, onAcceptAll, hasSuggestions = false, suggestLoading = false,
@@ -64,6 +65,29 @@ export default function APAccountMappingStep({
           <VendorInfoPill icon="fas fa-file-invoice" label="เลขที่เอกสาร" value={docNo} />
           <VendorInfoPill icon="fas fa-calendar-day" label="วันที่เอกสาร" value={docDate} last />
         </div>
+      </div>
+
+      {/* Invoice description */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <i className="fas fa-align-left" style={{ marginRight: '0.35rem' }} />
+          Invoice Description 
+        </label>
+        <input
+          type="text"
+          value={headerData.invhDesc || ''}
+          onChange={e => updateHeader('invhDesc', e.target.value)}
+          placeholder="คำอธิบายใบแจ้งหนี้..."
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '0.55rem 0.85rem', fontSize: '0.88rem',
+            border: '1.5px solid #c4b5fd', borderRadius: '8px',
+            background: '#faf5ff', color: '#1e1b4b',
+            outline: 'none',
+          }}
+          onFocus={e => { e.target.style.borderColor = '#7c3aed'; e.target.style.boxShadow = '0 0 0 3px #ede9fe' }}
+          onBlur={e => { e.target.style.borderColor = '#c4b5fd'; e.target.style.boxShadow = 'none' }}
+        />
       </div>
 
       {/* Fixed GL accounts */}

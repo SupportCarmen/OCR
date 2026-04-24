@@ -73,7 +73,7 @@ export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorS
                     style={isInactive ? { opacity: 0.45, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
                     onMouseDown={isInactive ? undefined : () => {
                       setSystemVendor(v)
-                      setVendorSearch(`${v.code} — ${v.name}`)
+                      setVendorSearch(`${v.code} — ${v.name} | TaxID : ${v.taxId || '—'} | Branch No. : ${String(v.branchNo ?? '—').padStart(5, '0')}`)
                       setShowVendorDrop(false)
                     }}
                   >
