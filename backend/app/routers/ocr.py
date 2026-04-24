@@ -115,7 +115,7 @@ async def extract_receipt(
         task = OCRTask(
             id=str(uuid.uuid4()),
             original_filename=upload_file.filename,
-            file_path="DEBUG_PATH_123",
+            file_path="STATELESS_EXTRACTION",
             status=TaskStatus.COMPLETED,
             ocr_engine=settings.ocr_engine,
         )
@@ -327,6 +327,8 @@ async def export_csv(db: AsyncSession = Depends(get_db)):
 
 @router.get("/debug-llm")
 async def debug_last_llm_response():
+    if not settings.app_debug:
+        raise HTTPException(status_code=403, detail="Debug mode is disabled")
     import pathlib, tempfile
     p = pathlib.Path(tempfile.gettempdir()) / "last_llm_response.txt"
     if not p.exists():
