@@ -1,7 +1,7 @@
 import { isNumFld, fmt } from '../../constants/apInvoice'
 
 export default function APFieldMappingStep({ t, lineItems, fieldMappings, availableFields, onMappingChange, onBack, onConfirm }) {
-  const COLS = [1,2,3,4,5,6,7,8,9,10,11]
+  const COLS = [2,3,4,5,6,7,8,9,10,11]
 
   return (
     <div className="data-card">
@@ -17,11 +17,11 @@ export default function APFieldMappingStep({ t, lineItems, fieldMappings, availa
           <table className="mapping-table">
             <thead>
               <tr>
-                {COLS.map(c => {
+                {COLS.map((c, index) => {
                   const val = fieldMappings[`col${c}`]
                   return (
                     <th key={c}>
-                      <div className="col-label">Column {c}</div>
+                      <div className="col-label">Column {index + 1}</div>
                       <select
                         value={val}
                         onChange={e => onMappingChange(c, e.target.value)}
@@ -51,7 +51,7 @@ export default function APFieldMappingStep({ t, lineItems, fieldMappings, availa
               ))}
               {lineItems.length > 3 && (
                 <tr>
-                  <td colSpan={11} style={{ textAlign: 'center', color: 'var(--text-4)', fontStyle: 'italic', fontSize: '0.8rem', padding: '0.75rem' }}>
+                  <td colSpan={10} style={{ textAlign: 'center', color: 'var(--text-4)', fontStyle: 'italic', fontSize: '0.8rem', padding: '0.75rem' }}>
                     … ดูเพิ่มอีก {lineItems.length - 3} รายการในขั้นตอนถัดไป
                   </td>
                 </tr>

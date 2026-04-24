@@ -134,8 +134,7 @@ export default function APAccountMappingStep({
           <table className="ap-acct-table">
             <thead>
               <tr>
-                <th style={{ width: '16%' }}>{t.category}</th>
-                <th style={{ width: '24%' }}>{t.description}</th>
+                <th style={{ width: '40%' }}>{t.description}</th>
                 <th style={{ width: '26%' }}>{t.deptCode}</th>
                 <th style={{ width: '26%' }}>{t.accountCode}</th>
                 {hasSuggestions && <th style={{ width: '8%' }}></th>}
@@ -155,8 +154,7 @@ export default function APAccountMappingStep({
                   : null
                 return (
                   <tr key={ri} style={hasSuggest ? { background: '#f5f3ff' } : hasError ? { background: '#fff1f2' } : undefined}>
-                    <td><span className="ap-acct-table cat-badge">{item.category || '—'}</span></td>
-                    <td style={{ fontSize: '0.83rem', color: 'var(--text-2)' }}>{item.description || '—'}</td>
+                    <td style={{ fontSize: '0.83rem', color: 'var(--text-2)', paddingLeft: '1rem' }}>{item.description || '—'}</td>
                     <td style={{ padding: '0.35rem 0.5rem' }}>
                       <div style={missingDept ? { borderRadius: '7px', outline: '2px solid #fca5a5' } : undefined}>
                         <CustomSearchSelect

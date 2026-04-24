@@ -246,7 +246,10 @@ export function useAPInvoice() {
   const isValid = validationErrors.length === 0
 
   const availableFields = getAvailableFields(t)
-  const activeCols = [1,2,3,4,5,6,7,8,9,10,11].filter(c => fieldMappings[`col${c}`] !== 'ignore')
+  const activeCols = [1,2,3,4,5,6,7,8,9,10,11].filter(c => {
+    const fld = fieldMappings[`col${c}`]
+    return fld !== 'ignore' && fld !== 'category'
+  })
 
   const adjustField = (tgt, sumCur, itemKey, adjustTotal = false, isDiscount = false) => {
     if (!lineItems.length) return
