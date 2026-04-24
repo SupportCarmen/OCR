@@ -15,6 +15,7 @@ export default function APAccountMappingStep({
   onBack, onGenerate,
   onAISuggest, onAcceptAll, hasSuggestions = false, suggestLoading = false,
   onConfirmSuggest, onRejectSuggest,
+  allMapped = false,
 }) {
   const taxProfile  = fmt(systemVendor.taxProfileCode1, systemVendor.taxProfileDesc1)
   const debitDept   = fmt(systemVendor.vat1DrDeptCode,  systemVendor.vat1DrDeptDesc)
@@ -143,6 +144,9 @@ export default function APAccountMappingStep({
             <tbody>
               {lineItems.map((item, ri) => {
                 const hasSuggest = !!(item._suggestDept || item._suggestAcc)
+                const missingDept = !item.deptCode
+                const missingAcc  = !item.accountCode
+                const hasError    = missingDept || missingAcc
                 const deptChoice = item._suggestDept
                   ? { code: item._suggestDept, name: masterDepts.find(d => d.code === item._suggestDept)?.name || '', source: 'ai' }
                   : null
@@ -150,26 +154,30 @@ export default function APAccountMappingStep({
                   ? { code: item._suggestAcc, name: masterAccounts.find(a => a.code === item._suggestAcc)?.name || '', source: 'ai' }
                   : null
                 return (
-                  <tr key={ri} style={hasSuggest ? { background: '#f5f3ff' } : undefined}>
+                  <tr key={ri} style={hasSuggest ? { background: '#f5f3ff' } : hasError ? { background: '#fff1f2' } : undefined}>
                     <td><span className="ap-acct-table cat-badge">{item.category || '—'}</span></td>
                     <td style={{ fontSize: '0.83rem', color: 'var(--text-2)' }}>{item.description || '—'}</td>
                     <td style={{ padding: '0.35rem 0.5rem' }}>
-                      <CustomSearchSelect
-                        value={item.deptCode || ''}
-                        options={masterDepts}
-                        placeholder={t.searchDept}
-                        topChoice={deptChoice}
-                        onChange={val => updateItem(ri, 'deptCode', val)}
-                      />
+                      <div style={missingDept ? { borderRadius: '7px', outline: '2px solid #fca5a5' } : undefined}>
+                        <CustomSearchSelect
+                          value={item.deptCode || ''}
+                          options={masterDepts}
+                          placeholder={t.searchDept}
+                          topChoice={deptChoice}
+                          onChange={val => updateItem(ri, 'deptCode', val)}
+                        />
+                      </div>
                     </td>
                     <td style={{ padding: '0.35rem 0.5rem' }}>
-                      <CustomSearchSelect
-                        value={item.accountCode || ''}
-                        options={masterAccounts}
-                        placeholder={t.searchAcc}
-                        topChoice={accChoice}
-                        onChange={val => updateItem(ri, 'accountCode', val)}
-                      />
+                      <div style={missingAcc ? { borderRadius: '7px', outline: '2px solid #fca5a5' } : undefined}>
+                        <CustomSearchSelect
+                          value={item.accountCode || ''}
+                          options={masterAccounts}
+                          placeholder={t.searchAcc}
+                          topChoice={accChoice}
+                          onChange={val => updateItem(ri, 'accountCode', val)}
+                        />
+                      </div>
                     </td>
                     {hasSuggestions && (
                       <td style={{ padding: '0.35rem 0.25rem', textAlign: 'center' }}>
@@ -205,9 +213,22 @@ export default function APAccountMappingStep({
         <button className="btn btn-outline" onClick={onBack}>
           <i className="fas fa-arrow-left" /> {t.backReview}
         </button>
-        <button className="btn btn-success" onClick={onGenerate}>
-          <i className="fas fa-floppy-disk" /> {t.generateInv}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+          {!allMapped && (
+            <span style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <i className="fas fa-triangle-exclamation" />
+              กรุณาเลือก Dept Code และ Account Code ให้ครบทุกรายการก่อนบันทึก
+            </span>
+          )}
+          <button
+            className="btn btn-success"
+            onClick={onGenerate}
+            disabled={!allMapped}
+            style={!allMapped ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
+          >
+            <i className="fas fa-floppy-disk" /> {t.generateInv}
+          </button>
+        </div>
       </div>
     </div>
   )

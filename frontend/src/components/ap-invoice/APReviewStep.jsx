@@ -27,6 +27,8 @@ export default function APReviewStep({ ctrl }) {
     adjustField, setStep, goToAccount,
   } = ctrl
 
+  const vendorMapped = !!systemVendor.code
+
   return (
     <>
       {/* Vendor Search — top */}
@@ -158,10 +160,23 @@ export default function APReviewStep({ ctrl }) {
         <button className="btn btn-outline" onClick={() => setStep(2)}>
           <i className="fas fa-arrow-left" /> {t.backMap}
         </button>
-        <button className={`btn ${isValid ? 'btn-primary' : 'btn-success'}`} onClick={goToAccount}>
-          {isValid ? 'ดำเนินการต่อ' : 'ดำเนินการต่อ (ข้ามคำเตือน)'}
-          <i className="fas fa-arrow-right" />
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+          {!vendorMapped && (
+            <span style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <i className="fas fa-triangle-exclamation" />
+              กรุณาเลือกผู้ขายจากระบบก่อนดำเนินการต่อ
+            </span>
+          )}
+          <button
+            className={`btn ${!vendorMapped ? 'btn-disabled' : isValid ? 'btn-primary' : 'btn-success'}`}
+            onClick={vendorMapped ? goToAccount : undefined}
+            disabled={!vendorMapped}
+            style={!vendorMapped ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
+          >
+            {isValid ? 'ดำเนินการต่อ' : 'ดำเนินการต่อ (ข้ามคำเตือน)'}
+            <i className="fas fa-arrow-right" />
+          </button>
+        </div>
       </div>
     </>
   )

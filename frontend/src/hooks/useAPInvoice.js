@@ -5,6 +5,7 @@ import {
 } from '../constants/apInvoice'
 import { parseNum } from '../constants/apInvoice'
 import { fetchAccountCodes, fetchDepartments, submitAPInvoiceToCarmen } from '../lib/api/carmen'
+import { useToast } from './useToast'
 
 function parseDateToISO(dateStr) {
   if (!dateStr) return new Date().toISOString()
@@ -30,18 +31,27 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
   const taxPeriod = parts.length === 3 ? `${parts[1]}/${parts[2]}` : ''
 
   const detail = lineItems.map(item => {
-    const netAmt = parseNum(item.lineSubTotal)
-    const taxAmt = parseNum(item.taxAmt)
-    const total  = parseNum(item.lineTotal)
+    const netAmt  = parseNum(item.lineSubTotal)
+    const taxAmt  = parseNum(item.taxAmt)
+    const total   = parseNum(item.lineTotal)
     const taxRate = parseNum(item.taxPct) || 7
+    const qty     = parseNum(item.qty) || 1
+
+    // Send net unit price (after discount) to Carmen — no separate discount field needed
+    const grossPrice = parseNum(item.unitPrice)
+    const discAmt    = parseNum(item.discountAmt)
+    const grossLine  = grossPrice * qty
+    const netPrice   = grossLine > 0
+      ? parseFloat(((grossLine - discAmt) / qty).toFixed(2))
+      : grossPrice
 
     return {
       InvhSeq: -1,
       InvdSeq: -1,
       InvdDesc: item.description || '',
-      InvdQty: parseNum(item.qty) || 1,
+      InvdQty: qty,
       UnitCode: 'UNIT',
-      InvdPrice: parseNum(item.unitPrice).toFixed(2),
+      InvdPrice: netPrice.toFixed(2),
       InvdTaxA1: taxAmt.toFixed(2),
       InvdTaxC1: taxAmt.toFixed(2),
       InvdTaxA2: '0.00',
@@ -98,6 +108,7 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
 export function useAPInvoice() {
   const [lang, setLang] = useState('th')
   const t = AP_I18N[lang]
+  const { toasts, showToast } = useToast()
 
   const [step, setStep] = useState(1)
   const [file, setFile] = useState(null)
@@ -156,8 +167,9 @@ export function useAPInvoice() {
         const db = {}
         list.forEach(v => { if (v.taxId) db[v.taxId] = v })
         setVendorDbByTax(db)
+        if (setRefreshing) showToast('รายชื่อผู้ขายอัปเดตแล้ว', 'success')
       })
-      .catch(() => {})
+      .catch(() => { if (setRefreshing) showToast('ไม่สามารถโหลดรายชื่อผู้ขายได้', 'error') })
       .finally(() => { if (setRefreshing) setVendorRefreshing(false) })
   }
 
@@ -303,12 +315,14 @@ export function useAPInvoice() {
             if (saved) setFieldMappings(JSON.parse(saved))
           }
           setStatus('อ่านข้อมูลสำเร็จ ✓')
+          showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
           setStep(2)
           return
         } catch (err) {
           retries--
           if (retries === 0) throw err
           setStatus('กำลังลองใหม่...')
+          showToast('กำลังลองใหม่...', 'info')
           await new Promise(r => setTimeout(r, delay))
           delay *= 2
         }
@@ -317,6 +331,7 @@ export function useAPInvoice() {
       console.error(err)
       setStatus(err.message)
       setError(t.errProcess)
+      showToast('ไม่สามารถอ่านข้อมูลได้ กรุณาลองใหม่', 'error')
     } finally {
       setLoading(false)
     }
@@ -335,10 +350,15 @@ export function useAPInvoice() {
     if (headerData.vendorTaxId) {
       localStorage.setItem(`ap_mapping_${headerData.vendorTaxId}`, JSON.stringify(fieldMappings))
     }
+    showToast('บันทึกการตั้งค่าคอลัมน์แล้ว', 'success')
     setStep(3)
   }
 
   const goToAccount = () => {
+    if (!systemVendor.code) {
+      showToast('กรุณาเลือกผู้ขายจากระบบ Carmen ERP ก่อนดำเนินการต่อ', 'warning')
+      return
+    }
     if (!isValid) {
       setModal({
         show: true, type: 'warning',
@@ -362,6 +382,7 @@ export function useAPInvoice() {
     if (!itemsToSuggest.length) return
 
     setSuggestLoading(true)
+    showToast('AI กำลังแนะนำรหัสบัญชี...', 'info')
     try {
       const res = await fetch('/api/v1/ap-invoice/suggest-gl', {
         method: 'POST',
@@ -371,11 +392,13 @@ export function useAPInvoice() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       const suggestions = data.suggestions || {}
+      let suggestedCount = 0
       setLineItems(prev => prev.map((item, idx) => {
         const s = suggestions[idx]
         if (!s) return item
         const newDept = !item.deptCode    && s.deptCode    ? s.deptCode    : null
         const newAcc  = !item.accountCode && s.accountCode ? s.accountCode : null
+        if (newDept || newAcc) suggestedCount++
         return {
           ...item,
           deptCode:     newDept ?? item.deptCode,
@@ -384,14 +407,22 @@ export function useAPInvoice() {
           _suggestAcc:  newAcc  || undefined,
         }
       }))
+      showToast(
+        suggestedCount > 0
+          ? `AI แนะนำรหัสบัญชีสำหรับ ${suggestedCount} รายการ — กรุณาตรวจสอบ`
+          : 'ไม่มีรายการที่ต้องการแนะนำเพิ่ม',
+        suggestedCount > 0 ? 'success' : 'info',
+      )
     } catch (err) {
       console.error('AI suggest error:', err)
+      showToast('ไม่สามารถแนะนำรหัสบัญชีได้ กรุณาลองใหม่', 'error')
     } finally {
       setSuggestLoading(false)
     }
   }
 
   const hasSuggestions = lineItems.some(i => i._suggestDept || i._suggestAcc)
+  const allMapped = lineItems.length > 0 && lineItems.every(i => i.deptCode && i.accountCode && !i._suggestDept && !i._suggestAcc)
 
   const handleAcceptAll = () => {
     setLineItems(prev => prev.map(item => ({
@@ -399,6 +430,7 @@ export function useAPInvoice() {
       _suggestDept: undefined,
       _suggestAcc:  undefined,
     })))
+    showToast('ยืนยันรหัสบัญชีทั้งหมดแล้ว', 'success')
   }
 
   const handleConfirmSuggest = (idx) => {
@@ -420,13 +452,20 @@ export function useAPInvoice() {
   }
 
   const handleGenerate = async () => {
+    const missing = lineItems.filter(i => !i.deptCode || !i.accountCode)
+    if (missing.length > 0) {
+      showToast(`กรุณาเลือก Dept Code และ Account Code ให้ครบทุกรายการ (ขาด ${missing.length} รายการ)`, 'warning')
+      return
+    }
     setLoading(true)
     setStatus('กำลังส่ง AP Invoice ไปยัง Carmen ERP...')
     setError(null)
+    showToast('กำลังส่ง AP Invoice ไปยัง Carmen ERP...', 'info')
     try {
       const payload = buildInvoicePayload(headerData, lineItems, systemVendor)
       const result = await submitAPInvoiceToCarmen(payload)
       if (result?.Code < 0) {
+        showToast('Carmen ERP ไม่ยอมรับข้อมูล กรุณาตรวจสอบ', 'warning')
         setModal({
           show: true, type: 'warning',
           title: 'ไม่สามารถสร้าง AP Invoice ได้',
@@ -437,9 +476,11 @@ export function useAPInvoice() {
         return
       }
       setInvoiceSeq(result?.InternalMessage ?? null)
+      showToast('สร้าง AP Invoice เข้า Carmen ERP สำเร็จ', 'success')
       setStep(5)
     } catch (err) {
       console.error('AP Invoice submit error:', err)
+      showToast(`ส่ง AP Invoice ล้มเหลว: ${err.message || 'เกิดข้อผิดพลาด'}`, 'error')
       setModal({
         show: true, type: 'warning',
         title: 'ส่ง AP Invoice ล้มเหลว',
@@ -463,6 +504,8 @@ export function useAPInvoice() {
   return {
     // i18n
     lang, setLang, t,
+    // Toast
+    toasts,
     // Wizard
     step, setStep,
     // File & preview
@@ -488,7 +531,7 @@ export function useAPInvoice() {
     updateHeader, blurHeader,
     updateItem, blurItem,
     confirmMapping, goToAccount,
-    handleAISuggest, handleAcceptAll, hasSuggestions,
+    handleAISuggest, handleAcceptAll, hasSuggestions, allMapped,
     handleConfirmSuggest, handleRejectSuggest, handleReset,
     handleGenerate,
     refreshVendors, vendorRefreshing,

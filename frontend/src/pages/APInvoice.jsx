@@ -18,16 +18,26 @@ export default function APInvoice() {
     lineItems, fieldMappings, setFieldMappings, headerData,
     availableFields, systemVendor, masterAccounts, masterDepts,
     handleFileChange, confirmMapping,
-    handleAISuggest, handleAcceptAll, hasSuggestions,
+    handleAISuggest, handleAcceptAll, hasSuggestions, allMapped,
     handleConfirmSuggest, handleRejectSuggest, handleReset,
     handleGenerate, invoiceSeq,
     updateItem, updateHeader, modal,
   } = ctrl
 
   const [showPreview, setShowPreview] = useState(false)
+  const [acceptAllModal, setAcceptAllModal] = useState(false)
+  const { toasts } = ctrl
 
   return (
     <>
+      <div className="toast-container" id="toastContainer">
+        {toasts.slice(-1).map(t => (
+          <div key={t.id} className={`toast ${t.type}`} style={{ opacity: 1, transform: 'none' }}>
+            {t.msg}
+          </div>
+        ))}
+      </div>
+
       <CustomModal
         show={modal.show}
         title={modal.title}
@@ -37,6 +47,17 @@ export default function APInvoice() {
         cancelText={modal.cancelText}
         onConfirm={modal.onConfirm}
         onCancel={modal.onCancel}
+      />
+
+      <CustomModal
+        show={acceptAllModal}
+        title="ยืนยัน Accept All"
+        message="AI อาจแนะนำรหัสบัญชีผิดพลาดได้ คุณได้ตรวจสอบรายการทั้งหมดแล้วใช่ไหม?"
+        type="warning"
+        confirmText="ยืนยัน ยอมรับทั้งหมด"
+        cancelText="ยกเลิก"
+        onConfirm={() => { setAcceptAllModal(false); handleAcceptAll() }}
+        onCancel={() => setAcceptAllModal(false)}
       />
 
       <LoadingOverlay show={loading} status={status} />
@@ -137,11 +158,12 @@ export default function APInvoice() {
             onBack={() => setStep(3)}
             onGenerate={handleGenerate}
             onAISuggest={handleAISuggest}
-            onAcceptAll={handleAcceptAll}
+            onAcceptAll={() => setAcceptAllModal(true)}
             hasSuggestions={hasSuggestions}
             onConfirmSuggest={handleConfirmSuggest}
             onRejectSuggest={handleRejectSuggest}
             suggestLoading={suggestLoading}
+            allMapped={allMapped}
           />
         )}
 

@@ -69,22 +69,40 @@ def _distribute_footer_discount(items: list[dict], doc_disc: float) -> None:
     items[-1]["discountAmt"] = _r2(_num(items[-1].get("discountAmt")) + (doc_disc - running))
 
 
-def _compute_line_totals(item: dict, tax_type: str) -> None:
-    """Fill lineSubTotal / taxAmt / lineTotal based on qty, unitPrice,
-    discountAmt, taxPct and the document tax type.
+def _compute_line_totals(item: dict, tax_type: str, has_footer_disc: bool = False) -> None:
+    """Fill lineSubTotal / taxAmt / lineTotal, then normalise unitPrice to the
+    net-per-unit price (after discount) so Carmen ERP always receives the
+    final net price without a separate discount field.
 
-    Uses lineAmt (the document's Amount column) as invoice_amt when available —
-    this avoids penny-rounding errors from qty×unitPrice vs the vendor's internal
-    calculation (e.g. 5 × 204.67 = 1,023.35 but document shows 1,023.36).
+    Amount-column (lineAmt) semantics depend on where the discount came from:
+    - has_footer_disc=True  → discount was distributed from doc footer;
+      lineAmt is GROSS (Amount column is before discount). Apply discount normally.
+    - has_footer_disc=False → discount is per-row in document (e.g. "Discount Per Unit");
+      lineAmt is NET (Amount column already shows post-discount value). Don't double-deduct.
+    - No lineAmt → fall back to qty × unitPrice.
     """
     qty = _num(item.get("qty")) or 1.0
     price = _num(item.get("unitPrice"))
     disc = _num(item.get("discountAmt"))
+    disc_pct = _num(item.get("discountPct"))
     tax_pct = _num(item.get("taxPct")) or 7.0
     line_amt_doc = _num(item.get("lineAmt"))
-    # Prefer the document's stated Amount column; fall back to qty×unitPrice
-    invoice_amt = _r2(line_amt_doc) if line_amt_doc else _r2(qty * price)
-    after_disc = _r2(invoice_amt - disc)
+
+    if line_amt_doc and disc > 0 and not has_footer_disc:
+        # Amount column = NET (per-row discount in document) — don't deduct again
+        after_disc = _r2(line_amt_doc)
+        invoice_amt = _r2(after_disc + disc)   # reconstruct gross for discountPct calc
+    elif line_amt_doc:
+        # Amount column = GROSS (footer discount or no discount)
+        invoice_amt = _r2(line_amt_doc)
+        after_disc = _r2(invoice_amt - disc)
+    else:
+        invoice_amt = _r2(qty * price)
+        after_disc = _r2(invoice_amt - disc)
+
+    # Compute discountPct for display if not already extracted from document
+    if disc_pct == 0 and disc > 0 and invoice_amt > 0:
+        disc_pct = _r2(disc / invoice_amt * 100)
 
     if tax_type == "Include":
         line_sub = _r2(after_disc * 100 / (100 + tax_pct))
@@ -96,9 +114,9 @@ def _compute_line_totals(item: dict, tax_type: str) -> None:
         line_total = _r2(line_sub + tax_amt)
 
     item["qty"] = qty
-    item["unitPrice"] = price
-    item["discountAmt"] = disc
-    item["discountPct"] = _num(item.get("discountPct"))
+    item["unitPrice"] = price            # original price from document (display as-is)
+    item["discountPct"] = disc_pct       # % shown in column (for display)
+    item["discountAmt"] = disc           # original discount amount (for display)
     item["taxPct"] = tax_pct
     item["taxType"] = tax_type
     item["lineSubTotal"] = line_sub
@@ -163,10 +181,11 @@ def postprocess(raw: dict) -> dict:
 
     items = [dict(i) for i in items_raw if i is not None]
 
+    has_footer_disc = doc_disc > 0
     _distribute_footer_discount(items, doc_disc)
     tax_type = _detect_tax_type(items, deposit_pct, doc_sub, doc_grand)
     for item in items:
-        _compute_line_totals(item, tax_type)
+        _compute_line_totals(item, tax_type, has_footer_disc=has_footer_disc)
 
     deposit_row = _build_deposit_row(items, deposit_pct, deposit_label, tax_type)
     if deposit_row is not None:
