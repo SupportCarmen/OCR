@@ -171,7 +171,12 @@ async def suggest_gl_for_items(items_payload: List[Dict[str, Any]], accounts_raw
         mapping = data.get(key) or data.get(item["index"]) or {}
         
         raw_dept = mapping.get("dept")
+        if raw_dept is None:
+            raw_dept = mapping.get("deptCode")
+            
         raw_acc = mapping.get("acc")
+        if raw_acc is None:
+            raw_acc = mapping.get("accountCode")
         
         dept_str = str(raw_dept).strip() if raw_dept is not None else None
         acc_str = str(raw_acc).strip() if raw_acc is not None else None
