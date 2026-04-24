@@ -69,6 +69,16 @@ async def migrate_db():
             await conn.execute(text("ALTER TABLE llm_usage_logs ADD COLUMN usage_type VARCHAR(50) NULL AFTER task_id"))
         except Exception:
             pass
+
+        # Add token_hash and bu_name to llm_usage_logs (safe, idempotent)
+        try:
+            await conn.execute(text("ALTER TABLE llm_usage_logs ADD COLUMN token_hash VARCHAR(64) NULL"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text("ALTER TABLE llm_usage_logs ADD COLUMN bu_name VARCHAR(100) NULL"))
+        except Exception:
+            pass
                 
         # Drop old unique constraint on mapping_history and add new one
         try:

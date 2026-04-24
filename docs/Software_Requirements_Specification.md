@@ -22,6 +22,7 @@
 | 1.9 | 16 Apr 2026 | Intern Team | Major architecture restructure: LLM layer (app/llm/), Tool layer (app/tools/ + ToolResult + registry), Carmen router split, generic tools endpoint (/api/v1/tools/), frontend domain API split (lib/api/*), custom hooks (useToast, useModal) |
 | 2.0 | 17 Apr 2026 | Intern Team | Correction Learning System: feedback router (/api/v1/feedback/correction), correction_feedback table, correction_service (ratio-based hints), prompt injection at extract time, diffCorrections/logCorrections on frontend |
 | 2.1 | 20 Apr 2026 | Intern Team | Architecture refactor: backend models/ package split (enums/orm/schemas), useOcrWizard hook extracted from App.jsx, barrel files (index.js) per component domain, Home hub page; UI/UX redesign with IBM Plex Sans + indigo design system |
+| 2.2 | 24 Apr 2026 | Intern Team | LLM usage tracking: add `token_hash` (SHA-256) and `bu_name` columns to `llm_usage_logs`; update `mapping_history` unique constraint to include dept_code + acc_code; `usage_service.log_llm_usage()` accepts `admin_token` + `bu_name` |
 
 ---
 
@@ -818,7 +819,7 @@ sequenceDiagram
 
 ## 6. โครงสร้างฐานข้อมูล (Database Schema)
 
-ระบบใช้ **MySQL/MariaDB** ผ่าน `aiomysql` (async) โดยมี 5 ตาราง:
+ระบบใช้ **MySQL/MariaDB** ผ่าน `aiomysql` (async) โดยมี 6 ตาราง:
 
 ### 6.1 Table: `ocr_tasks`
 
@@ -895,8 +896,9 @@ sequenceDiagram
 | `dept_code` | VARCHAR(50) | | YES | | รหัสแผนก (Department Code) |
 | `acc_code` | VARCHAR(50) | | YES | | รหัสบัญชี (Account Code) |
 | `confirmed_count` | INT | | NO | 1 | จำนวนครั้งที่ยืนยัน (เพิ่มครั้งละ 1 เมื่อ save) |
-| `created_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาสร้าง |
 | `updated_at` | TIMESTAMP | | NO | CURRENT_TIMESTAMP | เวลาแก้ไขล่าสุด |
+
+**Unique Constraint**: `(bank_name, field_type, dept_code, acc_code)` — 1 bank + 1 field + 1 dept + 1 acc = 1 record (รองรับหลาย choice ต่อ field_type)
 
 ---
 
@@ -921,6 +923,36 @@ sequenceDiagram
 - นับ `submitted receipts` ของธนาคารนั้นใน 90 วัน → denominator
 - นับ `corrections per field` ใน 90 วัน → numerator
 - `error_rate = corrections / receipts` → hint ถ้า > 10% และมี receipts >= 10 ใบ
+
+---
+
+### 6.6 Table: `llm_usage_logs`
+
+**ความหมาย**: บันทึก token usage ของทุก LLM call สำหรับติดตามค่าใช้จ่ายและการใช้งานแยกตาม admin token และ Business Unit
+
+| Column | Type | Key | Null | Default | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `id` | INT UNSIGNED | PK | NO | AUTO_INCREMENT | Log ID |
+| `task_id` | VARCHAR(36) | FK | YES | NULL | Reference ไปยัง ocr_tasks (NULL สำหรับ mapping/AP calls) |
+| `usage_type` | VARCHAR(50) | | YES | NULL | ประเภทการเรียก: `BANK_OCR`, `AP_INVOICE`, `MAPPING_SUGGESTION` |
+| `model` | VARCHAR(100) | | NO | | OpenRouter model ID |
+| `prompt_tokens` | INT | | NO | 0 | จำนวน prompt tokens |
+| `completion_tokens` | INT | | NO | 0 | จำนวน completion tokens |
+| `total_tokens` | INT | | NO | 0 | รวม tokens |
+| `token_hash` | VARCHAR(64) | IDX | YES | NULL | SHA-256 ของ adminToken — ใช้ติดตาม usage ต่อ token โดยไม่เก็บ credential ดิบ |
+| `bu_name` | VARCHAR(100) | IDX | YES | NULL | Business Unit name |
+| `created_at` | DATETIME | IDX | NO | CURRENT_TIMESTAMP | เวลาที่บันทึก |
+
+**หมายเหตุ**: `token_hash` คำนวณโดย `usage_service._hash_token(admin_token)` — caller ส่ง raw token มา, service hash ก่อนบันทึก
+
+**Query รายงาน usage ต่อ token/BU**:
+
+```sql
+SELECT token_hash, bu_name, COUNT(*) AS calls, SUM(total_tokens) AS total_tokens
+FROM llm_usage_logs
+GROUP BY token_hash, bu_name
+ORDER BY total_tokens DESC;
+```
 
 ---
 
@@ -1042,7 +1074,7 @@ CARMEN_BASE_URL=https://carmen.example.com
 | :--- | :--- |
 | `app/models/__init__.py` | Re-exports ทุก symbol เพื่อ backward compatibility (`from app.models import X` ยังใช้ได้) |
 | `app/models/enums.py` | `TaskStatus`, `BankType` enums |
-| `app/models/orm.py` | SQLAlchemy ORM classes: `OCRTask`, `Receipt`, `ReceiptDetail`, `MappingHistory`, `CorrectionFeedback` |
+| `app/models/orm.py` | SQLAlchemy ORM classes: `OCRTask`, `Receipt`, `ReceiptDetail`, `MappingHistory`, `CorrectionFeedback`, `LLMUsageLog` |
 | `app/models/schemas.py` | Pydantic schemas: `ExtractedReceiptData`, `OCRTaskResponse`, `ReceiptSchema`, ฯลฯ |
 
 ### 10.2 Key Frontend Files

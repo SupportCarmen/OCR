@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS ocr_tasks (
     status          ENUM('pending','processing','completed','failed')
                                     NOT NULL DEFAULT 'pending',
     ocr_engine      VARCHAR(100)    NULL,
-    raw_text        LONGTEXT        NULL,
     error_message   TEXT            NULL,
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at    DATETIME        NULL,
@@ -112,8 +111,35 @@ CREATE TABLE IF NOT EXISTS mapping_history (
     updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (id),
-    UNIQUE KEY uq_mapping_bank_field (bank_name, field_type),
+    UNIQUE KEY uq_mapping_bank_field_choice (bank_name, field_type, dept_code, acc_code),
     INDEX idx_mapping_history_bank (bank_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- llm_usage_logs — token usage per LLM call
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS llm_usage_logs (
+    id                  INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    task_id             VARCHAR(36)     NULL                    COMMENT 'FK to ocr_tasks (nullable for mapping/AP calls)',
+    usage_type          VARCHAR(50)     NULL                    COMMENT 'BANK_OCR | AP_INVOICE | MAPPING_SUGGESTION',
+    model               VARCHAR(100)    NOT NULL                COMMENT 'OpenRouter model ID',
+    prompt_tokens       INT             NOT NULL DEFAULT 0,
+    completion_tokens   INT             NOT NULL DEFAULT 0,
+    total_tokens        INT             NOT NULL DEFAULT 0,
+    token_hash          VARCHAR(64)     NULL                    COMMENT 'SHA-256 of adminToken — for per-token usage tracking',
+    bu_name             VARCHAR(100)    NULL                    COMMENT 'Business Unit name',
+    created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    CONSTRAINT fk_llm_usage_logs_task
+        FOREIGN KEY (task_id) REFERENCES ocr_tasks(id)
+        ON DELETE SET NULL,
+    INDEX idx_llm_usage_task_id (task_id),
+    INDEX idx_llm_usage_token_hash (token_hash),
+    INDEX idx_llm_usage_bu_name (bu_name),
+    INDEX idx_llm_usage_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

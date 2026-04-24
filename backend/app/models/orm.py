@@ -18,7 +18,6 @@ class OCRTask(Base):
     file_path = Column(String(512), nullable=True, default="N/A")
     status = Column(SAEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj]), default=TaskStatus.PENDING, nullable=False)
     ocr_engine = Column(String(100), nullable=True)
-    raw_text = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
@@ -119,6 +118,8 @@ class LLMUsageLog(Base):
     prompt_tokens = Column(Integer, default=0)
     completion_tokens = Column(Integer, default=0)
     total_tokens = Column(Integer, default=0)
+    token_hash = Column(String(64), nullable=True, index=True)  # SHA-256 of adminToken
+    bu_name = Column(String(100), nullable=True, index=True)    # Business Unit name
     created_at = Column(DateTime, server_default=func.now())
 
     task = relationship("OCRTask")

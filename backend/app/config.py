@@ -24,8 +24,9 @@ class Settings(BaseSettings):
     # Application
     app_host: str = "0.0.0.0"
     app_port: int = 8010
-    app_debug: bool = True
-    allowed_origins: str = "*"
+    app_debug: bool = False
+    allowed_origin_regex: str = r"https://[a-zA-Z0-9\-]+\.carmen4\.com"
+    allowed_origins: str = "http://localhost:3010"
 
     # Upload / Export
     max_file_size_mb: int = 20
