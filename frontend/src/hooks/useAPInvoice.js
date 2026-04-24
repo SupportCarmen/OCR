@@ -175,8 +175,6 @@ export function useAPInvoice() {
 
   const refreshVendors = () => loadVendors(true)
 
-  useEffect(() => { loadVendors() }, [])
-
   useEffect(() => {
     if (step !== 4 || glLoaded) return
     setGlLoaded(true)
@@ -317,6 +315,7 @@ export function useAPInvoice() {
           setStatus('อ่านข้อมูลสำเร็จ ✓')
           showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
           setStep(2)
+          loadVendors() // Load vendors after successful OCR extraction
           return
         } catch (err) {
           retries--

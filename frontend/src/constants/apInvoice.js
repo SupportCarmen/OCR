@@ -6,13 +6,6 @@ export const AP_STEPS = [
   { n: 5, label: 'สำเร็จ',  sub: 'Result' },
 ]
 
-export const MOCK_VENDOR_DB = {
-  '0105555059298': { code: 'V-10023', name: 'บริษัท บี 47 เซอร์วิส จำกัด สำนักงานใหญ่' },
-  '0105562202751': { code: 'V-10045', name: 'บริษัท คาร์เมน ซอฟต์แวร์ จำกัด' },
-  '0105545000000': { code: 'V-10088', name: 'บริษัท ตัวอย่าง ซัพพลายเออร์ จำกัด' },
-}
-
-export const VENDOR_LIST = Object.entries(MOCK_VENDOR_DB).map(([taxId, d]) => ({ taxId, ...d }))
 
 export const EMPTY_HEADER = {
   vendorName: '', vendorTaxId: '', vendorBranch: '',
