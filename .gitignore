@@ -17,6 +17,7 @@ backend/uploads/
 backend/exports/
 backend/json_test/
 backend/example_field/
+backend/logs/
 
 # Google Cloud credentials
 credentials/
@@ -33,6 +34,7 @@ Bank Tax Automation - Sheet1.csv
 
 # Node
 node_modules/
+frontend/dist/
 
 # Python virtual environment
 venv/

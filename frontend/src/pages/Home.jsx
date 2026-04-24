@@ -59,7 +59,7 @@ export default function Home() {
         </p>
         <div className="home-version">
           <span className="dot" />
-          System Online — v1.0.0
+          System Online — Beta v1.0.0
         </div>
       </div>
 
