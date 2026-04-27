@@ -24,12 +24,22 @@ if sys.platform == "win32":
                 io.TextIOWrapper(_stream.buffer, encoding="utf-8", errors="replace", line_buffering=True),
             )
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import init_db, migrate_db
+from app.exceptions import (
+    CarmenServiceError,
+    DuplicateDocumentError,
+    ExtractionError,
+    LLMParseError,
+    LLMServiceError,
+    ValidationError,
+)
+from app.routers.auth import router as auth_router
+from app.middleware.performance import PerformanceMiddleware
 from app.routers.ocr import router as ocr_router
 from app.routers.mapping import router as mapping_router
 from app.routers.carmen import router as carmen_router
@@ -85,6 +95,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ── Performance Middleware ──
+app.add_middleware(PerformanceMiddleware)
+
 # ── CORS Middleware ──
 origins = [origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()]
 
@@ -98,20 +111,40 @@ app.add_middleware(
 )
 
 # ── Global error handler ──
+_EXCEPTION_STATUS: list[tuple] = [
+    (HTTPException,          None),              # passthrough — use exc.status_code
+    (DuplicateDocumentError, 409),
+    (ValidationError,        400),
+    (LLMParseError,          422),
+    (ExtractionError,        422),
+    (LLMServiceError,        503),
+    (CarmenServiceError,     503),
+]
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     tb = traceback.format_exc()
     try:
         logger.error("Unhandled exception: %s %s\n%s", request.method, request.url, tb)
     except Exception:
-        pass  # avoid recursive encoding errors in the handler
-    content = {"detail": str(exc)}
+        pass
+
+    for exc_type, status in _EXCEPTION_STATUS:
+        if isinstance(exc, exc_type):
+            code = exc.status_code if status is None else status
+            content = {"detail": str(exc)}
+            if settings.app_debug:
+                content["traceback"] = tb
+            return JSONResponse(status_code=code, content=content)
+
+    content = {"detail": "Internal server error"}
     if settings.app_debug:
         content["traceback"] = tb
     return JSONResponse(status_code=500, content=content)
 
 
 # ── Register Routers ──
+app.include_router(auth_router)
 app.include_router(ocr_router)
 app.include_router(mapping_router)
 app.include_router(carmen_router)
@@ -120,12 +153,23 @@ app.include_router(feedback_router)
 app.include_router(ap_invoice_router)
 
 
-# Root endpoint ──
+# ── Root ──
 @app.get("/", tags=["Root"])
 async def root():
     return {
         "app": "AI OCR Bank Receipt Backend",
-        "version": "1.0.0",
+        "version": settings.app_version,
         "docs": "/docs",
         "health": "/api/v1/ocr/health",
+    }
+
+
+# ── Version ──
+@app.get("/api/version", tags=["Root"])
+async def version():
+    """Returns app version and registered prompt versions for audit/traceability."""
+    from app.llm.prompts import _PROMPT_VERSIONS
+    return {
+        "app_version": settings.app_version,
+        "prompt_versions": _PROMPT_VERSIONS,
     }

@@ -1,16 +1,17 @@
 """
 Carmen API Service — all HTTP calls to the Carmen ERP API.
 
-Centralizes base URL, auth headers, and error handling for Carmen requests.
-The router (`routers/carmen.py`) calls these functions; it does not build HTTP requests itself.
+Every public function accepts `carmen_token: str` so the caller's session token
+is used per-request instead of a shared env-var credential.
+
+Outbound calls are logged via httpx event hooks to prove data only reaches Carmen.
 """
 
 import logging
+import time
 from typing import Any, Dict
 
 import httpx
-
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,9 @@ _BASE_URL = "https://dev.carmen4.com/Carmen.API/api/interface"
 _TIMEOUT  = 30.0
 
 
-def _headers() -> Dict[str, str]:
+def _headers(carmen_token: str) -> Dict[str, str]:
     return {
-        "Authorization": settings.carmen_authorization,
+        "Authorization": carmen_token,
         "User-Agent": "FastAPI-Proxy",
     }
 
@@ -32,52 +33,75 @@ class CarmenAPIError(Exception):
         super().__init__(detail)
 
 
-async def get_account_codes() -> Any:
-    """Fetch account codes from Carmen API."""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(f"{_BASE_URL}/accountCode", headers=_headers())
+# ── httpx event hooks for outbound logging ────────────────────────────────────
+
+async def _on_request(request: httpx.Request) -> None:
+    """Record request start time on the request's extensions dict."""
+    request.extensions["_start"] = time.perf_counter()
+
+
+async def _on_response(response: httpx.Response) -> None:
+    """Fire-and-forget log entry after Carmen responds."""
+    from app.services.outbound_log_service import log_outbound
+    start = response.request.extensions.get("_start", time.perf_counter())
+    duration_ms = (time.perf_counter() - start) * 1000
+    await log_outbound(
+        service="carmen",
+        url=str(response.request.url),
+        method=response.request.method,
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+        request_size_bytes=int(response.request.headers.get("content-length", 0) or 0),
+    )
+
+
+def _client(carmen_token: str) -> httpx.AsyncClient:
+    """Return an AsyncClient with auth headers + outbound logging hooks."""
+    return httpx.AsyncClient(
+        timeout=_TIMEOUT,
+        headers=_headers(carmen_token),
+        event_hooks={"request": [_on_request], "response": [_on_response]},
+    )
+
+
+# ── Service functions ─────────────────────────────────────────────────────────
+
+async def get_account_codes(carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.get(f"{_BASE_URL}/accountCode")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
 
 
-async def get_departments() -> Any:
-    """Fetch departments from Carmen API."""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(f"{_BASE_URL}/department", headers=_headers())
+async def get_departments(carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.get(f"{_BASE_URL}/department")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
 
 
-async def get_gl_prefix() -> Any:
-    """Fetch GL prefixes from Carmen API. Returns empty list if unconfigured."""
-    if not settings.carmen_authorization:
-        return {"Data": [], "Status": "not_configured"}
-
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(f"{_BASE_URL}/glPrefix", headers=_headers())
+async def get_gl_prefix(carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.get(f"{_BASE_URL}/glPrefix")
         if resp.status_code != 200:
             return {"Data": [], "Status": f"upstream_{resp.status_code}"}
         return resp.json()
 
 
-async def post_gljv(body: dict) -> Any:
-    """Submit a GL Journal Voucher to Carmen API."""
-    hdrs = {**_headers(), "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.post(f"{_BASE_URL}/gljv", json=body, headers=hdrs)
+async def post_gljv(body: dict, carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.post(f"{_BASE_URL}/gljv", json=body)
         try:
             return resp.json()
         except Exception:
             raise CarmenAPIError(resp.status_code, resp.text)
 
 
-async def put_gljv(jvh_seq: int, body: dict) -> Any:
-    """Update an existing GL Journal Voucher in Carmen API."""
-    hdrs = {**_headers(), "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.put(f"{_BASE_URL}/gljv/{jvh_seq}", json=body, headers=hdrs)
+async def put_gljv(jvh_seq: int, body: dict, carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.put(f"{_BASE_URL}/gljv/{jvh_seq}", json=body)
         try:
             return resp.json()
         except Exception:
@@ -92,10 +116,9 @@ _VENDOR_FIELDS = frozenset({
 })
 
 
-async def get_vendors() -> Any:
-    """Fetch vendor list from Carmen API, returning only the required fields per vendor."""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(f"{_BASE_URL}/vendor", headers=_headers())
+async def get_vendors(carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.get(f"{_BASE_URL}/vendor")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         data = resp.json()
@@ -107,51 +130,43 @@ async def get_vendors() -> Any:
         return data
 
 
-async def get_tax_profiles() -> Any:
-    """Fetch tax profile list from Carmen API."""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(f"{_BASE_URL}/taxProfile", headers=_headers())
+async def get_tax_profiles(carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.get(f"{_BASE_URL}/taxProfile")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
 
 
-async def get_period_list() -> Any:
-    """Fetch AP period list from Carmen API."""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(f"{_BASE_URL}/getPeriodList", headers=_headers())
+async def get_period_list(carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.get(f"{_BASE_URL}/getPeriodList")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
 
 
-async def post_input_tax(body: dict) -> Any:
-    """Create an Input Tax record in Carmen API."""
-    hdrs = {**_headers(), "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.post(f"{_BASE_URL}/inputTaxRec", json=body, headers=hdrs)
+async def post_input_tax(body: dict, carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.post(f"{_BASE_URL}/inputTaxRec", json=body)
         try:
             return resp.json()
         except Exception:
             raise CarmenAPIError(resp.status_code, resp.text)
 
 
-async def put_input_tax(rec_seq: int, body: dict) -> Any:
-    """Update an existing Input Tax record in Carmen API."""
-    hdrs = {**_headers(), "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.put(f"{_BASE_URL}/inputTaxRec/{rec_seq}", json=body, headers=hdrs)
+async def put_input_tax(rec_seq: int, body: dict, carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.put(f"{_BASE_URL}/inputTaxRec/{rec_seq}", json=body)
         try:
             return resp.json()
         except Exception:
             raise CarmenAPIError(resp.status_code, resp.text)
 
 
-async def post_invoice(body: dict) -> Any:
-    """Submit an AP Invoice to Carmen API."""
-    hdrs = {**_headers(), "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.post(f"{_BASE_URL}/invoice", json=body, headers=hdrs)
+async def post_invoice(body: dict, carmen_token: str) -> Any:
+    async with _client(carmen_token) as client:
+        resp = await client.post(f"{_BASE_URL}/invoice", json=body)
         try:
             return resp.json()
         except Exception:

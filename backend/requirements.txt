@@ -20,3 +20,7 @@ pydantic-settings==2.7.1
 # Utilities
 python-dateutil==2.9.0
 httpx==0.28.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+cryptography==42.0.8

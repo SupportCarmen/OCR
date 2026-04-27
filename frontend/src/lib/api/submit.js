@@ -2,13 +2,10 @@
  * Submit API — save confirmed receipt data to the local database.
  */
 
-/**
- * Submit the processed document payload to the local backend DB.
- * @param {{ BankType: string, OriginalFilename: string, Header: object, Details: object[] }} payload
- * @returns {Promise<object>} response from backend
- */
+import { apiFetch } from './client'
+
 export async function submitToLocal(payload) {
-  const res = await fetch('/api/v1/ocr/submit', {
+  const res = await apiFetch('/api/v1/ocr/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import MappingHistory
 from app.tools import map_gl
+from app.auth import get_current_session, SessionInfo
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,10 @@ class SaveHistoryRequest(BaseModel):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/suggest")
-async def suggest_mapping(req: SuggestRequest):
+async def suggest_mapping(
+    req: SuggestRequest,
+    _session: SessionInfo = Depends(get_current_session),
+):
     """Suggest dept/acc codes for Commission, Tax Amount, Net Amount via LLM."""
     result = await map_gl.suggest_fixed_fields(
         accounts=[a.model_dump() for a in req.accounts],
@@ -63,7 +67,10 @@ async def suggest_mapping(req: SuggestRequest):
 
 
 @router.post("/suggest-payment-types")
-async def suggest_payment_types(req: SuggestPaymentTypesRequest):
+async def suggest_payment_types(
+    req: SuggestPaymentTypesRequest,
+    _session: SessionInfo = Depends(get_current_session),
+):
     """Suggest dept/acc codes for dynamic payment types (Visa, MCA, QR, …) via LLM."""
     result = await map_gl.suggest_payment_types(
         payment_types=req.payment_types,
@@ -74,7 +81,11 @@ async def suggest_payment_types(req: SuggestPaymentTypesRequest):
 
 
 @router.get("/history")
-async def get_mapping_history(bank_name: str, db: AsyncSession = Depends(get_db)):
+async def get_mapping_history(
+    bank_name: str,
+    db: AsyncSession = Depends(get_db),
+    _session: SessionInfo = Depends(get_current_session),
+):
     """Return all saved mapping history rows for a given bank."""
     result = await db.execute(
         select(MappingHistory)
@@ -95,12 +106,16 @@ async def get_mapping_history(bank_name: str, db: AsyncSession = Depends(get_db)
 
 
 @router.post("/history/save")
-async def save_mapping_history(req: SaveHistoryRequest, db: AsyncSession = Depends(get_db)):
+async def save_mapping_history(
+    req: SaveHistoryRequest,
+    db: AsyncSession = Depends(get_db),
+    _session: SessionInfo = Depends(get_current_session),
+):
     """Upsert confirmed mappings into history (INSERT or UPDATE confirmed_count)."""
     saved = 0
     for field_type, mapping in req.mappings.items():
         if not mapping.dept and not mapping.acc:
-            continue  # skip empty rows
+            continue
 
         result = await db.execute(
             select(MappingHistory).where(

@@ -37,7 +37,16 @@ class Settings(BaseSettings):
     database_url: str = "mysql+aiomysql://root:123456@localhost:3306/ocr_db"
     
     # Carmen API
-    carmen_authorization: str = ""
+    carmen_authorization: str = ""  # deprecated — kept for fallback only; prefer session token
+
+    # Application version — bump on every release
+    app_version: str = "1.0.0"
+
+    # Auth — JWT + session encryption
+    # Generate session_encryption_key: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    ocr_jwt_secret: str = "dev-ocr-jwt-secret-change-in-production"
+    session_encryption_key: str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="  # dev default — MUST override in prod
+    session_ttl_hours: int = 8
 
     class Config:
         env_file = Path(__file__).parent.parent / ".env"

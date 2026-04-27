@@ -5,6 +5,7 @@ import {
 } from '../constants/apInvoice'
 import { parseNum } from '../constants/apInvoice'
 import { fetchAccountCodes, fetchDepartments, submitAPInvoiceToCarmen } from '../lib/api/carmen'
+import { apiFetch } from '../lib/api/client'
 import { useToast } from './useToast'
 
 function parseDateToISO(dateStr) {
@@ -140,7 +141,7 @@ export function useAPInvoice() {
 
   const loadVendors = async (setRefreshing = false) => {
     if (setRefreshing) setVendorRefreshing(true)
-    return fetch('/api/v1/ocr/carmen/vendors')
+    return apiFetch('/api/v1/ocr/carmen/vendors')
       .then(r => r.json())
       .then(data => {
         const list = (data.Data || []).map(v => ({
@@ -284,7 +285,7 @@ export function useAPInvoice() {
         try {
           const formData = new FormData()
           formData.append('file', fileObj)
-          const res = await fetch('/api/v1/ap-invoice/extract', { method: 'POST', body: formData })
+          const res = await apiFetch('/api/v1/ap-invoice/extract', { method: 'POST', body: formData })
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const data = await res.json()
 
@@ -386,7 +387,7 @@ export function useAPInvoice() {
     setSuggestLoading(true)
     showToast('AI กำลังแนะนำรหัสบัญชี...', 'info')
     try {
-      const res = await fetch('/api/v1/ap-invoice/suggest-gl', {
+      const res = await apiFetch('/api/v1/ap-invoice/suggest-gl', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: itemsToSuggest }),

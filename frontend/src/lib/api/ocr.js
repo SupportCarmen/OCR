@@ -2,12 +2,8 @@
  * OCR API — extract receipt data from uploaded files.
  */
 
-/**
- * Upload a file to the OCR backend and return extracted fields.
- * @param {File} file
- * @param {string} bankType - BBL | KBANK | SCB
- * @returns {Promise<object>} flat extracted fields + details array
- */
+import { apiFetch } from './client'
+
 export async function extractFromFile(file, bankType) {
   const formData = new FormData()
   formData.append('files', file)
@@ -16,7 +12,7 @@ export async function extractFromFile(file, bankType) {
     ? `/api/v1/ocr/extract?bank_type=${bankType}`
     : '/api/v1/ocr/extract'
 
-  const res = await fetch(url, { method: 'POST', body: formData })
+  const res = await apiFetch(url, { method: 'POST', body: formData })
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -56,12 +52,8 @@ export async function extractFromFile(file, bankType) {
   }
 }
 
-/**
- * Mark a receipt as submitted (sets submitted_at in DB).
- * @param {string} receiptId
- */
 export async function markSubmitted(receiptId) {
-  const res = await fetch(`/api/v1/ocr/receipts/${receiptId}/submit`, { method: 'PATCH' })
+  const res = await apiFetch(`/api/v1/ocr/receipts/${receiptId}/submit`, { method: 'PATCH' })
   if (!res.ok) {
     console.warn(`markSubmitted failed for ${receiptId}: ${res.status}`)
   }

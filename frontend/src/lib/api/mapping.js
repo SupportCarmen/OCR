@@ -2,13 +2,10 @@
  * Mapping API — GL account/department mapping suggestions and history.
  */
 
-/**
- * Ask LLM to suggest dept/acc codes for Commission, Tax Amount, Net Amount.
- * @param {{ accounts: {code,name}[], departments: {code,name}[] }} payload
- * @returns {Promise<{ suggestions: object, source: string }>}
- */
+import { apiFetch } from './client'
+
 export async function suggestMapping(payload) {
-  const res = await fetch('/api/v1/mapping/suggest', {
+  const res = await apiFetch('/api/v1/mapping/suggest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -21,13 +18,8 @@ export async function suggestMapping(payload) {
   return res.json()
 }
 
-/**
- * Ask LLM to suggest dept/acc codes for a list of payment types.
- * @param {{ payment_types: string[], accounts: {code,name}[], departments: {code,name}[] }} payload
- * @returns {Promise<{ suggestions: object, source: string }>}
- */
 export async function suggestPaymentTypes(payload) {
-  const res = await fetch('/api/v1/mapping/suggest-payment-types', {
+  const res = await apiFetch('/api/v1/mapping/suggest-payment-types', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -36,23 +28,14 @@ export async function suggestPaymentTypes(payload) {
   return res.json()
 }
 
-/**
- * Load saved mapping history for a bank.
- * @param {string} bankName
- * @returns {Promise<{ bank_name: string, history: object }>}
- */
 export async function fetchMappingHistory(bankName) {
-  const res = await fetch(`/api/v1/mapping/history?bank_name=${encodeURIComponent(bankName)}`)
+  const res = await apiFetch(`/api/v1/mapping/history?bank_name=${encodeURIComponent(bankName)}`)
   if (!res.ok) throw new Error(`History fetch failed (${res.status})`)
   return res.json()
 }
 
-/**
- * Save confirmed mappings to history.
- * @param {{ bank_name: string, mappings: object }} payload
- */
 export async function saveMappingHistory(payload) {
-  const res = await fetch('/api/v1/mapping/history/save', {
+  const res = await apiFetch('/api/v1/mapping/history/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

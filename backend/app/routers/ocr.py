@@ -9,9 +9,11 @@ Carmen proxy endpoints live in app/routers/carmen.py.
 """
 
 import logging
+import uuid
+from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
+from fastapi import APIRouter, Request, UploadFile, File, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +34,9 @@ from app.services.correction_service import get_correction_hints
 from app.tools import submit as submit_tool
 from app.tools.submit import SubmitInput
 from app.utils.image_processing import is_valid_image
+from app.auth import get_current_session, SessionInfo
+from app.services import audit_service
+from app.context import current_document_ref
 
 
 # ── Pydantic schemas for submit endpoint ────────────
@@ -78,18 +83,26 @@ router = APIRouter(prefix="/api/v1/ocr", tags=["OCR"])
 
 @router.post("/extract", response_model=List[ExtractedReceiptData])
 async def extract_receipt(
+    request: Request,
     files: List[UploadFile] = File(..., description="รูปใบเสร็จ (JPG, PNG, PDF)"),
     bank_type: Optional[BankType] = Query(None, description="ประเภทธนาคาร BBL/KBANK/SCB"),
     db: AsyncSession = Depends(get_db),
+    _session: SessionInfo = Depends(get_current_session),
 ):
     """
-    Stateless extraction:
-    Read files, call LLM, return JSON data.
+    Stateless extraction: read files, call LLM, return JSON data.
     Does NOT save to DB or Disk.
     Sets is_duplicate=True if doc_no already exists in submitted receipts.
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
+
+    filenames = ", ".join(f.filename for f in files)
+    current_document_ref.set(filenames)
+    await audit_service.log_action(
+        _session, audit_service.EXTRACT, audit_service.CREDIT_CARD,
+        document_ref=filenames, ip_address=request.client.host if request.client else None,
+    )
 
     results = []
     bank_type_str = bank_type.value if bank_type else None
@@ -110,8 +123,6 @@ async def extract_receipt(
                 detail=f"{upload_file.filename} exceeds {settings.max_file_size_mb}MB limit",
             )
 
-        # Create a task record for tracking usage even if stateless
-        import uuid
         task = OCRTask(
             id=str(uuid.uuid4()),
             original_filename=upload_file.filename,
@@ -130,7 +141,6 @@ async def extract_receipt(
             task_id=task.id,
         )
 
-        # Duplicate check — flag if doc_no already submitted
         if extracted.doc_no:
             dup = await db.execute(
                 select(Receipt).where(
@@ -156,6 +166,7 @@ async def list_tasks(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
+    _session: SessionInfo = Depends(get_current_session),
 ):
     tasks, total = await ocr_service.get_all_tasks(db, status=status, limit=limit, offset=offset)
     return JSONResponse(content={
@@ -180,7 +191,11 @@ async def list_tasks(
 # ═══════════════════════════════════════════════════
 
 @router.get("/tasks/{task_id}")
-async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
+async def get_task(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    _session: SessionInfo = Depends(get_current_session),
+):
     try:
         result = await db.execute(
             select(OCRTask)
@@ -246,12 +261,15 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
 # ═══════════════════════════════════════════════════
 
 @router.patch("/receipts/{receipt_id}/submit")
-async def mark_receipt_submitted(receipt_id: str, db: AsyncSession = Depends(get_db)):
+async def mark_receipt_submitted(
+    receipt_id: str,
+    db: AsyncSession = Depends(get_db),
+    _session: SessionInfo = Depends(get_current_session),
+):
     result = await db.execute(select(Receipt).where(Receipt.id == receipt_id))
     receipt = result.scalar_one_or_none()
     if not receipt:
         raise HTTPException(status_code=404, detail=f"Receipt {receipt_id} not found")
-    from datetime import datetime
     receipt.submitted_at = datetime.utcnow()
     await db.commit()
     return {"ok": True, "submitted_at": receipt.submitted_at.isoformat()}
@@ -259,15 +277,22 @@ async def mark_receipt_submitted(receipt_id: str, db: AsyncSession = Depends(get
 
 # ═══════════════════════════════════════════════════
 # POST /api/v1/ocr/submit
-# Save confirmed data to local DB and mark as submitted
 # ═══════════════════════════════════════════════════
 
 @router.post("/submit")
 async def submit_receipt_stateless(
+    request: Request,
     payload: SubmitPayload,
     db: AsyncSession = Depends(get_db),
+    session: SessionInfo = Depends(get_current_session),
 ):
     """Save user-confirmed data to DB. Delegates all logic to submit_tool."""
+    doc_ref = payload.Header.DocNo or payload.OriginalFilename or ""
+    current_document_ref.set(doc_ref)
+    await audit_service.log_action(
+        session, audit_service.SUBMIT, audit_service.CREDIT_CARD,
+        document_ref=doc_ref, ip_address=request.client.host if request.client else None,
+    )
     inp = SubmitInput(
         bank_type=payload.BankType,
         original_filename=payload.OriginalFilename or "uploaded_file",
@@ -310,7 +335,15 @@ async def submit_receipt_stateless(
 # ═══════════════════════════════════════════════════
 
 @router.get("/export")
-async def export_csv(db: AsyncSession = Depends(get_db)):
+async def export_csv(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    session: SessionInfo = Depends(get_current_session),
+):
+    await audit_service.log_action(
+        session, audit_service.EXPORT, audit_service.CREDIT_CARD,
+        ip_address=request.client.host if request.client else None,
+    )
     csv_path = await ocr_service.export_tasks_to_csv(db)
     filename = csv_path.replace("\\", "/").split("/")[-1]
     return FileResponse(
@@ -322,7 +355,7 @@ async def export_csv(db: AsyncSession = Depends(get_db)):
 
 
 # ═══════════════════════════════════════════════════
-# GET /api/v1/ocr/debug-llm  (temporary debug endpoint)
+# GET /api/v1/ocr/debug-llm  (debug only)
 # ═══════════════════════════════════════════════════
 
 @router.get("/debug-llm")
@@ -337,12 +370,11 @@ async def debug_last_llm_response():
 
 
 # ═══════════════════════════════════════════════════
-# GET /api/v1/ocr/health
+# GET /api/v1/ocr/health  — public, no auth
 # ═══════════════════════════════════════════════════
 
 @router.get("/health")
 async def health_check():
-    from datetime import datetime
     return {
         "health": "healthy",
         "ocr_engine": settings.ocr_engine,
@@ -351,4 +383,3 @@ async def health_check():
         "openrouter_configured": bool(settings.openrouter_api_key),
         "timestamp": datetime.utcnow().isoformat(),
     }
-

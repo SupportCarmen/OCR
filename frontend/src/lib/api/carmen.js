@@ -2,46 +2,31 @@
  * Carmen API — proxy calls to the Carmen ERP system.
  */
 
-/**
- * Fetch Account Codes from Carmen (via backend proxy).
- * @returns {Promise<object[]>}
- */
+import { apiFetch } from './client'
+
 export async function fetchAccountCodes() {
-  const res = await fetch('/api/v1/ocr/carmen/account-codes')
+  const res = await apiFetch('/api/v1/ocr/carmen/account-codes')
   if (!res.ok) throw new Error(`Failed to fetch account codes (${res.status})`)
   const json = await res.json()
   return json.Data || []
 }
 
-/**
- * Fetch Departments from Carmen (via backend proxy).
- * @returns {Promise<object[]>}
- */
 export async function fetchDepartments() {
-  const res = await fetch('/api/v1/ocr/carmen/departments')
+  const res = await apiFetch('/api/v1/ocr/carmen/departments')
   if (!res.ok) throw new Error(`Failed to fetch departments (${res.status})`)
   const json = await res.json()
   return json.Data || []
 }
 
-/**
- * Fetch GL Prefixes from Carmen (via backend proxy).
- * @returns {Promise<object[]>}
- */
 export async function fetchGLPrefixes() {
-  const res = await fetch('/api/v1/ocr/carmen/gl-prefix')
+  const res = await apiFetch('/api/v1/ocr/carmen/gl-prefix')
   if (!res.ok) throw new Error(`Failed to fetch GL prefixes (${res.status})`)
   const json = await res.json()
   return json.Data || []
 }
 
-/**
- * Submit a GL Journal Voucher to Carmen (via backend proxy).
- * @param {object} payload - Full Carmen gljv payload
- * @returns {Promise<object>}
- */
 export async function submitToCarmen(payload) {
-  const res = await fetch('/api/v1/ocr/carmen/gljv', {
+  const res = await apiFetch('/api/v1/ocr/carmen/gljv', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -53,13 +38,8 @@ export async function submitToCarmen(payload) {
   return res.json()
 }
 
-/**
- * Submit an AP Invoice to Carmen (via backend proxy).
- * @param {object} payload - AP Invoice payload
- * @returns {Promise<object>}
- */
 export async function submitAPInvoiceToCarmen(payload) {
-  const res = await fetch('/api/v1/ocr/carmen/invoice', {
+  const res = await apiFetch('/api/v1/ocr/carmen/invoice', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -71,13 +51,8 @@ export async function submitAPInvoiceToCarmen(payload) {
   return res.json()
 }
 
-/**
- * Submit an Input Tax record to Carmen (via backend proxy).
- * @param {object} payload - Input tax payload
- * @returns {Promise<object>}
- */
 export async function submitInputTax(payload) {
-  const res = await fetch('/api/v1/ocr/carmen/input-tax', {
+  const res = await apiFetch('/api/v1/ocr/carmen/input-tax', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

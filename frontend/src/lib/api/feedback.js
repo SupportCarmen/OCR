@@ -1,12 +1,10 @@
 /**
  * Feedback API — log user corrections for learning
- *
- * Field names are mapped from frontend PascalCase to snake_case
- * to match the LLM prompt field names.
  */
 
+import { apiFetch } from './client'
+
 const FIELD_NAME_MAP = {
-  // Header fields (PascalCase → snake_case)
   DateProcessed: 'date_processed',
   BankName: 'bank_name',
   DocName: 'doc_name',
@@ -15,7 +13,6 @@ const FIELD_NAME_MAP = {
   DocNo: 'doc_no',
   MerchantName: 'merchant_name',
   MerchantId: 'merchant_id',
-  // Detail fields (already snake_case — pass through)
   transaction: 'transaction',
   pay_amt: 'pay_amt',
   commis_amt: 'commis_amt',
@@ -28,16 +25,12 @@ function mapFieldName(key) {
   return FIELD_NAME_MAP[key] || key
 }
 
-/**
- * Log all corrections at submit time — compares final values against originals.
- * Sends batch to backend (one request per correction, fire-and-forget).
- */
 export async function logCorrections(receiptId, bankType, corrections) {
   if (!receiptId || !bankType || !corrections.length) return
 
   const results = await Promise.allSettled(
     corrections.map(({ fieldName, originalValue, correctedValue }) =>
-      fetch('/api/v1/feedback/correction', {
+      apiFetch('/api/v1/feedback/correction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -55,13 +48,9 @@ export async function logCorrections(receiptId, bankType, corrections) {
   console.log(`[feedback] ✓ Logged ${logged}/${corrections.length} corrections`)
 }
 
-/**
- * Compare current header + details against originals and return diff list.
- */
 export function diffCorrections(headerData, originalHeader, details, originalDetails) {
   const corrections = []
 
-  // Header diff
   for (const [key, value] of Object.entries(headerData)) {
     const orig = originalHeader[key]
     if (orig !== undefined && String(orig ?? '') !== String(value ?? '')) {
@@ -69,7 +58,6 @@ export function diffCorrections(headerData, originalHeader, details, originalDet
     }
   }
 
-  // Detail diff
   details.forEach((row, rowIdx) => {
     const origRow = originalDetails[rowIdx]
     if (!origRow) return

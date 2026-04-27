@@ -12,9 +12,17 @@ from app.llm.prompts.kbank import PROMPT as _KBANK
 from app.llm.prompts.generic import PROMPT as _GENERIC
 
 _REGISTRY: dict[str, str] = {
-    "SCB": _SCB,
-    "BBL": _BBL,
+    "SCB":   _SCB,
+    "BBL":   _BBL,
     "KBANK": _KBANK,
+}
+
+# Bump the version string whenever a prompt changes — used by GET /api/version
+_PROMPT_VERSIONS: dict[str, str] = {
+    "SCB":    "1.0.0",
+    "BBL":    "1.0.0",
+    "KBANK":  "1.0.0",
+    "GENERIC":"1.0.0",
 }
 
 

@@ -8,6 +8,7 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 
 from app.database import get_db
 from app.models import CorrectionFeedback, CorrectionFeedbackRequest, CorrectionFeedbackResponse
+from app.auth.dependencies import get_current_session, SessionInfo
 
 router = APIRouter(prefix="/api/v1/feedback", tags=["feedback"])
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 async def log_correction(
     feedback: CorrectionFeedbackRequest,
     db: AsyncSession = Depends(get_db),
+    _session: SessionInfo = Depends(get_current_session),
 ):
     """
     Log a user correction (called at submit time).

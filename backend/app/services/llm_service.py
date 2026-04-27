@@ -1,30 +1,26 @@
 """
 OpenRouter Vision OCR Service.
 
-Sends an image directly to a multimodal LLM via OpenRouter for
-simultaneous OCR + structured data extraction in a single API call.
-
-Supported models (set OPENROUTER_MODEL in .env):
-  - google/gemini-2.5-flash-preview  (fast, accurate on Thai text)
-  - google/gemini-2.0-flash-001
-  - anthropic/claude-3.5-sonnet
-  - openai/gpt-4o
+Sends an image to a multimodal LLM via OpenRouter for simultaneous OCR +
+structured data extraction in a single API call.
 """
 
 import base64
 import json
 import logging
 import os
+import pathlib
+import stat
+import tempfile
 from typing import Optional, Tuple
 
 from app.config import settings
-from app.llm.client import get_client
+from app.llm.client import call_vision_llm, _strip_code_fences
 from app.llm.prompts import get_ocr_prompt
 from app.models import ExtractedReceiptData
 
 logger = logging.getLogger(__name__)
 
-# Fields that map to ExtractedReceiptData
 _RECEIPT_FIELDS = set(ExtractedReceiptData.model_fields.keys())
 
 
@@ -50,80 +46,48 @@ async def extract_from_image(
     task_id: Optional[str] = None,
 ) -> Tuple[str, ExtractedReceiptData]:
     """
-    Send an image to OpenRouter vision LLM and return:
-      (raw_text, ExtractedReceiptData)
+    Send an image to OpenRouter vision LLM and return (raw_text, ExtractedReceiptData).
 
     bank_type: "SCB" | "BBL" | "KBANK" — selects bank-specific prompt.
     hints: correction hints from correction_feedback (appended to prompt).
     task_id: optional ID to link token usage to an OCR task.
-    Raises on API or JSON parse failure — let the caller handle errors.
+    Raises on API or JSON parse failure.
     """
-    from app.services.usage_service import log_llm_usage
-
     if not settings.openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY is not configured")
 
-    client = get_client()
     prompt = get_ocr_prompt(bank_type, hints=hints)
-
     mime_type = _get_mime_type(filename)
     b64_image = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{b64_image}"
 
     logger.info(f"Calling OpenRouter model={settings.openrouter_ocr_model} bank={bank_type or 'generic'}")
 
-    response = await client.chat.completions.create(
-        model=settings.openrouter_ocr_model,
-        messages=[
+    result_text = await call_vision_llm(
+        system_prompt=prompt,
+        user_content=[
+            {"type": "image_url", "image_url": {"url": data_url}},
             {
-                "role": "system",
-                "content": prompt,
-            },
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": data_url},
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            "Extract all detail rows from this document following the system instructions exactly. "
-                            "Each merchant number row = one separate object in details[]. "
-                            "Output valid JSON only, no explanation."
-                        ),
-                    },
-                ],
+                "type": "text",
+                "text": (
+                    "Extract all detail rows from this document following the system instructions exactly. "
+                    "Each merchant number row = one separate object in details[]. "
+                    "Output valid JSON only, no explanation."
+                ),
             },
         ],
-        temperature=0.0,
-        max_tokens=8192,
+        model=settings.openrouter_ocr_model,
+        task_id=task_id,
+        usage_type="BANK_OCR",
+        image_size_bytes=len(image_bytes),
     )
 
-    if response.usage:
-        await log_llm_usage(
-            model=settings.openrouter_ocr_model,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-            total_tokens=response.usage.total_tokens,
-            task_id=task_id,
-            usage_type="BANK_OCR"
-        )
-
-    raw_content = response.choices[0].message.content if (response.choices and response.choices[0].message) else None
-    if raw_content is None:
-        raise ValueError("LLM returned None content — model may have hit token limit or safety filter")
-
-    result_text = raw_content.strip()
     if not result_text:
         raise ValueError("LLM returned empty string from vision model")
 
     logger.info(f"Raw LLM response:\n{result_text[:1000]}")
 
-    # Save last raw response for debug endpoint (debug mode only)
     if settings.app_debug:
-        import pathlib, tempfile, stat
         tmp = pathlib.Path(tempfile.gettempdir()) / "last_llm_response.txt"
         tmp.write_text(result_text, encoding="utf-8")
         try:
@@ -131,23 +95,14 @@ async def extract_from_image(
         except Exception:
             pass
 
-    # Strip markdown code fences if model wraps response
-    if result_text.startswith("```"):
-        lines = result_text.split("\n")
-        if len(lines) > 1:
-            last_line = lines[-1].strip()
-            result_text = "\n".join(lines[1:-1] if last_line == "```" else lines[1:])
-            result_text = result_text.strip()
-
+    result_text = _strip_code_fences(result_text)
     data: dict = json.loads(result_text)
 
     raw_text: str = data.pop("raw_text", "") or ""
 
-    # Only pass known fields to ExtractedReceiptData
     extracted = ExtractedReceiptData(**{k: v for k, v in data.items() if k in _RECEIPT_FIELDS})
     extracted.raw_text = raw_text
 
-    # Post-process: remove rows with zero or null pay_amt.
     def _is_zero(v: Optional[str]) -> bool:
         if v is None:
             return True

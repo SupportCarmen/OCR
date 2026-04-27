@@ -2,16 +2,14 @@
 Carmen Proxy Router — thin HTTP layer for Carmen ERP API calls.
 
 All business logic and HTTP construction lives in `services/carmen_service.py`.
-These endpoints simply check configuration, call the service, and map errors to HTTP responses.
-
-Paths are kept identical to the original /api/v1/ocr/carmen/* so the frontend requires no changes.
+Session injection (get_current_session) supplies the per-user Carmen token.
 """
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.config import settings
+from app.auth import get_current_session, SessionInfo
 from app.services.carmen_service import (
     CarmenAPIError,
     get_account_codes,
@@ -32,110 +30,94 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/ocr/carmen", tags=["Carmen"])
 
 
-def _require_auth():
-    if not settings.carmen_authorization:
-        raise HTTPException(status_code=500, detail="carmen_authorization not configured")
-
-
 @router.get("/account-codes")
-async def proxy_account_codes():
-    _require_auth()
+async def proxy_account_codes(session: SessionInfo = Depends(get_current_session)):
     try:
-        return await get_account_codes()
+        return await get_account_codes(session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
 @router.get("/departments")
-async def proxy_departments():
-    _require_auth()
+async def proxy_departments(session: SessionInfo = Depends(get_current_session)):
     try:
-        return await get_departments()
+        return await get_departments(session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
 @router.get("/gl-prefix")
-async def proxy_gl_prefix():
-    # gl-prefix is soft — returns empty list when not configured (no 500)
+async def proxy_gl_prefix(session: SessionInfo = Depends(get_current_session)):
     try:
-        return await get_gl_prefix()
+        return await get_gl_prefix(session.carmen_token)
     except CarmenAPIError as e:
         return {"Data": [], "Status": f"upstream_{e.status_code}"}
 
 
 @router.post("/gljv")
-async def proxy_gljv(request: Request):
-    _require_auth()
+async def proxy_gljv(request: Request, session: SessionInfo = Depends(get_current_session)):
     body = await request.json()
     try:
-        return await post_gljv(body)
+        return await post_gljv(body, session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen GL JV ล้มเหลว: {e.detail}")
 
 
 @router.put("/gljv/{jvh_seq}")
-async def proxy_update_gljv(jvh_seq: int, request: Request):
-    _require_auth()
+async def proxy_update_gljv(jvh_seq: int, request: Request, session: SessionInfo = Depends(get_current_session)):
     body = await request.json()
     try:
-        return await put_gljv(jvh_seq, body)
+        return await put_gljv(jvh_seq, body, session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen GL JV update ล้มเหลว: {e.detail}")
 
 
 @router.get("/vendors")
-async def proxy_vendors():
-    _require_auth()
+async def proxy_vendors(session: SessionInfo = Depends(get_current_session)):
     try:
-        return await get_vendors()
+        return await get_vendors(session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
 @router.get("/tax-profiles")
-async def proxy_tax_profiles():
-    _require_auth()
+async def proxy_tax_profiles(session: SessionInfo = Depends(get_current_session)):
     try:
-        return await get_tax_profiles()
+        return await get_tax_profiles(session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
 @router.get("/period-list")
-async def proxy_period_list():
-    _require_auth()
+async def proxy_period_list(session: SessionInfo = Depends(get_current_session)):
     try:
-        return await get_period_list()
+        return await get_period_list(session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
 @router.post("/input-tax")
-async def proxy_create_input_tax(request: Request):
-    _require_auth()
+async def proxy_create_input_tax(request: Request, session: SessionInfo = Depends(get_current_session)):
     body = await request.json()
     try:
-        return await post_input_tax(body)
+        return await post_input_tax(body, session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen Input Tax ล้มเหลว: {e.detail}")
 
 
 @router.put("/input-tax/{rec_seq}")
-async def proxy_update_input_tax(rec_seq: int, request: Request):
-    _require_auth()
+async def proxy_update_input_tax(rec_seq: int, request: Request, session: SessionInfo = Depends(get_current_session)):
     body = await request.json()
     try:
-        return await put_input_tax(rec_seq, body)
+        return await put_input_tax(rec_seq, body, session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen Input Tax update ล้มเหลว: {e.detail}")
 
 
 @router.post("/invoice")
-async def proxy_create_invoice(request: Request):
-    _require_auth()
+async def proxy_create_invoice(request: Request, session: SessionInfo = Depends(get_current_session)):
     body = await request.json()
     try:
-        return await post_invoice(body)
+        return await post_invoice(body, session.carmen_token)
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen Invoice ล้มเหลว: {e.detail}")

@@ -1,9 +1,9 @@
 import logging
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from app.config import settings
-from app.llm.client import get_client, call_text_llm
+from app.llm.client import call_vision_llm, call_text_llm, _strip_code_fences
 from app.llm.prompts.ap_invoice import PROMPT as AP_INVOICE_PROMPT
 from app.llm.prompts.mapping import build_ap_expense_prompt
 from app.services.ap_invoice_postprocess import postprocess as postprocess_ap_invoice
@@ -58,68 +58,27 @@ def _filter_expense_accounts(accounts: list[dict], items: list[dict], max_acc: i
 
 async def extract_ap_invoice_data(data_url: str, filename: str, task_id: str) -> Dict[str, Any]:
     """Extract AP Invoice details using Vision LLM."""
-    prompt = AP_INVOICE_PROMPT
     ap_model = settings.openrouter_ap_invoice_model or settings.openrouter_ocr_model
     logger.info(f"Extracting AP Invoice: {filename} (model: {ap_model})")
-    
-    client = get_client()
 
-    try:
-        response = await client.chat.completions.create(
-            model=ap_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt,
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": data_url},
-                        },
-                        {
-                            "type": "text",
-                            "text": "Extract details and return JSON.",
-                        },
-                    ],
-                },
-            ],
-            temperature=0.0,
-            max_tokens=8192,
-        )
-    except Exception as e:
-        logger.error(f"LLM API Error: {e}")
-        raise RuntimeError("Failed to connect to LLM service")
+    result_text = await call_vision_llm(
+        system_prompt=AP_INVOICE_PROMPT,
+        user_content=[
+            {"type": "image_url", "image_url": {"url": data_url}},
+            {"type": "text", "text": "Extract details and return JSON."},
+        ],
+        model=ap_model,
+        task_id=task_id,
+        usage_type="AP_INVOICE",
+        image_size_bytes=len(data_url.encode()),
+    )
 
-    if response.usage:
-        from app.services.usage_service import log_llm_usage
-        await log_llm_usage(
-            model=ap_model,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-            total_tokens=response.usage.total_tokens,
-            task_id=task_id,
-            usage_type="AP_INVOICE"
-        )
-
-    raw_content = response.choices[0].message.content if (response.choices and response.choices[0].message) else None
-    if not raw_content:
-        raise RuntimeError("Empty response from LLM")
-
-    result_text = raw_content.strip()
-    if result_text.startswith("```"):
-        lines = result_text.split("\n")
-        if len(lines) > 1:
-            last_line = lines[-1].strip()
-            result_text = "\n".join(lines[1:-1] if last_line == "```" else lines[1:])
-            result_text = result_text.strip()
+    result_text = _strip_code_fences(result_text)
 
     try:
         data = json.loads(result_text)
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON Decode Error. Raw text: {result_text}")
+    except json.JSONDecodeError:
+        logger.error(f"JSON Decode Error. Raw text: {result_text[:500]}")
         raise RuntimeError("LLM returned invalid JSON")
 
     return postprocess_ap_invoice(data)

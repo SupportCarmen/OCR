@@ -1,13 +1,14 @@
 """
-LLM Client Factory — shared AsyncOpenAI client + text completion helper.
+LLM Client — shared AsyncOpenAI client + call helpers.
 
-All modules that need to talk to OpenRouter should use these helpers
-instead of constructing AsyncOpenAI directly.
+All LLM calls (vision and text) must go through this module.
+Never construct AsyncOpenAI elsewhere.
 """
 
 import json
 import logging
-from typing import Optional
+import time
+from typing import Any, List, Optional
 
 from openai import AsyncOpenAI
 
@@ -15,39 +16,133 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+_OPENROUTER_OUTBOUND_URL = f"{settings.openrouter_base_url}/chat/completions"
+
 
 def get_client() -> AsyncOpenAI:
-    """Return a new AsyncOpenAI client configured for OpenRouter."""
     return AsyncOpenAI(
         api_key=settings.openrouter_api_key,
         base_url=settings.openrouter_base_url,
     )
 
 
+def _strip_code_fences(text: str) -> str:
+    """Remove ```json / ``` wrappers that some models add around JSON output."""
+    if not text.startswith("```"):
+        return text
+    lines = text.split("\n")
+    if len(lines) <= 1:
+        return text
+    last = lines[-1].strip()
+    inner = lines[1:-1] if last == "```" else lines[1:]
+    return "\n".join(inner).strip()
+
+
+async def call_vision_llm(
+    system_prompt: str,
+    user_content: List[Any],
+    model: str,
+    task_id: Optional[str] = None,
+    usage_type: Optional[str] = None,
+    image_size_bytes: int = 0,
+) -> str:
+    """
+    Send a multimodal (vision) request to OpenRouter.
+
+    Returns the raw text content from the LLM response.
+    Raises RuntimeError on API failure or empty response.
+    Logs outbound call and token usage automatically.
+    """
+    from app.services.usage_service import log_llm_usage
+    from app.services.outbound_log_service import log_outbound
+
+    client = get_client()
+    start = time.perf_counter()
+    status_code = 200
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.0,
+            max_tokens=8192,
+        )
+    except Exception as exc:
+        status_code = 500
+        raise RuntimeError(f"LLM API call failed: {exc}") from exc
+    finally:
+        await log_outbound(
+            service="openrouter",
+            url=_OPENROUTER_OUTBOUND_URL,
+            method="POST",
+            status_code=status_code,
+            duration_ms=(time.perf_counter() - start) * 1000,
+            request_size_bytes=image_size_bytes,
+        )
+
+    if response.usage:
+        await log_llm_usage(
+            model=model,
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+            total_tokens=response.usage.total_tokens,
+            task_id=task_id,
+            usage_type=usage_type,
+        )
+
+    content = (
+        response.choices[0].message.content
+        if response.choices and response.choices[0].message
+        else None
+    )
+    if not content:
+        raise RuntimeError("LLM returned empty content — model may have hit token limit or safety filter")
+
+    return content.strip()
+
+
 async def call_text_llm(
     prompt: str,
     model: Optional[str] = None,
     task_id: Optional[str] = None,
-    usage_type: Optional[str] = None
+    usage_type: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Call the text/suggestion LLM with a single user prompt.
 
-    Strips markdown code fences if present, then parses JSON.
+    Strips markdown code fences, parses JSON.
     Returns None on any failure (no exceptions raised to callers).
-
-    Uses settings.openrouter_suggestion_model by default.
     """
     from app.services.usage_service import log_llm_usage
+    from app.services.outbound_log_service import log_outbound
 
     client = get_client()
     target_model = model or settings.openrouter_suggestion_model
-    response = await client.chat.completions.create(
-        model=target_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
-        max_tokens=2048,
-    )
+
+    start = time.perf_counter()
+    status_code = 200
+    try:
+        response = await client.chat.completions.create(
+            model=target_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=2048,
+        )
+    except Exception:
+        status_code = 500
+        raise
+    finally:
+        duration_ms = (time.perf_counter() - start) * 1000
+        await log_outbound(
+            service="openrouter",
+            url=_OPENROUTER_OUTBOUND_URL,
+            method="POST",
+            status_code=status_code,
+            duration_ms=duration_ms,
+            request_size_bytes=len(prompt.encode()),
+        )
 
     if response.usage:
         await log_llm_usage(
@@ -56,7 +151,7 @@ async def call_text_llm(
             completion_tokens=response.usage.completion_tokens,
             total_tokens=response.usage.total_tokens,
             task_id=task_id,
-            usage_type=usage_type
+            usage_type=usage_type,
         )
 
     content = (
@@ -67,15 +162,9 @@ async def call_text_llm(
     if not content:
         return None
 
-    raw = content.strip()
-    if raw.startswith("```"):
-        lines = raw.split("\n")
-        if len(lines) > 1:
-            last = lines[-1].strip()
-            raw = "\n".join(lines[1:-1] if last == "```" else lines[1:]).strip()
-
+    raw = _strip_code_fences(content.strip())
     try:
         return json.loads(raw)
     except Exception:
-        logger.error(f"Failed to parse LLM JSON: {raw[:200]}")
+        logger.error("Failed to parse LLM JSON: %s", raw[:200])
         return None
