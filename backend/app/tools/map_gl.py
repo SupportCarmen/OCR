@@ -58,15 +58,23 @@ def _validate_codes(
     keys: List[str],
     valid_acc: set,
     valid_dept: set,
-    acc_type_map: Dict[str, str],
 ) -> Dict[str, Dict]:
-    """Validate LLM output codes exist in allowed sets; force dept=GEN for BalanceSheet accounts."""
+    """Validate LLM output codes exist in allowed sets; default dept=GEN when account matched.
+
+    Accepts both `dept`/`acc` and `deptCode`/`accountCode` key shapes — Gemini
+    occasionally returns the verbose form despite prompt instructions.
+    """
     suggestions = {}
     for key in keys:
-        mapping = data.get(key, {})
-        dept = mapping.get("dept") if mapping.get("dept") in valid_dept else None
-        acc  = mapping.get("acc")  if mapping.get("acc")  in valid_acc  else None
-        if acc and acc_type_map.get(acc) == "balancesheet":
+        mapping = data.get(key) or {}
+        raw_dept = mapping.get("dept") if mapping.get("dept") is not None else mapping.get("deptCode")
+        raw_acc  = mapping.get("acc")  if mapping.get("acc")  is not None else mapping.get("accountCode")
+        dept = raw_dept if raw_dept in valid_dept else None
+        acc  = raw_acc  if raw_acc  in valid_acc  else None
+        # Default dept to GEN whenever an account was matched — bank fees / commissions
+        # are typically charged to the general cost-center, and an empty dept forces the
+        # user to fill it in manually for every row.
+        if acc and not dept and "GEN" in valid_dept:
             dept = "GEN"
         suggestions[key] = {"dept": dept, "acc": acc}
     return suggestions
@@ -89,22 +97,34 @@ async def suggest_fixed_fields(
             return ToolResult(success=True, tool=TOOL_FIXED, input=tool_input,
                               output={"suggestions": {}, "source": "ai"})
 
-        acc_type_map   = {a["code"]: (a.get("type") or "").lower() for a in accounts}
         commission_acc = _filter_by_type(accounts, "income")
         balance_acc    = _filter_by_type(accounts, "balancesheet")
 
-        # Pre-filter by domain keywords — reduces list from 800 → ~20 before sending to LLM
+        # Pre-filter by domain keywords — split per-field so we can fall back to the
+        # top-ranked candidate when the LLM returns null.
         commission_filtered = _filter_by_keywords(
             commission_acc,
             ["commission", "credit card", "เครดิตการ์ด", "ค่าธรรมเนียม", "bank charge"],
             limit=40,
         )
-        balance_filtered = _filter_by_keywords(
+        tax_filtered = _filter_by_keywords(
             balance_acc,
-            ["output tax", "ภาษีขาย", "undue", "รอตัด", "bank", "ธนาคาร", "c/a", "s/a",
-             "กระแสรายวัน", "ออมทรัพย์", "receivable", "ลูกหนี้"],
-            limit=50,
+            ["output tax", "ภาษีขาย", "undue", "รอตัด"],
+            limit=20,
         )
+        bank_filtered = _filter_by_keywords(
+            balance_acc,
+            ["bank", "ธนาคาร", "c/a", "s/a", "กระแสรายวัน", "ออมทรัพย์", "receivable", "ลูกหนี้"],
+            limit=30,
+        )
+
+        # Combine balance-sheet candidates for the prompt (dedupe, preserve rank order)
+        seen: set = set()
+        balance_filtered: List[Dict[str, Any]] = []
+        for a in tax_filtered + bank_filtered:
+            if a["code"] not in seen:
+                seen.add(a["code"])
+                balance_filtered.append(a)
 
         dept_lines           = "\n".join(f"  {d['code']} {d['name']}" for d in departments[:50])
         commission_acc_lines = "\n".join(f"  {a['code']} {a['name']}" for a in commission_filtered)
@@ -120,12 +140,29 @@ async def suggest_fixed_fields(
 
         data = await call_text_llm(prompt, usage_type="MAPPING_SUGGESTION")
         if data is None:
-            return ToolResult(success=True, tool=TOOL_FIXED, input=tool_input,
-                              output={"suggestions": {}, "source": "ai"})
+            data = {}
+
+        if "suggestions" in data and isinstance(data["suggestions"], dict):
+            data = data["suggestions"]
 
         valid_acc  = {a["code"] for a in accounts}
         valid_dept = {d["code"] for d in departments}
-        suggestions = _validate_codes(data, FIXED_TYPES, valid_acc, valid_dept, acc_type_map)
+        suggestions = _validate_codes(data, FIXED_TYPES, valid_acc, valid_dept)
+
+        # Per-field fallback — never return null; pick top-ranked pre-filtered candidate.
+        # Falls back to the broader type pool if a keyword filter found nothing.
+        fallback_acc = {
+            "Commission": (commission_filtered or commission_acc or [{}])[0].get("code"),
+            "Tax Amount": (tax_filtered or balance_acc or [{}])[0].get("code"),
+            "Net Amount": (bank_filtered or balance_acc or [{}])[0].get("code"),
+        }
+        for field in FIXED_TYPES:
+            entry = suggestions.get(field) or {}
+            if not entry.get("acc") and fallback_acc[field] in valid_acc:
+                suggestions[field] = {
+                    "acc": fallback_acc[field],
+                    "dept": "GEN" if "GEN" in valid_dept else entry.get("dept"),
+                }
 
         logger.info(f"[{TOOL_FIXED}] completed — {len(suggestions)} fields suggested")
         return ToolResult(
@@ -162,8 +199,7 @@ async def suggest_payment_types(
             return ToolResult(success=True, tool=TOOL_PAYMENT, input=tool_input,
                               output={"suggestions": {}, "source": "ai"})
 
-        acc_type_map = {a["code"]: (a.get("type") or "").lower() for a in accounts}
-        b_accounts   = _filter_by_type(accounts, "balancesheet")
+        b_accounts = _filter_by_type(accounts, "balancesheet")
 
         # Payment types are bank receivables — pre-filter to bank/receivable accounts
         b_filtered = _filter_by_keywords(
@@ -187,17 +223,29 @@ async def suggest_payment_types(
 
         data = await call_text_llm(prompt, usage_type="MAPPING_SUGGESTION")
         if data is None:
-            return ToolResult(success=True, tool=TOOL_PAYMENT, input=tool_input,
-                              output={"suggestions": {}, "source": "ai"})
+            data = {}
+
+        if "suggestions" in data and isinstance(data["suggestions"], dict):
+            data = data["suggestions"]
 
         valid_acc  = {a["code"] for a in accounts}
         valid_dept = {d["code"] for d in departments}
-        # Only keep keys that were requested
-        suggestions = _validate_codes(
-            {k: v for k, v in data.items() if k in payment_types},
-            [k for k in data if k in payment_types],
-            valid_acc, valid_dept, acc_type_map,
-        )
+        suggestions = _validate_codes(data, payment_types, valid_acc, valid_dept)
+
+        # Fallback: if LLM couldn't match (e.g. payment_type is a numeric account
+        # number rather than a card-type abbreviation), default to the top-ranked
+        # bank/receivable account. Falls back through b_filtered → b_accounts → any
+        # account so we always emit a non-null suggestion.
+        fallback_pool = b_filtered or b_accounts or accounts
+        fallback_acc = fallback_pool[0]["code"] if fallback_pool else None
+        if fallback_acc and fallback_acc in valid_acc:
+            for key in payment_types:
+                entry = suggestions.get(key) or {}
+                if not entry.get("acc"):
+                    suggestions[key] = {
+                        "acc": fallback_acc,
+                        "dept": "GEN" if "GEN" in valid_dept else entry.get("dept"),
+                    }
 
         logger.info(f"[{TOOL_PAYMENT}] completed — {len(suggestions)}/{len(payment_types)} types suggested")
         return ToolResult(
