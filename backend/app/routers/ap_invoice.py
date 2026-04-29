@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models.orm import OCRTask, TaskStatus
 from app.auth import get_current_session, SessionInfo
 from app.services import audit_service
-from app.context import current_document_ref, current_tenant
+from app.context import current_document_ref
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,6 @@ async def extract_ap_invoice(
     task = OCRTask(
         id=str(uuid.uuid4()),
         original_filename=file.filename,
-        tenant=current_tenant.get() or None,
         status=TaskStatus.COMPLETED,
         ocr_engine=settings.ocr_engine,
     )
@@ -68,25 +67,23 @@ async def extract_ap_invoice(
 
     try:
         data = await extract_ap_invoice_data(data_url, file.filename, task.id)
-        
-        # Persist lean audit data (references only, no calculation fields)
+
         from app.models.orm import APInvoice
         from app.context import current_user_id
-        
+        from sqlalchemy import select
+
         ap_invoice_id = str(uuid.uuid4())
-        
-        # Check for duplicates (same doc_no + vendor_name + tenant)
+
+        # Check for duplicates (same doc_no + vendor_name) — tenant isolation by DB
         is_duplicate = False
-        doc_no = data.get("documentNumber")
+        doc_no      = data.get("documentNumber")
         vendor_name = data.get("vendorName")
-        
+
         if doc_no and vendor_name:
-            from sqlalchemy import select
             dup_check = await db.execute(
                 select(APInvoice).where(
                     APInvoice.doc_no == doc_no,
                     APInvoice.vendor_name == vendor_name,
-                    APInvoice.tenant == (current_tenant.get() or "unknown")
                 )
             )
             if dup_check.scalars().first():
@@ -96,7 +93,6 @@ async def extract_ap_invoice(
         ap_inv = APInvoice(
             id=ap_invoice_id,
             task_id=task.id,
-            tenant=current_tenant.get() or "unknown",
             user_id=current_user_id.get() or session.user_id,
             vendor_name=vendor_name,
             doc_no=doc_no,

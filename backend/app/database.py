@@ -1,551 +1,333 @@
 """
-Database setup — async MySQL/MariaDB via SQLAlchemy.
+Database setup — per-tenant MariaDB via SQLAlchemy.
 
-Migration strategy: lightweight versioned runner (no Alembic dependency).
-Each migration function is registered in _MIGRATIONS with a unique name.
-Applied migrations are recorded in `schema_migrations` so each runs exactly once.
+Architecture: Separate Schema per Tenant
+  Each Carmen tenant gets its own database: carmen_ai_{tenant}
+  Tables are identical across all tenant DBs — no `tenant` column needed.
+
+Engine Registry:
+  Engines are created lazily on first request and cached for the process
+  lifetime so the connection pool is reused across requests.
+
+Session routing:
+  async_session()  — context-aware shim; reads current_tenant context var
+                     to pick the correct engine.  All fire-and-forget services
+                     (audit, outbound, usage) use this without modification.
+  get_db()         — FastAPI dependency; same routing via context var.
 """
 
 import logging
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker, AsyncConnection
+from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
 
-async_session = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+# ── URL helpers ───────────────────────────────────────────────────────────────
+
+def _db_root_url() -> str:
+    """Strip the database name from DATABASE_URL."""
+    return settings.database_url.rsplit("/", 1)[0]
+
+def _tenant_db_url(tenant: str) -> str:
+    return f"{_db_root_url()}/carmen_ai_{tenant}"
 
 
-class Base(DeclarativeBase):
-    pass
+# ── Engine Registry ───────────────────────────────────────────────────────────
+
+_ENGINES: dict[str, object] = {}          # tenant → AsyncEngine
+_SESSION_FACTORIES: dict[str, object] = {}  # tenant → async_sessionmaker
 
 
-async def init_db():
-    """Create all ORM-declared tables if they don't exist."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-# ── Migration functions ────────────────────────────────────────────────────────
-
-async def _m001_receipt_columns(conn):
-    cols = [
-        ("company_tax_id", "VARCHAR(50)"),
-        ("company_address", "TEXT"),
-        ("account_no",      "VARCHAR(100)"),
-        ("merchant_name",   "VARCHAR(255)"),
-        ("merchant_id",     "VARCHAR(100)"),
-        ("wht_rate",        "VARCHAR(20)"),
-        ("wht_amount",      "NUMERIC(15,2)"),
-        ("net_amount",      "NUMERIC(15,2)"),
-    ]
-    for col, col_type in cols:
-        try:
-            await conn.execute(text(f"ALTER TABLE receipts ADD COLUMN {col} {col_type}"))
-            logger.info(f"  + receipts.{col}")
-        except Exception:
-            pass  # already exists — MySQL raises 1060
-
-
-async def _m002_ocr_tasks_nullable(conn):
-    await conn.execute(text("ALTER TABLE ocr_tasks MODIFY file_path VARCHAR(512) NULL"))
-
-
-async def _m003_llm_usage_columns(conn):
-    for col, defn in [
-        ("usage_type", "VARCHAR(50) NULL AFTER task_id"),
-        ("token_hash", "VARCHAR(64) NULL"),
-        ("bu_name",    "VARCHAR(100) NULL"),
-        ("session_id", "VARCHAR(36) NULL"),
-        ("user_id",    "VARCHAR(100) NULL"),
-    ]:
-        try:
-            await conn.execute(text(f"ALTER TABLE llm_usage_logs ADD COLUMN {col} {defn}"))
-            logger.info(f"  + llm_usage_logs.{col}")
-        except Exception:
-            pass
-
-
-async def _m004_mapping_history_constraint(conn):
-    try:
-        await conn.execute(text("ALTER TABLE mapping_history DROP INDEX uq_mapping_bank_field"))
-    except Exception:
-        pass
-    try:
-        await conn.execute(text(
-            "ALTER TABLE mapping_history ADD CONSTRAINT uq_mapping_bank_field_choice "
-            "UNIQUE (bank_name, field_type, dept_code, acc_code)"
-        ))
-    except Exception:
-        pass
-
-
-async def _m005_create_audit_logs(conn):
-    await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            id           BIGINT       AUTO_INCREMENT PRIMARY KEY,
-            user_id      VARCHAR(100) NULL,
-            username     VARCHAR(100) NULL,
-            bu           VARCHAR(100) NULL,
-            action       VARCHAR(50)  NOT NULL,
-            resource     VARCHAR(50)  NULL,
-            document_ref VARCHAR(255) NULL,
-            ip_address   VARCHAR(45)  NULL,
-            created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_audit_user   (user_id),
-            INDEX idx_audit_action (action, created_at),
-            INDEX idx_audit_date   (created_at)
+def _get_engine(tenant: str):
+    if tenant not in _ENGINES:
+        _ENGINES[tenant] = create_async_engine(
+            _tenant_db_url(tenant),
+            echo=False,
+            pool_pre_ping=True,
+            pool_size=5,
+            max_overflow=10,
         )
-    """))
-
-
-async def _m006_create_performance_logs(conn):
-    await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS performance_logs (
-            id           BIGINT       AUTO_INCREMENT PRIMARY KEY,
-            endpoint     VARCHAR(200) NOT NULL,
-            method       VARCHAR(10)  NULL,
-            duration_ms  DOUBLE       NOT NULL,
-            status_code  INT          NULL,
-            user_id      VARCHAR(100) NULL,
-            document_ref VARCHAR(255) NULL,
-            created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_perf_endpoint (endpoint, created_at),
-            INDEX idx_perf_user     (user_id),
-            INDEX idx_perf_date     (created_at)
+        _SESSION_FACTORIES[tenant] = async_sessionmaker(
+            _ENGINES[tenant],
+            class_=AsyncSession,
+            expire_on_commit=False,
         )
-    """))
+        logger.debug("Engine created for tenant: %s", tenant)
+    return _ENGINES[tenant]
 
 
-async def _m007_create_outbound_call_logs(conn):
-    await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS outbound_call_logs (
-            id                 BIGINT       AUTO_INCREMENT PRIMARY KEY,
-            service            VARCHAR(50)  NOT NULL,
-            url                VARCHAR(500) NOT NULL,
-            method             VARCHAR(10)  NULL,
-            status_code        INT          NULL,
-            duration_ms        DOUBLE       NULL,
-            request_size_bytes INT          NULL,
-            session_id         VARCHAR(36)  NULL,
-            user_id            VARCHAR(100) NULL,
-            created_at         DATETIME     DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_outbound_service (service, created_at),
-            INDEX idx_outbound_session (session_id)
-        )
-    """))
+def _get_session_factory(tenant: str):
+    _get_engine(tenant)  # ensure engine + factory exist
+    return _SESSION_FACTORIES[tenant]
 
 
-async def _m013_add_tenant(conn):
-    """Add tenant to all tenant-scoped tables for multi-tenant isolation."""
-    changes = [
-        ("ocr_sessions",       "tenant VARCHAR(100) NULL AFTER id"),
-        ("receipts",           "tenant VARCHAR(100) NULL AFTER task_id"),
-        ("mapping_history",    "tenant VARCHAR(100) NULL AFTER id"),
-        ("correction_feedback","tenant VARCHAR(100) NULL AFTER id"),
-        ("llm_usage_logs",     "tenant VARCHAR(100) NULL"),
-        ("audit_logs",         "tenant VARCHAR(100) NULL AFTER id"),
-    ]
-    for table, defn in changes:
-        try:
-            await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {defn}"))
-            logger.info(f"  + {table}.tenant")
-        except Exception:
-            pass  # already exists
+# ── Public Session Factories ──────────────────────────────────────────────────
 
-    # Indexes for fast per-tenant queries
-    indexes = [
-        ("receipts",           "idx_receipts_tenant",     "tenant"),
-        ("mapping_history",    "idx_mapping_tenant",      "tenant"),
-        ("correction_feedback","idx_feedback_tenant",     "tenant"),
-        ("llm_usage_logs",     "idx_llm_tenant",          "tenant"),
-        ("audit_logs",         "idx_audit_tenant",        "tenant"),
-    ]
-    for table, idx_name, col in indexes:
-        try:
-            await conn.execute(text(f"ALTER TABLE {table} ADD INDEX {idx_name} ({col})"))
-            logger.info(f"  + {table}.{idx_name}")
-        except Exception:
-            pass
-
-    # Update mapping_history unique constraint to include tenant
-    try:
-        await conn.execute(text("ALTER TABLE mapping_history DROP INDEX uq_mapping_bank_field_choice"))
-    except Exception:
-        pass
-    try:
-        await conn.execute(text(
-            "ALTER TABLE mapping_history ADD CONSTRAINT uq_mapping_tenant_bank_field_choice "
-            "UNIQUE (tenant, bank_name, field_type, dept_code, acc_code)"
-        ))
-        logger.info("  + mapping_history.uq_mapping_tenant_bank_field_choice")
-    except Exception:
-        pass
-
-
-async def _m014_schema_cleanup_and_analytics(conn):
-    """Drop unused columns, add analytics columns, rename correction_feedback.receipt_id."""
-
-    # 1. DROP ocr_tasks.file_path
-    try:
-        await conn.execute(text("ALTER TABLE ocr_tasks DROP COLUMN file_path"))
-        logger.info("  - ocr_tasks.file_path")
-    except Exception:
-        pass
-
-    # 2. ADD ocr_tasks.tenant
-    try:
-        await conn.execute(text("ALTER TABLE ocr_tasks ADD COLUMN tenant VARCHAR(100) NULL AFTER original_filename"))
-        await conn.execute(text("ALTER TABLE ocr_tasks ADD INDEX idx_ocr_tasks_tenant (tenant)"))
-        logger.info("  + ocr_tasks.tenant")
-    except Exception:
-        pass
-
-    # 3. ADD llm_usage_logs.duration_ms + cost_usd
-    for col, defn in [
-        ("duration_ms", "DOUBLE NULL AFTER total_tokens"),
-        ("cost_usd",    "DECIMAL(10,6) NULL AFTER duration_ms"),
-    ]:
-        try:
-            await conn.execute(text(f"ALTER TABLE llm_usage_logs ADD COLUMN {col} {defn}"))
-            logger.info(f"  + llm_usage_logs.{col}")
-        except Exception:
-            pass
-
-    # 4. ADD audit_logs.session_id
-    try:
-        await conn.execute(text("ALTER TABLE audit_logs ADD COLUMN session_id VARCHAR(36) NULL AFTER tenant"))
-        await conn.execute(text("ALTER TABLE audit_logs ADD INDEX idx_audit_session (session_id)"))
-        logger.info("  + audit_logs.session_id")
-    except Exception:
-        pass
-
-    # 5. ADD performance_logs.tenant
-    try:
-        await conn.execute(text("ALTER TABLE performance_logs ADD COLUMN tenant VARCHAR(100) NULL AFTER id"))
-        await conn.execute(text("ALTER TABLE performance_logs ADD INDEX idx_perf_tenant (tenant)"))
-        logger.info("  + performance_logs.tenant")
-    except Exception:
-        pass
-
-    # 6. ADD outbound_call_logs.tenant
-    try:
-        await conn.execute(text("ALTER TABLE outbound_call_logs ADD COLUMN tenant VARCHAR(100) NULL AFTER id"))
-        await conn.execute(text("ALTER TABLE outbound_call_logs ADD INDEX idx_outbound_tenant (tenant)"))
-        logger.info("  + outbound_call_logs.tenant")
-    except Exception:
-        pass
-
-    # 7. ADD correction_feedback.user_id
-    try:
-        await conn.execute(text("ALTER TABLE correction_feedback ADD COLUMN user_id VARCHAR(100) NULL"))
-        await conn.execute(text("ALTER TABLE correction_feedback ADD INDEX idx_feedback_user (user_id)"))
-        logger.info("  + correction_feedback.user_id")
-    except Exception:
-        pass
-
-    # 8. RENAME correction_feedback.receipt_id → doc_no
-    try:
-        await conn.execute(text("ALTER TABLE correction_feedback CHANGE COLUMN receipt_id doc_no VARCHAR(100) NOT NULL"))
-        logger.info("  ~ correction_feedback.receipt_id → doc_no")
-    except Exception:
-        pass
-    # Update unique constraint
-    try:
-        await conn.execute(text("ALTER TABLE correction_feedback DROP INDEX uq_correction_receipt_field"))
-    except Exception:
-        pass
-    try:
-        await conn.execute(text(
-            "ALTER TABLE correction_feedback ADD CONSTRAINT uq_correction_doc_field "
-            "UNIQUE (doc_no, field_name)"
-        ))
-        logger.info("  + correction_feedback.uq_correction_doc_field")
-    except Exception:
-        pass
-
-
-async def _m012_drop_session_expires_at(conn):
-    """Drop ocr_sessions.expires_at + its composite index.
-    JWT exp + Carmen 401 deactivation now cover everything this column did."""
-    try:
-        await conn.execute(text("ALTER TABLE ocr_sessions DROP INDEX idx_session_active_exp"))
-        logger.info("  - ocr_sessions.idx_session_active_exp")
-    except Exception:
-        pass
-    try:
-        await conn.execute(text("ALTER TABLE ocr_sessions DROP COLUMN expires_at"))
-        logger.info("  - ocr_sessions.expires_at")
-    except Exception:
-        pass
-
-
-async def _m011_merge_receipt_details_into_transactions(conn):
-    """Add receipts.transactions JSON column and drop the receipt_details table."""
-    try:
-        await conn.execute(text("ALTER TABLE receipts ADD COLUMN transactions JSON NULL"))
-        logger.info("  + receipts.transactions")
-    except Exception:
-        pass  # already exists
-    try:
-        await conn.execute(text("DROP TABLE IF EXISTS receipt_details"))
-        logger.info("  - receipt_details")
-    except Exception:
-        pass
-
-
-async def _m010_drop_sensitive_receipt_columns(conn):
-    """Drop PII / amount columns from receipts that we no longer persist."""
-    cols = [
-        "company_tax_id",
-        "company_address",
-        "account_no",
-        "merchant_id",
-        "wht_rate",
-        "wht_amount",
-        "net_amount",
-        "bank_tax_id",
-        "bank_address",
-    ]
-    for col in cols:
-        try:
-            await conn.execute(text(f"ALTER TABLE receipts DROP COLUMN {col}"))
-            logger.info(f"  - receipts.{col}")
-        except Exception:
-            pass  # column already absent
-
-
-async def _m009_drop_llm_usage_token_hash(conn):
-    """Drop unused token_hash column (and its index) from llm_usage_logs."""
-    try:
-        await conn.execute(text("ALTER TABLE llm_usage_logs DROP INDEX idx_llm_usage_token_hash"))
-        logger.info("  - llm_usage_logs.idx_llm_usage_token_hash")
-    except Exception:
-        pass
-    try:
-        await conn.execute(text("ALTER TABLE llm_usage_logs DROP COLUMN token_hash"))
-        logger.info("  - llm_usage_logs.token_hash")
-    except Exception:
-        pass
-
-
-async def _m008_create_ocr_sessions(conn):
-    await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS ocr_sessions (
-            id                      VARCHAR(36)  PRIMARY KEY,
-            carmen_token_encrypted  TEXT         NOT NULL,
-            user_id                 VARCHAR(100) NULL,
-            username                VARCHAR(100) NULL,
-            bu                      VARCHAR(100) NULL,
-            is_active               TINYINT(1)   NOT NULL DEFAULT 1,
-            created_at              DATETIME     DEFAULT CURRENT_TIMESTAMP,
-            expires_at              DATETIME     NULL,
-            last_used_at            DATETIME     NULL,
-            INDEX idx_session_user       (user_id),
-            INDEX idx_session_bu         (bu),
-            INDEX idx_session_active_exp (is_active, expires_at)
-        )
-    """))
-
-
-async def _m015_create_daily_usage_summary(conn):
-    """Create daily_usage_summary table for pre-aggregated analytics."""
-    await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS daily_usage_summary (
-            id                   INT          AUTO_INCREMENT PRIMARY KEY,
-            tenant               VARCHAR(100) NOT NULL,
-            summary_date         DATE         NOT NULL,
-            total_documents      INT          DEFAULT 0,
-            total_submissions    INT          DEFAULT 0,
-            total_llm_calls      INT          DEFAULT 0,
-            total_tokens         BIGINT       DEFAULT 0,
-            total_cost_usd       DECIMAL(12,4) DEFAULT 0,
-            avg_llm_latency_ms   DOUBLE       DEFAULT 0,
-            total_api_calls      INT          DEFAULT 0,
-            avg_api_latency_ms   DOUBLE       DEFAULT 0,
-            p95_api_latency_ms   DOUBLE       DEFAULT 0,
-            total_errors         INT          DEFAULT 0,
-            total_corrections    INT          DEFAULT 0,
-            total_outbound_calls INT          DEFAULT 0,
-            created_at           DATETIME     DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_tenant_date (tenant, summary_date),
-            INDEX idx_summary_tenant (tenant),
-            INDEX idx_summary_date (summary_date)
-        )
-    """))
-    logger.info("  + daily_usage_summary")
-
-
-async def _m016_partition_log_tables(conn):
-    """Partition performance_logs and outbound_call_logs by quarter.
-
-    MariaDB requires the partition column to be part of the PRIMARY KEY,
-    so we first rebuild the PK to include created_at, then add partitions.
+def async_session() -> AsyncSession:
     """
-    for table in ("performance_logs", "outbound_call_logs"):
-        try:
-            # Check if already partitioned
-            result = await conn.execute(text("""
-                SELECT COUNT(*) FROM INFORMATION_SCHEMA.PARTITIONS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = :table
-                  AND PARTITION_NAME IS NOT NULL
-            """), {"table": table})
-            if result.scalar() > 0:
-                logger.info("  ~ %s already partitioned — skipping", table)
-                continue
+    Context-aware session — backward-compatible with all existing
+    `async with async_session() as db:` call sites.
 
-            # Rebuild PK to include created_at (required for RANGE partitioning)
-            await conn.execute(text(f"""
-                ALTER TABLE {table}
-                    DROP PRIMARY KEY,
-                    ADD PRIMARY KEY (id, created_at)
-            """))
-
-            # Add quarterly partitions
-            await conn.execute(text(f"""
-                ALTER TABLE {table}
-                PARTITION BY RANGE (TO_DAYS(created_at)) (
-                    PARTITION p_before_2026 VALUES LESS THAN (TO_DAYS('2026-01-01')),
-                    PARTITION p2026q1 VALUES LESS THAN (TO_DAYS('2026-04-01')),
-                    PARTITION p2026q2 VALUES LESS THAN (TO_DAYS('2026-07-01')),
-                    PARTITION p2026q3 VALUES LESS THAN (TO_DAYS('2026-10-01')),
-                    PARTITION p2026q4 VALUES LESS THAN (TO_DAYS('2027-01-01')),
-                    PARTITION p_future VALUES LESS THAN MAXVALUE
-                )
-            """))
-            logger.info("  + %s partitioned by quarter", table)
-        except Exception as exc:
-            logger.error("  ! %s partition failed: %s", table, exc)
-            # Non-fatal — table still works without partitions
+    Reads current_tenant context var (set by PerformanceMiddleware from
+    the Origin header) to route to the correct carmen_ai_{tenant} database.
+    """
+    from app.context import current_tenant
+    tenant = current_tenant.get("") or settings.carmen_tenant_default
+    return _get_session_factory(tenant)()
 
 
-async def _m017_create_model_pricing(conn: AsyncConnection):
-    await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS model_pricing (
-            model_name            VARCHAR(255) PRIMARY KEY,
-            input_price_per_1m    DECIMAL(18,9) DEFAULT 0,
-            output_price_per_1m   DECIMAL(18,9) DEFAULT 0,
-            source                VARCHAR(50) DEFAULT 'manual',
-            price_verified_at     DATETIME,
-            updated_at            DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )
-    """))
+# ── FastAPI Dependency ────────────────────────────────────────────────────────
 
-
-async def _m018_create_ap_invoice_tables(conn: AsyncConnection):
-    await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS ap_invoices (
-            id              VARCHAR(36) PRIMARY KEY,
-            task_id         VARCHAR(36),
-            tenant          VARCHAR(100) NOT NULL,
-            user_id         VARCHAR(36),
-            vendor_name     VARCHAR(255),
-            doc_no          VARCHAR(100),
-            doc_date        VARCHAR(50),
-            original_filename VARCHAR(255),
-            created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_ap_tenant (tenant),
-            INDEX idx_ap_task (task_id),
-            FOREIGN KEY (task_id) REFERENCES ocr_tasks(id)
-        )
-    """))
-
-
-async def _m019_rename_receipts_to_credit_cards(conn: AsyncConnection):
-    # Check if receipts exists
-    result = await conn.execute(text("SHOW TABLES LIKE 'receipts'"))
-    if result.fetchone():
-        # Check if credit_cards also exists (e.g. created by init_db/create_all)
-        res_cc = await conn.execute(text("SHOW TABLES LIKE 'credit_cards'"))
-        if res_cc.fetchone():
-            # Only drop if empty to be safe
-            count_res = await conn.execute(text("SELECT COUNT(*) FROM credit_cards"))
-            if count_res.scalar() == 0:
-                await conn.execute(text("DROP TABLE credit_cards"))
-                logger.info("Dropped empty credit_cards table to allow rename")
-            else:
-                logger.warning("credit_cards table already exists and has data. Skipping rename.")
-                return
-        
-        await conn.execute(text("RENAME TABLE receipts TO credit_cards"))
-        logger.info("Renamed table receipts to credit_cards")
-
-
-# ── Registry: (unique_name, callable) — append only, never reorder ────────────
-
-_MIGRATIONS = [
-    ("001_receipt_columns",          _m001_receipt_columns),
-    ("002_ocr_tasks_nullable",       _m002_ocr_tasks_nullable),
-    ("003_llm_usage_columns",        _m003_llm_usage_columns),
-    ("004_mapping_history_constraint", _m004_mapping_history_constraint),
-    ("005_create_audit_logs",        _m005_create_audit_logs),
-    ("006_create_performance_logs",  _m006_create_performance_logs),
-    ("007_create_outbound_call_logs", _m007_create_outbound_call_logs),
-    ("008_create_ocr_sessions",      _m008_create_ocr_sessions),
-    ("009_drop_llm_usage_token_hash", _m009_drop_llm_usage_token_hash),
-    ("010_drop_sensitive_receipt_columns", _m010_drop_sensitive_receipt_columns),
-    ("011_merge_receipt_details_into_transactions", _m011_merge_receipt_details_into_transactions),
-    ("012_drop_session_expires_at", _m012_drop_session_expires_at),
-    ("013_add_tenant", _m013_add_tenant),
-    ("014_schema_cleanup_and_analytics", _m014_schema_cleanup_and_analytics),
-    ("015_create_daily_usage_summary", _m015_create_daily_usage_summary),
-    ("016_partition_log_tables", _m016_partition_log_tables),
-    ("017_create_model_pricing", _m017_create_model_pricing),
-    ("018_create_ap_invoice_tables", _m018_create_ap_invoice_tables),
-    ("019_rename_receipts_to_credit_cards", _m019_rename_receipts_to_credit_cards),
-]
-
-
-async def migrate_db():
-    """Run pending migrations and record each in schema_migrations."""
-    async with engine.begin() as conn:
-        # Ensure the tracking table exists
-        await conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                name       VARCHAR(100) PRIMARY KEY,
-                applied_at DATETIME     DEFAULT CURRENT_TIMESTAMP
-            )
-        """))
-
-        rows = await conn.execute(text("SELECT name FROM schema_migrations"))
-        applied = {row[0] for row in rows.fetchall()}
-
-        for name, fn in _MIGRATIONS:
-            if name in applied:
-                continue
-            logger.info(f"Applying migration: {name}")
-            try:
-                await fn(conn)
-                await conn.execute(
-                    text("INSERT INTO schema_migrations (name) VALUES (:name)"),
-                    {"name": name},
-                )
-                logger.info(f"Migration {name} applied.")
-            except Exception as exc:
-                logger.error(f"Migration {name} FAILED: {exc}")
-                raise
-
-
-async def get_db() -> AsyncSession:
-    """Dependency: yields an async database session."""
-    async with async_session() as session:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    FastAPI dependency — yields a session for the current tenant.
+    Tenant is resolved from current_tenant context var (set by middleware).
+    Usage: db: AsyncSession = Depends(get_db)
+    """
+    from app.context import current_tenant
+    tenant = current_tenant.get("") or settings.carmen_tenant_default
+    factory = _get_session_factory(tenant)
+    async with factory() as session:
         try:
             yield session
             await session.commit()
         except Exception:
             await session.rollback()
             raise
+
+
+# ── ORM Base ─────────────────────────────────────────────────────────────────
+
+class Base(DeclarativeBase):
+    pass
+
+
+# ── Tenant Provisioning ───────────────────────────────────────────────────────
+
+async def provision_tenant(tenant: str) -> None:
+    """
+    Create carmen_ai_{tenant} database and initialise all tables.
+
+    Safe to call multiple times — CREATE DATABASE IF NOT EXISTS and
+    create_all() are both idempotent.  All current migrations are pre-marked
+    as applied because create_all() already produces the final schema.
+    """
+    root_url = _db_root_url()
+    admin_engine = create_async_engine(root_url, echo=False)
+    try:
+        async with admin_engine.begin() as conn:
+            await conn.execute(
+                text(f"CREATE DATABASE IF NOT EXISTS carmen_ai_{tenant} "
+                     "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            )
+        logger.info("Provisioned database: carmen_ai_%s", tenant)
+    finally:
+        await admin_engine.dispose()
+
+    # Create tables from ORM in the new DB
+    engine = _get_engine(tenant)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # Pre-mark all current migrations so the runner skips them
+    async with engine.begin() as conn:
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                name       VARCHAR(100) PRIMARY KEY,
+                applied_at DATETIME     DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        for name, _ in _MIGRATIONS:
+            await conn.execute(
+                text("INSERT IGNORE INTO schema_migrations (name) VALUES (:name)"),
+                {"name": name},
+            )
+
+    logger.info("Tables and migrations initialised for tenant: %s", tenant)
+
+
+async def get_all_tenants() -> list[str]:
+    """
+    List all provisioned tenants by querying INFORMATION_SCHEMA for
+    databases named carmen_ai_*.
+    """
+    root_url = _db_root_url()
+    admin_engine = create_async_engine(root_url, echo=False)
+    try:
+        async with admin_engine.connect() as conn:
+            result = await conn.execute(text(
+                "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA "
+                "WHERE SCHEMA_NAME LIKE 'carmen_ai_%'"
+            ))
+            return [row[0].replace("carmen_ai_", "") for row in result.fetchall()]
+    finally:
+        await admin_engine.dispose()
+
+
+# ── init_db (startup) ─────────────────────────────────────────────────────────
+
+async def init_db() -> None:
+    """Ensure tables exist in every provisioned tenant DB."""
+    tenants = await get_all_tenants()
+    for tenant in tenants:
+        engine = _get_engine(tenant)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    if tenants:
+        logger.info("init_db: tables verified for %d tenant(s)", len(tenants))
+    else:
+        logger.warning("init_db: no carmen_ai_* databases found — use provision_tenant() to add one")
+
+
+# ── Migration functions ───────────────────────────────────────────────────────
+# These run ONLY on existing DBs that were migrated from the old shared schema.
+# Brand-new DBs provisioned via provision_tenant() skip all of these because
+# create_all() already produces the final schema and migrations are pre-marked.
+
+async def _m021_remove_tenant_columns(conn: AsyncConnection) -> None:
+    """
+    Remove tenant column (and its index) from all tables.
+    Applied when migrating an existing carmen_ai_{tenant} DB that was
+    created by splitting from the old shared ocr_db schema.
+    """
+    tables_cols = [
+        ("ocr_tasks",           "tenant"),
+        ("credit_cards",        "tenant"),
+        ("mapping_history",     "tenant"),
+        ("correction_feedback", "tenant"),
+        ("llm_usage_logs",      "tenant"),
+        ("ocr_sessions",        "tenant"),
+        ("audit_logs",          "tenant"),
+        ("performance_logs",    "tenant"),
+        ("outbound_call_logs",  "tenant"),
+        ("daily_usage_summary", "tenant"),
+        ("ap_invoices",         "tenant"),
+    ]
+    for table, col in tables_cols:
+        for idx in (f"idx_{table.replace('_logs','').replace('_',''[:8])}_tenant",
+                    f"idx_{table}_tenant"):
+            try:
+                await conn.execute(text(f"ALTER TABLE {table} DROP INDEX {idx}"))
+            except Exception:
+                pass
+        try:
+            await conn.execute(text(f"ALTER TABLE {table} DROP COLUMN {col}"))
+            logger.info("  - %s.tenant", table)
+        except Exception:
+            pass  # column already absent
+
+    # Fix unique constraints that previously included tenant
+    _fixes = [
+        ("mapping_history",
+         "uq_mapping_tenant_bank_field_choice",
+         "uq_mapping_bank_field_choice",
+         "UNIQUE (bank_name, field_type, dept_code, acc_code)"),
+        ("correction_feedback",
+         "uq_correction_tenant_doc_field",
+         "uq_correction_doc_field",
+         "UNIQUE (doc_no, field_name)"),
+        ("daily_usage_summary",
+         "uq_tenant_date",
+         "uq_summary_date",
+         "UNIQUE (summary_date)"),
+    ]
+    for table, old_key, new_key, definition in _fixes:
+        try:
+            await conn.execute(text(f"ALTER TABLE {table} DROP INDEX {old_key}"))
+        except Exception:
+            pass
+        try:
+            await conn.execute(text(
+                f"ALTER TABLE {table} ADD CONSTRAINT {new_key} {definition}"
+            ))
+            logger.info("  ~ %s: %s → %s", table, old_key, new_key)
+        except Exception:
+            pass
+
+
+# ── Migration Registry ────────────────────────────────────────────────────────
+# Append-only. Never reorder. Each entry runs exactly once per DB.
+# Migrations 001-020 are pre-marked as applied on fresh DBs (provision_tenant).
+
+_MIGRATIONS: list[tuple[str, object]] = [
+    # ── Legacy migrations (001-020) ──────────────────────────────────────────
+    # These are historical. New tenant DBs skip them via provision_tenant().
+    # Listed here so the registry is complete and pre-marking works correctly.
+    ("001_receipt_columns",                             None),
+    ("002_ocr_tasks_nullable",                          None),
+    ("003_llm_usage_columns",                           None),
+    ("004_mapping_history_constraint",                  None),
+    ("005_create_audit_logs",                           None),
+    ("006_create_performance_logs",                     None),
+    ("007_create_outbound_call_logs",                   None),
+    ("008_create_ocr_sessions",                         None),
+    ("009_drop_llm_usage_token_hash",                   None),
+    ("010_drop_sensitive_receipt_columns",              None),
+    ("011_merge_receipt_details_into_transactions",     None),
+    ("012_drop_session_expires_at",                     None),
+    ("013_add_tenant",                                  None),
+    ("014_schema_cleanup_and_analytics",                None),
+    ("015_create_daily_usage_summary",                  None),
+    ("016_partition_log_tables",                        None),
+    ("017_create_model_pricing",                        None),
+    ("018_create_ap_invoice_tables",                    None),
+    ("019_rename_receipts_to_credit_cards",             None),
+    ("020_fix_correction_feedback_unique_key",          None),
+    # ── Live migrations (021+) ───────────────────────────────────────────────
+    # These run on DBs migrated from the old shared schema.
+    ("021_remove_tenant_columns",                       _m021_remove_tenant_columns),
+]
+
+
+async def migrate_db(tenant: str) -> None:
+    """Run pending migrations for a single tenant DB."""
+    engine = _get_engine(tenant)
+    async with engine.begin() as conn:
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                name       VARCHAR(100) PRIMARY KEY,
+                applied_at DATETIME     DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        rows = await conn.execute(text("SELECT name FROM schema_migrations"))
+        applied = {row[0] for row in rows.fetchall()}
+
+        for name, fn in _MIGRATIONS:
+            if name in applied:
+                continue
+            if fn is None:
+                # Legacy stub — mark as applied, nothing to run
+                await conn.execute(
+                    text("INSERT IGNORE INTO schema_migrations (name) VALUES (:name)"),
+                    {"name": name},
+                )
+                continue
+            logger.info("[%s] Applying migration: %s", tenant, name)
+            try:
+                await fn(conn)
+                await conn.execute(
+                    text("INSERT INTO schema_migrations (name) VALUES (:name)"),
+                    {"name": name},
+                )
+                logger.info("[%s] Migration %s applied.", tenant, name)
+            except Exception as exc:
+                logger.error("[%s] Migration %s FAILED: %s", tenant, name, exc)
+                raise
+
+
+async def migrate_all_tenants() -> None:
+    """Run pending migrations across every provisioned tenant DB."""
+    tenants = await get_all_tenants()
+    for tenant in tenants:
+        await migrate_db(tenant)

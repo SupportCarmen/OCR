@@ -44,7 +44,6 @@ async def log_action(
     try:
         async with async_session() as db:
             db.add(AuditLog(
-                tenant=session.tenant,
                 session_id=current_session_id.get() or None,
                 user_id=session.user_id,
                 username=session.username,

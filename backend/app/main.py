@@ -4,7 +4,7 @@ import logging
 import asyncio
 import traceback
 from contextlib import asynccontextmanager
-from datetime import datetime, time as dtime
+
 
 # ── Force UTF-8 on Windows (prevents 'charmap' codec errors with Thai text) ──
 if sys.platform == "win32":
@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import init_db, migrate_db
+from app.database import init_db, migrate_all_tenants, get_all_tenants
 from app.exceptions import (
     CarmenServiceError,
     DuplicateDocumentError,
@@ -54,14 +54,27 @@ logger = logging.getLogger(__name__)
 
 # ── Background Scheduler ─────────────────────────────────────────────────────
 
+async def _run_for_all_tenants(coro_factory, label: str) -> None:
+    """Run an async coroutine factory once per provisioned tenant, setting current_tenant context."""
+    from app.context import current_tenant as _ct
+    tenants = await get_all_tenants()
+    for tenant in tenants:
+        token = _ct.set(tenant)
+        try:
+            await coro_factory()
+        except Exception as exc:
+            logger.error("[scheduler] %s failed for tenant %s: %s", label, tenant, exc)
+        finally:
+            _ct.reset(token)
+
+
 async def _scheduler_loop():
     """
     Lightweight background scheduler — runs inside the FastAPI event loop.
-    No external dependencies needed (no APScheduler, no celery).
 
     Schedule:
-      - Every 24h: archive + cleanup old logs, build daily summary
-      - Every 30d: check / create future partitions
+      - Every 24h: archive + cleanup old logs, build daily summary  (per tenant)
+      - Every 30d: check / create future partitions                  (per tenant)
     """
     logger.info("📅 Background scheduler started")
     await asyncio.sleep(60)  # wait for app to fully start
@@ -69,57 +82,52 @@ async def _scheduler_loop():
     day_counter = 0
     while True:
         try:
-            now = datetime.utcnow()
-
-            # ── Daily: retention cleanup ──
+            # ── Daily: retention cleanup (per tenant) ──
             if settings.retention_enabled:
-                from app.services.retention_service import archive_and_cleanup
+                from app.services.retention_service import archive_and_cleanup, purge_inactive_sessions
                 logger.info("[scheduler] Running retention archive + cleanup...")
-                result = await archive_and_cleanup()
-                for table, info in result.items():
-                    if info.get("archived", 0) > 0:
-                        logger.info("[scheduler] %s: archived=%d deleted=%d",
-                                    table, info["archived"], info["deleted"])
+                await _run_for_all_tenants(archive_and_cleanup, "retention")
+                await _run_for_all_tenants(purge_inactive_sessions, "session-purge")
 
-            # ── Daily: build yesterday's summary ──
+            # ── Daily: build yesterday's summary (per tenant) ──
             from app.services.summary_service import build_daily_summary
             logger.info("[scheduler] Building daily summary...")
-            await build_daily_summary()  # defaults to yesterday
+            await _run_for_all_tenants(build_daily_summary, "summary")
 
-            # ── Monthly: check partitions ──
+            # ── Monthly: check partitions (per tenant) ──
             day_counter += 1
-            if day_counter % 30 == 1:  # first run + every 30 days
+            if day_counter % 30 == 1:
                 from app.services.partition_manager import ensure_partitions
                 logger.info("[scheduler] Checking partitions...")
-                part_result = await ensure_partitions()
-                for table, created in part_result.items():
-                    if created:
-                        logger.info("[scheduler] %s: created partitions %s", table, created)
+                await _run_for_all_tenants(ensure_partitions, "partitions")
 
         except Exception as exc:
             logger.error("[scheduler] Error: %s", exc)
 
-        # Sleep 24 hours
         await asyncio.sleep(86400)
 
 
 async def _pricing_sync_loop():
-    """Update OpenRouter model pricing every 8 hours."""
+    """Sync OpenRouter model pricing into every tenant DB every 8 hours."""
     while True:
         try:
             from app.services.usage_service import fetch_openrouter_pricing
-            await fetch_openrouter_pricing()
+            tenants = await get_all_tenants()
+            if tenants:
+                await _run_for_all_tenants(fetch_openrouter_pricing, "pricing-sync")
+            else:
+                logger.info("[pricing_scheduler] No tenant DBs yet — skipping pricing sync")
         except asyncio.CancelledError:
             break
         except Exception as exc:
             logger.error("[pricing_scheduler] Error: %s", exc)
-        
+
         await asyncio.sleep(8 * 3600)
 
 
 # ── Lifespan (startup / shutdown) ──
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Initialize database on startup, start background scheduler."""
     logger.info("🚀 Starting AI OCR Bank Receipt Backend...")
     logger.info(f"   OCR Model  : {settings.openrouter_ocr_model}")
@@ -128,7 +136,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"   Upload Dir : {settings.upload_dir}")
     logger.info(f"   Database   : {settings.database_url}")
 
-    await migrate_db()
+    await migrate_all_tenants()
     await init_db()
     logger.info("✅ Database initialized")
 

@@ -10,6 +10,7 @@ from app.database import async_session
 from app.models.orm import PerformanceLog
 from app.context import current_tenant, current_user_id, current_document_ref
 
+
 logger = logging.getLogger(__name__)
 
 _SKIP_PATHS = {"/", "/docs", "/openapi.json", "/redoc", "/api/v1/ocr/health", "/api/version"}
@@ -79,7 +80,6 @@ class PerformanceMiddleware(BaseHTTPMiddleware):
 
         import asyncio
         asyncio.ensure_future(_persist(
-            tenant=tenant,
             endpoint=request.url.path,
             method=request.method,
             duration_ms=duration_ms,
@@ -93,7 +93,6 @@ class PerformanceMiddleware(BaseHTTPMiddleware):
 
 
 async def _persist(
-    tenant: str,
     endpoint: str,
     method: str,
     duration_ms: float,
@@ -104,7 +103,6 @@ async def _persist(
     try:
         async with async_session() as db:
             db.add(PerformanceLog(
-                tenant=tenant,
                 endpoint=endpoint,
                 method=method,
                 duration_ms=duration_ms,

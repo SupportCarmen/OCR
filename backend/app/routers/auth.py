@@ -20,7 +20,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, provision_tenant, async_session
 from app.models.orm import OcrSession
 from app.context import current_tenant
 from app.auth.session import (
@@ -81,11 +81,10 @@ async def _validate_token(token: str, tenant: str) -> None:
 async def exchange_sso_token(
     request: Request,
     body: ExchangeRequest,
-    db: AsyncSession = Depends(get_db),
 ):
     """Exchange a Carmen SSO token for an OCR session JWT."""
     token = body.token.strip()
-    bu = body.bu.strip()
+    bu    = body.bu.strip()
 
     if not token or not bu:
         raise HTTPException(status_code=400, detail="token and bu are required")
@@ -95,8 +94,10 @@ async def exchange_sso_token(
     # Validate token is live against the tenant's Carmen instance
     await _validate_token(token, tenant)
 
-    # user_id extracted from Carmen token format "<hash>|<uuid>"; username from URL param
-    user_id = extract_user_id_from_token(token)
+    # Provision DB for this tenant if it's their first login (idempotent)
+    await provision_tenant(tenant)
+
+    user_id  = extract_user_id_from_token(token)
     username = body.user or user_id
 
     try:
@@ -107,26 +108,27 @@ async def exchange_sso_token(
 
     session_id = str(uuid.uuid4())
 
-    # ── Auto Cleanup: ลบ session เก่าที่ created_at เกิน TTL หรือถูก deactivate แล้ว ──
-    cutoff = datetime.utcnow() - timedelta(hours=settings.session_ttl_hours)
-    deleted = await db.execute(
-        delete(OcrSession).where(
-            (OcrSession.created_at < cutoff) | (OcrSession.is_active == False)  # noqa: E712
+    # Use async_session() after provision_tenant() so the DB is guaranteed to exist
+    async with async_session() as db:
+        # Auto cleanup: ลบ session เก่าที่ expired หรือถูก deactivate แล้ว
+        cutoff = datetime.utcnow() - timedelta(hours=settings.session_ttl_hours)
+        deleted = await db.execute(
+            delete(OcrSession).where(
+                (OcrSession.created_at < cutoff) | (OcrSession.is_active == False)  # noqa: E712
+            )
         )
-    )
-    if deleted.rowcount:
-        logger.info("Auto cleanup: removed %d stale session(s)", deleted.rowcount)
+        if deleted.rowcount:
+            logger.info("Auto cleanup: removed %d stale session(s)", deleted.rowcount)
 
-    db.add(OcrSession(
-        id=session_id,
-        carmen_token_encrypted=encrypted,
-        user_id=user_id,
-        username=username,
-        bu=bu,
-        tenant=tenant,
-        is_active=True,
-    ))
-    await db.commit()
+        db.add(OcrSession(
+            id=session_id,
+            carmen_token_encrypted=encrypted,
+            user_id=user_id,
+            username=username,
+            bu=bu,
+            is_active=True,
+        ))
+        await db.commit()
 
     logger.info("SSO exchange OK — tenant=%s user=%s bu=%s session=%s",
                 tenant, username, bu, session_id)

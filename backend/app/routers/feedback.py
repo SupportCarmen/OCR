@@ -41,7 +41,6 @@ async def log_correction(
     stmt = (
         mysql_insert(CorrectionFeedback)
         .values(
-            tenant=_session.tenant,
             doc_no=feedback.doc_no,
             bank_type=feedback.bank_type,
             field_name=feedback.field_name,
@@ -59,7 +58,7 @@ async def log_correction(
     await db.execute(stmt)
     await db.commit()
 
-    # Fetch back the full record for the response
+    # Fetch back the full record — tenant isolation is guaranteed by separate-schema DB
     result = await db.execute(
         select(CorrectionFeedback).where(
             CorrectionFeedback.doc_no == feedback.doc_no,
@@ -68,9 +67,7 @@ async def log_correction(
     )
     record = result.scalar_one()
 
-    logger.info(
-        f"✓ Upserted correction: {feedback.field_name} "
-        f"({feedback.bank_type}) — '{feedback.original_value}' → '{feedback.corrected_value}'"
-    )
+    logger.info("✓ Upserted correction: %s (%s)", feedback.field_name, feedback.bank_type)
+    logger.debug("  original='%s' → corrected='%s'", feedback.original_value, feedback.corrected_value)
 
     return CorrectionFeedbackResponse.model_validate(record)

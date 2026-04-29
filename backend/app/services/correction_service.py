@@ -41,6 +41,7 @@ async def get_correction_hints(
     so submitted document count is the correct base for the ratio.
 
     Only returns field names — no specific corrected values to avoid biasing LLM.
+    Tenant isolation is guaranteed by the separate-schema architecture.
     """
     cutoff = datetime.utcnow() - timedelta(days=TTL_DAYS)
 

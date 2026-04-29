@@ -9,7 +9,6 @@ from sqlalchemy.dialects.mysql import insert
 
 from app.database import async_session
 from app.models.orm import LLMUsageLog, LLMModelPricing
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ async def _get_pricing(model_name: str) -> Optional[tuple[Decimal, Decimal]]:
     return None
 
 
-def _estimate_cost(model: str, prompt_tokens: int, completion_tokens: int, rates: tuple[Decimal, Decimal]) -> Decimal:
+def _estimate_cost(_model: str, prompt_tokens: int, completion_tokens: int, rates: tuple[Decimal, Decimal]) -> Decimal:
     """Calculate cost in USD."""
     input_rate, output_rate = rates
     cost = (prompt_tokens * input_rate + completion_tokens * output_rate) / 1_000_000
@@ -56,7 +55,7 @@ async def log_llm_usage(
     bu_name: Optional[str] = None,
     duration_ms: Optional[float] = None,
 ) -> None:
-    from app.context import current_session_id, current_user_id, current_bu, current_tenant
+    from app.context import current_session_id, current_user_id, current_bu
 
     try:
         rates = await _get_pricing(model)
@@ -75,7 +74,6 @@ async def log_llm_usage(
                 session_id=current_session_id.get() or None,
                 user_id=current_user_id.get() or None,
                 bu_name=current_bu.get() or bu_name or None,
-                tenant=current_tenant.get() or None,
             ))
             await db.commit()
     except Exception as e:

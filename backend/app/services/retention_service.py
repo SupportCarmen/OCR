@@ -10,9 +10,7 @@ CSV files can be imported back into the DB or analyzed offline.
 """
 
 import csv
-import io
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Tuple
@@ -29,26 +27,30 @@ logger = logging.getLogger(__name__)
 RETENTION_POLICY: List[Tuple[str, int, List[str]]] = [
     (
         "performance_logs", 90,
-        ["id", "tenant", "endpoint", "method", "duration_ms",
+        ["id", "endpoint", "method", "duration_ms",
          "status_code", "user_id", "document_ref", "created_at"],
     ),
     (
         "outbound_call_logs", 90,
-        ["id", "tenant", "service", "url", "method", "status_code",
+        ["id", "service", "url", "method", "status_code",
          "duration_ms", "request_size_bytes", "session_id", "user_id", "created_at"],
     ),
     (
         "llm_usage_logs", 365,
         ["id", "task_id", "usage_type", "model", "prompt_tokens",
          "completion_tokens", "total_tokens", "duration_ms", "cost_usd",
-         "session_id", "user_id", "bu_name", "tenant", "created_at"],
+         "session_id", "user_id", "bu_name", "created_at"],
     ),
     (
         "audit_logs", 365,
-        ["id", "tenant", "session_id", "user_id", "username", "bu",
+        ["id", "session_id", "user_id", "username", "bu",
          "action", "resource", "document_ref", "ip_address", "created_at"],
     ),
 ]
+
+# ocr_sessions cleanup is separate — inactive sessions (is_active=0) are purged
+# after SESSION_INACTIVE_PURGE_DAYS regardless of creation date.
+SESSION_INACTIVE_PURGE_DAYS = 30
 
 # Max rows to delete per batch — keeps lock time short
 _BATCH_SIZE = 5000
@@ -175,3 +177,36 @@ async def _process_table(
                 break  # no more rows to delete
 
     return {"archived": archived, "deleted": deleted}
+
+
+async def purge_inactive_sessions() -> int:
+    """
+    Delete ocr_sessions rows that have been inactive (is_active=0)
+    for more than SESSION_INACTIVE_PURGE_DAYS days.
+
+    Active sessions are never deleted here — JWT exp + Carmen 401
+    deactivation handle live session invalidation.
+    Returns the number of rows deleted.
+    """
+    cutoff = datetime.utcnow() - timedelta(days=SESSION_INACTIVE_PURGE_DAYS)
+    deleted = 0
+
+    async with async_session() as db:
+        while True:
+            result = await db.execute(
+                text(
+                    "DELETE FROM ocr_sessions "
+                    "WHERE is_active = 0 AND last_used_at < :cutoff "
+                    "LIMIT :batch_size"
+                ),
+                {"cutoff": cutoff, "batch_size": _BATCH_SIZE},
+            )
+            await db.commit()
+            batch_deleted = result.rowcount
+            deleted += batch_deleted
+            if batch_deleted < _BATCH_SIZE:
+                break
+
+    if deleted:
+        logger.info("[retention] ocr_sessions: purged %d inactive sessions (cutoff=%s)", deleted, cutoff.date())
+    return deleted

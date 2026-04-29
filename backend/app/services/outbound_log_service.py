@@ -15,7 +15,7 @@ from typing import Optional
 
 from app.database import async_session
 from app.models.orm import OutboundCallLog
-from app.context import current_session_id, current_user_id, current_tenant
+from app.context import current_session_id, current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,6 @@ async def log_outbound(
     try:
         async with async_session() as db:
             db.add(OutboundCallLog(
-                tenant=current_tenant.get() or None,
                 service=service,
                 url=url,
                 method=method,

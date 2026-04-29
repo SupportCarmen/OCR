@@ -21,7 +21,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.context import current_tenant
 from app.models import OCRTask, CreditCard, TaskStatus
 from app.tools.base import ToolResult
 
@@ -78,7 +77,6 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
         task = OCRTask(
             id=task_id,
             original_filename=inp.original_filename or "uploaded_file",
-            tenant=current_tenant.get() or None,
             status=TaskStatus.COMPLETED,
             ocr_engine=settings.ocr_engine,
             completed_at=datetime.utcnow(),
@@ -94,7 +92,6 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
         bt = str(inp.bank_type or "").upper()
         card = CreditCard(
             task_id=task.id,
-            tenant=current_tenant.get() or None,
             bank_name=inp.bank_name,
             bank_type=bt if bt in ("BBL", "KBANK", "SCB") else None,
             doc_name=inp.doc_name,

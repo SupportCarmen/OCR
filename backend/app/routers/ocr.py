@@ -36,7 +36,7 @@ from app.tools.submit import SubmitInput
 from app.utils.image_processing import is_valid_image
 from app.auth import get_current_session, SessionInfo
 from app.services import audit_service
-from app.context import current_document_ref, current_tenant
+from app.context import current_document_ref
 
 
 # ── Pydantic schemas for submit endpoint ────────────
@@ -120,7 +120,6 @@ async def extract_card(
         task = OCRTask(
             id=str(uuid.uuid4()),
             original_filename=upload_file.filename,
-            tenant=current_tenant.get() or None,
             status=TaskStatus.COMPLETED,
             ocr_engine=settings.ocr_engine,
         )

@@ -7,6 +7,14 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 import os
 
+_WEAK_JWT_SECRETS = {
+    "dev-ocr-jwt-secret-change-in-production",
+    "secret",
+    "changeme",
+    "",
+}
+_WEAK_FERNET_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables / .env file."""
@@ -35,7 +43,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "mysql+aiomysql://root:123456@localhost:3306/ocr_db"
-    
+
     # Carmen API
     carmen_authorization: str = ""  # deprecated — kept for fallback only; prefer session token
 
@@ -45,7 +53,7 @@ class Settings(BaseSettings):
     # Auth — JWT + session encryption
     # Generate session_encryption_key: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     ocr_jwt_secret: str = "dev-ocr-jwt-secret-change-in-production"
-    session_encryption_key: str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="  # dev default — MUST override in prod
+    session_encryption_key: str = _WEAK_FERNET_KEY
     session_ttl_hours: int = 8
 
     # Data retention & archival
@@ -61,6 +69,20 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Reject known-bad secrets at startup so misconfigured production deployments
+# fail loudly instead of silently accepting forged tokens.
+if not settings.app_debug:
+    if settings.ocr_jwt_secret in _WEAK_JWT_SECRETS:
+        raise RuntimeError(
+            "OCR_JWT_SECRET is set to a known-weak default. "
+            "Set a strong random secret in your .env before starting in production."
+        )
+    if settings.session_encryption_key == _WEAK_FERNET_KEY:
+        raise RuntimeError(
+            "SESSION_ENCRYPTION_KEY is set to the placeholder value. "
+            "Generate a real key: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+        )
 
 # Ensure upload/export/archive directories exist
 os.makedirs(settings.upload_dir, exist_ok=True)
