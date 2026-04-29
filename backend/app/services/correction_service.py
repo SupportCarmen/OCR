@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from app.models import CorrectionFeedback, Receipt
+from app.models import CorrectionFeedback, CreditCard
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ ERROR_RATE_THRESHOLD = 0.10
 # Only consider data from the last N days
 TTL_DAYS = 90
 
-# Minimum submitted receipts required before ratio is meaningful
-MIN_RECEIPTS = 10
+# Minimum submitted documents required before ratio is meaningful
+MIN_CARDS = 10
 
 
 async def get_correction_hints(
@@ -37,27 +37,27 @@ async def get_correction_hints(
     Return {field_name: hint_text} for fields where:
       corrections(field, 90d) / submitted_receipts(bank, 90d) > 10%
 
-    Uses receipts table as denominator — corrections are logged at submit time,
-    so submitted receipt count is the correct base for the ratio.
+    Uses credit_cards table as denominator — corrections are logged at submit time,
+    so submitted document count is the correct base for the ratio.
 
     Only returns field names — no specific corrected values to avoid biasing LLM.
     """
     cutoff = datetime.utcnow() - timedelta(days=TTL_DAYS)
 
-    # 1. Count submitted receipts for this bank in the last 90 days
+    # 1. Count submitted documents for this bank in the last 90 days
     total_result = await db.execute(
         select(func.count())
-        .select_from(Receipt)
-        .where(Receipt.bank_type == bank_type)
-        .where(Receipt.submitted_at.isnot(None))
-        .where(Receipt.submitted_at >= cutoff)
+        .select_from(CreditCard)
+        .where(CreditCard.bank_type == bank_type)
+        .where(CreditCard.submitted_at.isnot(None))
+        .where(CreditCard.submitted_at >= cutoff)
     )
-    total_receipts = total_result.scalar() or 0
+    total_cards = total_result.scalar() or 0
 
-    if total_receipts < MIN_RECEIPTS:
+    if total_cards < MIN_CARDS:
         logger.debug(
-            f"[hints] {bank_type}: only {total_receipts} submitted receipts "
-            f"(need {MIN_RECEIPTS}) — skipping hints"
+            f"[hints] {bank_type}: only {total_cards} submitted documents "
+            f"(need {MIN_CARDS}) — skipping hints"
         )
         return {}
 
@@ -76,12 +76,12 @@ async def get_correction_hints(
     # 3. Filter by error rate
     hints: dict[str, str] = {}
     for field_name, correction_count in rows:
-        error_rate = correction_count / total_receipts
+        error_rate = correction_count / total_cards
         if error_rate >= ERROR_RATE_THRESHOLD:
-            hints[field_name] = f"{correction_count}/{total_receipts} ({error_rate:.0%})"
+            hints[field_name] = f"{correction_count}/{total_cards} ({error_rate:.0%})"
             logger.debug(
                 f"[hints] {bank_type}.{field_name}: "
-                f"{correction_count}/{total_receipts} = {error_rate:.0%} → HINT"
+                f"{correction_count}/{total_cards} = {error_rate:.0%} → HINT"
             )
 
     if hints:

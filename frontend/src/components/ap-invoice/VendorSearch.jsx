@@ -1,4 +1,5 @@
 import Badge from '../common/Badge'
+import { getCarmenUrl } from '../../lib/url'
 
 export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorSearch, setVendorSearch, showVendorDrop, setShowVendorDrop, filteredVendors, onRefresh, refreshing }) {
   return (
@@ -13,7 +14,7 @@ export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorS
             {systemVendor.code ? 'Mapped' : 'Unmapped'}
           </Badge>
           <a
-            href="https://dev.carmen4.com/#/apVendor/create"
+            href={getCarmenUrl('/apVendor/create')}
             target="_blank"
             rel="noopener noreferrer"
             style={{

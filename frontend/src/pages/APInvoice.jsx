@@ -21,7 +21,7 @@ export default function APInvoice() {
     handleAISuggest, handleAcceptAll, hasSuggestions, allMapped,
     handleConfirmSuggest, handleRejectSuggest, handleReset,
     handleGenerate, invoiceSeq,
-    updateItem, updateHeader, modal,
+    updateItem, updateHeader, modal, isDuplicate,
   } = ctrl
 
   const [showPreview, setShowPreview] = useState(false)
@@ -164,6 +164,7 @@ export default function APInvoice() {
             onRejectSuggest={handleRejectSuggest}
             suggestLoading={suggestLoading}
             allMapped={allMapped}
+            isDuplicate={isDuplicate}
           />
         )}
 

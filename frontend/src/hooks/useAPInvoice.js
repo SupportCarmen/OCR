@@ -136,6 +136,7 @@ export function useAPInvoice() {
   const [masterDepts, setMasterDepts] = useState([])
   const [glLoaded, setGlLoaded] = useState(false)
   const [modal, setModal] = useState({ show: false })
+  const [isDuplicate, setIsDuplicate] = useState(false)
 
   const fileInputRef = useRef(null)
 
@@ -288,6 +289,21 @@ export function useAPInvoice() {
           const res = await apiFetch('/api/v1/ap-invoice/extract', { method: 'POST', body: formData })
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const data = await res.json()
+
+          if (data.is_duplicate) {
+            setStatus('พบเอกสารซ้ำ')
+            setModal({
+              show: true,
+              type: 'warning',
+              title: 'พบเอกสารซ้ำในระบบ',
+              message: `เอกสารเลขที่ ${data.documentNumber || '—'} ของผู้ขายรายนี้ถูกบันทึกไว้ในระบบแล้ว ไม่สามารถนำเข้าซ้ำได้`,
+              confirmText: 'ตกลง',
+              onConfirm: () => { setModal({ show: false }); setStep(1); setFile(null); setPreviewUrl(null) }
+            })
+            return
+          }
+
+          setIsDuplicate(!!data.is_duplicate)
 
           setHeaderData({
             vendorName:     data.vendorName     || '',
@@ -502,6 +518,7 @@ export function useAPInvoice() {
     setHeaderData(EMPTY_HEADER); setSystemVendor({ code: '', name: '' }); setVendorSearch('')
     setLineItems([]); setFieldMappings(DEFAULT_MAPPINGS); setStep(1)
     setGlLoaded(false)
+    setIsDuplicate(false)
   }
 
   return {
@@ -540,5 +557,6 @@ export function useAPInvoice() {
     refreshVendors, vendorRefreshing,
     invoiceSeq,
     adjustField,
+    isDuplicate,
   }
 }

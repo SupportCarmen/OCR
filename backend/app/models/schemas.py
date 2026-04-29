@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from .enums import TaskStatus, BankType
 
 
-class ReceiptSchema(BaseModel):
+class CreditCardSchema(BaseModel):
     id: str
     task_id: str
     bank_name: Optional[str] = None
@@ -33,7 +33,7 @@ class OCRTaskResponse(BaseModel):
     error_message: Optional[str] = None
     created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    receipt: Optional[ReceiptSchema] = None
+    credit_card: Optional[CreditCardSchema] = None
 
     class Config:
         from_attributes = True
@@ -58,7 +58,7 @@ class ExtractedDetailRow(BaseModel):
     total: Optional[str] = None
 
 
-class ExtractedReceiptData(BaseModel):
+class ExtractedCreditCardData(BaseModel):
     bank_name: Optional[str] = Field(None, description="ชื่อธนาคาร")
     doc_name: Optional[str] = Field(None, description="ประเภทเอกสาร")
     company_name: Optional[str] = Field(None, description="ชื่อบริษัท")
@@ -74,7 +74,7 @@ class ExtractedReceiptData(BaseModel):
 
 
 class CorrectionFeedbackRequest(BaseModel):
-    receipt_id: str
+    doc_no: str
     bank_type: str
     field_name: str
     original_value: Optional[str] = None
@@ -83,7 +83,7 @@ class CorrectionFeedbackRequest(BaseModel):
 
 class CorrectionFeedbackResponse(BaseModel):
     id: int
-    receipt_id: str
+    doc_no: str
     bank_type: str
     field_name: str
     original_value: Optional[str] = None

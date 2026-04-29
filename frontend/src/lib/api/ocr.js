@@ -20,9 +20,9 @@ export async function extractFromFile(file, bankType) {
   }
 
   const results = await res.json()
-  const receipt = results[0] || {}
+  const card = results[0] || {}
 
-  const details = (receipt.details || []).map(d => ({
+  const details = (card.details || []).map(d => ({
     Transaction: d.transaction || '',
     PayAmt:      d.pay_amt    || '',
     CommisAmt:   d.commis_amt || '',
@@ -32,24 +32,24 @@ export async function extractFromFile(file, bankType) {
   }))
 
   return {
-    bank_name:        receipt.bank_name        || '',
-    bank_type:        bankType                 || '',
-    doc_name:         receipt.doc_name         || '',
-    company_name:     receipt.company_name     || '',
-    doc_date:         receipt.doc_date         || '',
-    doc_no:           receipt.doc_no           || '',
-    merchant_name:    receipt.merchant_name    || '',
-    merchant_id:      receipt.merchant_id      || '',
-    bank_companyname: receipt.bank_companyname || '',
-    branch_no:        receipt.branch_no        || '',
-    is_duplicate:     receipt.is_duplicate     || false,
+    bank_name:        card.bank_name        || '',
+    bank_type:        bankType              || '',
+    doc_name:         card.doc_name         || '',
+    company_name:     card.company_name     || '',
+    doc_date:         card.doc_date         || '',
+    doc_no:           card.doc_no           || '',
+    merchant_name:    card.merchant_name    || '',
+    merchant_id:      card.merchant_id      || '',
+    bank_companyname: card.bank_companyname || '',
+    branch_no:        card.branch_no        || '',
+    is_duplicate:     card.is_duplicate     || false,
     details,
   }
 }
 
-export async function markSubmitted(receiptId) {
-  const res = await apiFetch(`/api/v1/ocr/receipts/${receiptId}/submit`, { method: 'PATCH' })
+export async function markSubmitted(cardId) {
+  const res = await apiFetch(`/api/v1/ocr/credit-cards/${cardId}/submit`, { method: 'PATCH' })
   if (!res.ok) {
-    console.warn(`markSubmitted failed for ${receiptId}: ${res.status}`)
+    console.warn(`markSubmitted failed for ${cardId}: ${res.status}`)
   }
 }

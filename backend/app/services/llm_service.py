@@ -17,11 +17,11 @@ from typing import Optional, Tuple
 from app.config import settings
 from app.llm.client import call_vision_llm, _strip_code_fences
 from app.llm.prompts import get_ocr_prompt
-from app.models import ExtractedReceiptData
+from app.models import ExtractedCreditCardData
 
 logger = logging.getLogger(__name__)
 
-_RECEIPT_FIELDS = set(ExtractedReceiptData.model_fields.keys())
+_CARD_FIELDS = set(ExtractedCreditCardData.model_fields.keys())
 
 
 def _get_mime_type(filename: str) -> str:
@@ -44,9 +44,9 @@ async def extract_from_image(
     bank_type: Optional[str] = None,
     hints: Optional[dict] = None,
     task_id: Optional[str] = None,
-) -> Tuple[str, ExtractedReceiptData]:
+) -> Tuple[str, ExtractedCreditCardData]:
     """
-    Send an image to OpenRouter vision LLM and return (raw_text, ExtractedReceiptData).
+    Send an image to OpenRouter vision LLM and return (raw_text, ExtractedCreditCardData).
 
     bank_type: "SCB" | "BBL" | "KBANK" — selects bank-specific prompt.
     hints: correction hints from correction_feedback (appended to prompt).
@@ -85,7 +85,6 @@ async def extract_from_image(
     if not result_text:
         raise ValueError("LLM returned empty string from vision model")
 
-    logger.info(f"Raw LLM response:\n{result_text[:1000]}")
 
     if settings.app_debug:
         tmp = pathlib.Path(tempfile.gettempdir()) / "last_llm_response.txt"
@@ -100,7 +99,7 @@ async def extract_from_image(
 
     raw_text: str = data.pop("raw_text", "") or ""
 
-    extracted = ExtractedReceiptData(**{k: v for k, v in data.items() if k in _RECEIPT_FIELDS})
+    extracted = ExtractedCreditCardData(**{k: v for k, v in data.items() if k in _CARD_FIELDS})
     extracted.raw_text = raw_text
 
     def _is_zero(v: Optional[str]) -> bool:
@@ -115,9 +114,5 @@ async def extract_from_image(
 
     n_details = len(extracted.details)
     total_sample = extracted.details[0].total if n_details else "—"
-    logger.info(
-        f"Vision OCR extracted — doc_no={extracted.doc_no}, "
-        f"bank={extracted.bank_name}, details={n_details} rows, first_total={total_sample}"
-    )
 
     return raw_text, extracted

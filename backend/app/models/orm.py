@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import JSON, BigInteger, Boolean, Column, Float, String, DateTime, Text, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Boolean, Column, Float, Numeric, String, DateTime, Text, Integer, ForeignKey, UniqueConstraint, Date
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -15,19 +15,19 @@ class OCRTask(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     original_filename = Column(String(255), nullable=False)
-    file_path = Column(String(512), nullable=True, default="N/A")
+    tenant = Column(String(100), nullable=True, index=True)
     status = Column(SAEnum(TaskStatus, values_callable=lambda obj: [e.value for e in obj]), default=TaskStatus.PENDING, nullable=False)
     ocr_engine = Column(String(100), nullable=True)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
 
-    receipt = relationship("Receipt", back_populates="task", uselist=False)
+    credit_card = relationship("CreditCard", back_populates="task", uselist=False)
 
 
-class Receipt(Base):
+class CreditCard(Base):
     """Document header — one per OCR task."""
-    __tablename__ = "receipts"
+    __tablename__ = "credit_cards"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     task_id = Column(String(36), ForeignKey("ocr_tasks.id"), nullable=False)
@@ -47,7 +47,7 @@ class Receipt(Base):
     submitted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
-    task = relationship("OCRTask", back_populates="receipt")
+    task = relationship("OCRTask", back_populates="credit_card")
 
 
 class MappingHistory(Base):
@@ -72,15 +72,16 @@ class CorrectionFeedback(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     tenant = Column(String(100), nullable=True, index=True)
-    receipt_id = Column(String(100), nullable=False, index=True)
+    doc_no = Column(String(100), nullable=False, index=True)
     bank_type = Column(String(50), nullable=False, index=True)
     field_name = Column(String(100), nullable=False, index=True)
     original_value = Column(Text, nullable=True)
     corrected_value = Column(Text, nullable=True)
+    user_id = Column(String(100), nullable=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("receipt_id", "field_name", name="uq_correction_receipt_field"),
+        UniqueConstraint("doc_no", "field_name", name="uq_correction_doc_field"),
     )
 
 
@@ -95,10 +96,12 @@ class LLMUsageLog(Base):
     prompt_tokens     = Column(Integer,     default=0)
     completion_tokens = Column(Integer,     default=0)
     total_tokens      = Column(Integer,     default=0)
+    duration_ms       = Column(Float,       nullable=True)
+    cost_usd          = Column(Numeric(10, 6), nullable=True)
     session_id        = Column(String(36),  nullable=True, index=True)
     user_id           = Column(String(100), nullable=True, index=True)
     bu_name           = Column(String(100), nullable=True, index=True)
-    tenant       = Column(String(100), nullable=True, index=True)
+    tenant            = Column(String(100), nullable=True, index=True)
     created_at        = Column(DateTime,    server_default=func.now())
 
     task = relationship("OCRTask")
@@ -124,7 +127,8 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id           = Column(BigInteger, primary_key=True, autoincrement=True)
-    tenant  = Column(String(100), nullable=True, index=True)
+    tenant       = Column(String(100), nullable=True, index=True)
+    session_id   = Column(String(36),  nullable=True, index=True)
     user_id      = Column(String(100), nullable=True, index=True)
     username     = Column(String(100), nullable=True)
     bu           = Column(String(100), nullable=True, index=True)
@@ -140,6 +144,7 @@ class PerformanceLog(Base):
     __tablename__ = "performance_logs"
 
     id           = Column(BigInteger, primary_key=True, autoincrement=True)
+    tenant       = Column(String(100), nullable=True, index=True)
     endpoint     = Column(String(200), nullable=False, index=True)
     method       = Column(String(10),  nullable=True)
     duration_ms  = Column(Float,       nullable=False)
@@ -155,6 +160,7 @@ class OutboundCallLog(Base):
     __tablename__ = "outbound_call_logs"
 
     id                   = Column(BigInteger, primary_key=True, autoincrement=True)
+    tenant               = Column(String(100), nullable=True, index=True)
     service              = Column(String(50),  nullable=False, index=True)  # openrouter | carmen
     url                  = Column(String(500), nullable=False)
     method               = Column(String(10),  nullable=True)
@@ -164,3 +170,67 @@ class OutboundCallLog(Base):
     session_id           = Column(String(36),  nullable=True, index=True)
     user_id              = Column(String(100), nullable=True)
     created_at           = Column(DateTime, server_default=func.now(), index=True)
+
+
+class DailyUsageSummary(Base):
+    """Pre-aggregated daily metrics per tenant — one row per (tenant, date)."""
+    __tablename__ = "daily_usage_summary"
+
+    id                   = Column(Integer,    primary_key=True, autoincrement=True)
+    tenant               = Column(String(100), nullable=False, index=True)
+    summary_date         = Column(DateTime,    nullable=False, index=True)
+
+    # Volume
+    total_documents      = Column(Integer, default=0)
+    total_submissions    = Column(Integer, default=0)
+
+    # LLM
+    total_llm_calls      = Column(Integer, default=0)
+    total_tokens         = Column(BigInteger, default=0)
+    total_cost_usd       = Column(Numeric(12, 4), default=0)
+    avg_llm_latency_ms   = Column(Float, default=0)
+
+    # API Performance
+    total_api_calls      = Column(Integer, default=0)
+    avg_api_latency_ms   = Column(Float, default=0)
+    p95_api_latency_ms   = Column(Float, default=0)
+    total_errors         = Column(Integer, default=0)
+
+    # Quality
+    total_corrections    = Column(Integer, default=0)
+
+    # External calls
+    total_outbound_calls = Column(Integer, default=0)
+
+    created_at           = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("tenant", "summary_date", name="uq_tenant_date"),
+    )
+
+
+class LLMModelPricing(Base):
+    __tablename__ = "model_pricing"
+
+    model_name = Column(String(255), primary_key=True)
+    input_price_per_1m = Column(Numeric(18, 9), default=0)
+    output_price_per_1m = Column(Numeric(18, 9), default=0)
+    source = Column(String(50), default="manual")
+    price_verified_at = Column(DateTime)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class APInvoice(Base):
+    __tablename__ = "ap_invoices"
+
+    id = Column(String(36), primary_key=True)
+    task_id = Column(String(36), ForeignKey("ocr_tasks.id"), index=True)
+    tenant = Column(String(100), nullable=False, index=True)
+    user_id = Column(String(36), index=True)
+
+    vendor_name = Column(String(255))
+    doc_no = Column(String(100))
+    doc_date = Column(String(50))
+    original_filename = Column(String(255))
+    
+    created_at = Column(DateTime, server_default=func.now())

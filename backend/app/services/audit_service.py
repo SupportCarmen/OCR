@@ -13,6 +13,7 @@ from typing import Optional
 from app.database import async_session
 from app.models.orm import AuditLog
 from app.auth.session import SessionInfo
+from app.context import current_session_id, current_document_ref
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,13 @@ async def log_action(
         async with async_session() as db:
             db.add(AuditLog(
                 tenant=session.tenant,
+                session_id=current_session_id.get() or None,
                 user_id=session.user_id,
                 username=session.username,
                 bu=session.bu,
                 action=action,
                 resource=resource,
-                document_ref=document_ref,
+                document_ref=document_ref or current_document_ref.get() or None,
                 ip_address=ip_address,
             ))
             await db.commit()

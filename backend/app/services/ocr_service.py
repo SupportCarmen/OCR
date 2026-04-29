@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 
 from app.config import settings
-from app.models import OCRTask, Receipt, TaskStatus, ExtractedReceiptData
+from app.models import OCRTask, CreditCard, TaskStatus, ExtractedCreditCardData
 from app.utils.image_processing import preprocess_image
 from app.services.llm_service import extract_from_image
 
@@ -24,7 +24,7 @@ async def extract_stateless(
     bank_type: Optional[str] = None,
     hints: Optional[dict] = None,
     task_id: Optional[str] = None,
-) -> ExtractedReceiptData:
+) -> ExtractedCreditCardData:
     """
     Stateless OCR extraction:
     resize → OpenRouter vision LLM → return structured data.
@@ -73,12 +73,12 @@ async def get_all_tasks(
 
 
 async def export_tasks_to_csv(db: AsyncSession) -> str:
-    """Export submitted receipts to CSV — one row per transaction label."""
+    """Export submitted credit card documents to CSV — one row per transaction label."""
     import csv
 
     result = await db.execute(
-        select(OCRTask, Receipt)
-        .join(Receipt, Receipt.task_id == OCRTask.id)
+        select(OCRTask, CreditCard)
+        .join(CreditCard, CreditCard.task_id == OCRTask.id)
         .where(OCRTask.status == TaskStatus.COMPLETED)
         .order_by(desc(OCRTask.completed_at))
     )
@@ -102,17 +102,17 @@ async def export_tasks_to_csv(db: AsyncSession) -> str:
     with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
-        for task, receipt in rows:
-            transactions = receipt.transactions or [""]
+        for task, card in rows:
+            transactions = card.transactions or [""]
             for tx in transactions:
                 writer.writerow([
                     task.completed_at.strftime("%m/%d/%Y %H:%M:%S") if task.completed_at else "",
-                    receipt.bank_name or "",
-                    receipt.doc_name or "",
-                    receipt.company_name or "",
-                    receipt.merchant_name or "",
-                    receipt.doc_date or "",
-                    receipt.doc_no or "",
+                    card.bank_name or "",
+                    card.doc_name or "",
+                    card.company_name or "",
+                    card.merchant_name or "",
+                    card.doc_date or "",
+                    card.doc_no or "",
                     tx or "",
                 ])
                 written += 1

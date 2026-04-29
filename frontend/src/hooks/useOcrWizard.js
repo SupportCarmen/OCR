@@ -4,6 +4,7 @@ import { extractFromFile } from '../lib/api/ocr'
 import { submitToLocal } from '../lib/api/submit'
 import { submitToCarmen } from '../lib/api/carmen'
 import { logCorrections, diffCorrections } from '../lib/api/feedback'
+import { getCarmenUrl } from '../lib/url'
 import { useToast } from './useToast'
 import { useModal } from './useModal'
 
@@ -25,7 +26,7 @@ export function useOcrWizard() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [status, setStatus] = useState('')
-  const [receiptId, setReceiptId] = useState(saved?.receiptId || null)
+  const [cardId, setCardId] = useState(saved?.cardId || null)
   const [headerData, setHeaderData] = useState(saved?.headerData || {})
   const [details, setDetails] = useState(saved?.details || [])
   const [originalDetails, setOriginalDetails] = useState(saved?.originalDetails || [])
@@ -62,10 +63,10 @@ export function useOcrWizard() {
 
   useEffect(() => {
     if (step > 1) {
-      const state = { step, bank, receiptId, headerData, details, originalDetails, originalHeader }
+      const state = { step, bank, cardId, headerData, details, originalDetails, originalHeader }
       localStorage.setItem('ocr_wizard_state', JSON.stringify(state))
     }
-  }, [step, bank, receiptId, headerData, details, originalDetails])
+  }, [step, bank, cardId, headerData, details, originalDetails])
 
   function handleFileChange(e) {
     const selectedFiles = e.target.files
@@ -94,16 +95,18 @@ export function useOcrWizard() {
   }
 
   function applyExtractedData(ext, taskId = null) {
-    setReceiptId(ext.doc_no || taskId || null)
+    setCardId(ext.doc_no || taskId || null)
     const header = {
       DateProcessed: new Date().toLocaleDateString('en-GB'),
-      BankName:     ext.bank_name     || '',
-      DocName:      ext.doc_name      || '',
-      CompanyName:  ext.company_name  || '',
-      DocDate:      ext.doc_date      || '',
-      DocNo:        ext.doc_no        || '',
-      MerchantName: ext.merchant_name || '',
-      MerchantId:   ext.merchant_id   || '',
+      BankName:         ext.bank_name         || '',
+      DocName:          ext.doc_name          || '',
+      CompanyName:      ext.company_name      || '',
+      DocDate:          ext.doc_date          || '',
+      DocNo:            ext.doc_no            || '',
+      MerchantName:     ext.merchant_name     || '',
+      MerchantId:       ext.merchant_id       || '',
+      BankCompanyname:  ext.bank_companyname  || '',
+      BranchNo:         ext.branch_no         || '',
     }
     setHeaderData(header)
     const detailsList = ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }]
@@ -265,9 +268,11 @@ export function useOcrWizard() {
         DocName:        headerData.DocName         || '',
         CompanyName:    headerData.CompanyName     || '',
         DocDate:        headerData.DocDate         || '',
-        DocNo:          headerData.DocNo           || '',
-        MerchantName:   headerData.MerchantName    || '',
-        MerchantId:     headerData.MerchantId      || '',
+        DocNo:            headerData.DocNo            || '',
+        MerchantName:     headerData.MerchantName     || '',
+        MerchantId:       headerData.MerchantId       || '',
+        BankCompanyname:  headerData.BankCompanyname  || '',
+        BranchNo:         headerData.BranchNo         || '',
       },
       Details: details.map(row => ({
         Transaction: row.Transaction || row.transaction || '',
@@ -285,7 +290,7 @@ export function useOcrWizard() {
 
       const corrections = diffCorrections(headerData, originalHeader, details, originalDetails)
       if (corrections.length > 0) {
-        logCorrections(receiptId, bank, corrections)
+        logCorrections(cardId, bank, corrections)
           .catch(err => console.error('[feedback] Error logging corrections:', err))
       }
 
@@ -345,7 +350,7 @@ export function useOcrWizard() {
         cancelText:  jvId ? 'เปิดดู JV' : undefined,
         cancelStyle: jvId ? { background: 'var(--teal)', color: 'white', border: '1px solid var(--teal)' } : undefined,
         onConfirm:   () => { closeModal(); setStep(5) },
-        onCancel:    jvId ? () => window.open(`https://dev.carmen4.com/#/glJv/${jvId}/show`, '_blank') : undefined,
+        onCancel:    jvId ? () => window.open(getCarmenUrl(`/glJv/${jvId}/show`), '_blank') : undefined,
       })
     } catch (err) {
       if (err.code === 'DUPLICATE_DOC_NO') {

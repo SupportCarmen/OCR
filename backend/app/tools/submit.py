@@ -8,7 +8,7 @@ Usage:
     inp = submit.SubmitInput(bank_type="SCB", ...)
     result = await submit.run(inp, db)
     if result.success:
-        receipt_id = result.output["receipt_id"]
+        card_id = result.output["card_id"]
 """
 
 import logging
@@ -21,12 +21,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import OCRTask, Receipt, TaskStatus
+from app.context import current_tenant
+from app.models import OCRTask, CreditCard, TaskStatus
 from app.tools.base import ToolResult
 
 logger = logging.getLogger(__name__)
 
-TOOL_NAME = "submit_receipt"
+TOOL_NAME = "submit_card"
 
 
 @dataclass
@@ -40,6 +41,8 @@ class SubmitInput:
     doc_name: Optional[str]
     company_name: Optional[str]
     merchant_name: Optional[str]
+    bank_companyname: Optional[str] = None
+    branch_no: Optional[str] = None
     details: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -48,7 +51,7 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
     Save confirmed receipt data to DB.
 
     Returns:
-        success=True  → output = {receipt_id, doc_no, submitted_at}
+        success=True  → output = {card_id, doc_no, submitted_at}
         success=False + output = {error: "DUPLICATE_DOC_NO", ...}  → duplicate detected
         success=False + errors   → unexpected failure
     """
@@ -57,9 +60,9 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
         # 1. Duplicate safeguard (primary check is at /extract time)
         if inp.doc_no:
             dup_result = await db.execute(
-                select(Receipt).where(
-                    Receipt.doc_no == inp.doc_no,
-                    Receipt.submitted_at.isnot(None),
+                select(CreditCard).where(
+                    CreditCard.doc_no == inp.doc_no,
+                    CreditCard.submitted_at.isnot(None),
                 )
             )
             if dup_result.scalars().first():
@@ -75,7 +78,7 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
         task = OCRTask(
             id=task_id,
             original_filename=inp.original_filename or "uploaded_file",
-            file_path="STATELESS_MODE",
+            tenant=current_tenant.get() or None,
             status=TaskStatus.COMPLETED,
             ocr_engine=settings.ocr_engine,
             completed_at=datetime.utcnow(),
@@ -89,8 +92,9 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
             if t
         ]
         bt = str(inp.bank_type or "").upper()
-        receipt = Receipt(
+        card = CreditCard(
             task_id=task.id,
+            tenant=current_tenant.get() or None,
             bank_name=inp.bank_name,
             bank_type=bt if bt in ("BBL", "KBANK", "SCB") else None,
             doc_name=inp.doc_name,
@@ -98,23 +102,25 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
             doc_date=inp.doc_date,
             doc_no=inp.doc_no,
             merchant_name=inp.merchant_name,
+            bank_companyname=inp.bank_companyname,
+            branch_no=inp.branch_no,
             transactions=transactions or None,
             submitted_at=datetime.utcnow(),
         )
-        db.add(receipt)
+        db.add(card)
         await db.flush()
 
         await db.commit()
-        logger.info(f"[{TOOL_NAME}] saved doc_no={inp.doc_no}, receipt_id={receipt.id}")
+        logger.info(f"[{TOOL_NAME}] saved doc_no={inp.doc_no}, card_id={card.id}")
 
         return ToolResult(
             success=True,
             tool=TOOL_NAME,
             input=tool_input,
             output={
-                "receipt_id": receipt.id,
+                "card_id": card.id,
                 "doc_no": inp.doc_no,
-                "submitted_at": receipt.submitted_at.isoformat(),
+                "submitted_at": card.submitted_at.isoformat() if card.submitted_at else None,
             },
             metadata={"task_id": task_id, "transaction_count": len(transactions)},
         )

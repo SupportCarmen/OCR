@@ -24,8 +24,8 @@ function mapFieldName(key) {
   return FIELD_NAME_MAP[key] || key
 }
 
-export async function logCorrections(receiptId, bankType, corrections) {
-  if (!receiptId || !bankType || !corrections.length) return
+export async function logCorrections(cardId, bankType, corrections) {
+  if (!cardId || !bankType || !corrections.length) return
 
   const results = await Promise.allSettled(
     corrections.map(({ fieldName, originalValue, correctedValue }) =>
@@ -33,7 +33,7 @@ export async function logCorrections(receiptId, bankType, corrections) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          receipt_id: receiptId,
+          doc_no: cardId,
           bank_type: bankType,
           field_name: mapFieldName(fieldName),
           original_value: String(originalValue ?? ''),

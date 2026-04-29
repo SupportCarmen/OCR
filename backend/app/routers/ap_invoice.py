@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models.orm import OCRTask, TaskStatus
 from app.auth import get_current_session, SessionInfo
 from app.services import audit_service
-from app.context import current_document_ref
+from app.context import current_document_ref, current_tenant
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ async def extract_ap_invoice(
     task = OCRTask(
         id=str(uuid.uuid4()),
         original_filename=file.filename,
-        file_path="STATELESS_AP_INVOICE",
+        tenant=current_tenant.get() or None,
         status=TaskStatus.COMPLETED,
         ocr_engine=settings.ocr_engine,
     )
@@ -67,7 +67,49 @@ async def extract_ap_invoice(
     await db.commit()
 
     try:
-        return await extract_ap_invoice_data(data_url, file.filename, task.id)
+        data = await extract_ap_invoice_data(data_url, file.filename, task.id)
+        
+        # Persist lean audit data (references only, no calculation fields)
+        from app.models.orm import APInvoice
+        from app.context import current_user_id
+        
+        ap_invoice_id = str(uuid.uuid4())
+        
+        # Check for duplicates (same doc_no + vendor_name + tenant)
+        is_duplicate = False
+        doc_no = data.get("documentNumber")
+        vendor_name = data.get("vendorName")
+        
+        if doc_no and vendor_name:
+            from sqlalchemy import select
+            dup_check = await db.execute(
+                select(APInvoice).where(
+                    APInvoice.doc_no == doc_no,
+                    APInvoice.vendor_name == vendor_name,
+                    APInvoice.tenant == (current_tenant.get() or "unknown")
+                )
+            )
+            if dup_check.scalars().first():
+                is_duplicate = True
+                logger.info(f"Duplicate AP Invoice detected: {doc_no} for {vendor_name}")
+
+        ap_inv = APInvoice(
+            id=ap_invoice_id,
+            task_id=task.id,
+            tenant=current_tenant.get() or "unknown",
+            user_id=current_user_id.get() or session.user_id,
+            vendor_name=vendor_name,
+            doc_no=doc_no,
+            doc_date=data.get("documentDate"),
+            original_filename=file.filename,
+        )
+        db.add(ap_inv)
+        await db.commit()
+        
+        data["id"] = ap_invoice_id
+        data["is_duplicate"] = is_duplicate
+        return data
+
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 

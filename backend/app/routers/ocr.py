@@ -26,8 +26,8 @@ from app.models import (
     TaskStatus,
     BankType,
     OCRTask,
-    Receipt,
-    ExtractedReceiptData,
+    CreditCard,
+    ExtractedCreditCardData,
 )
 from app.services import ocr_service
 from app.services.correction_service import get_correction_hints
@@ -36,7 +36,7 @@ from app.tools.submit import SubmitInput
 from app.utils.image_processing import is_valid_image
 from app.auth import get_current_session, SessionInfo
 from app.services import audit_service
-from app.context import current_document_ref
+from app.context import current_document_ref, current_tenant
 
 
 # ── Pydantic schemas for submit endpoint ────────────
@@ -49,14 +49,16 @@ class SubmitDetailItem(BaseModel):
 class SubmitHeader(BaseModel):
     # Accepts MerchantId from frontend for display continuity but it is NOT persisted.
     model_config = ConfigDict(extra='ignore', populate_by_name=True)
-    DateProcessed:  Optional[str] = Field(None, alias="date_processed")
-    BankName:       Optional[str] = Field(None, alias="bank_name")
-    DocName:        Optional[str] = Field(None, alias="doc_name")
-    CompanyName:    Optional[str] = Field(None, alias="company_name")
-    DocDate:        Optional[str] = Field(None, alias="doc_date")
-    DocNo:          Optional[str] = Field(None, alias="doc_no")
-    MerchantName:   Optional[str] = Field(None, alias="merchant_name")
-    MerchantId:     Optional[str] = Field(None, alias="merchant_id")
+    DateProcessed:    Optional[str] = Field(None, alias="date_processed")
+    BankName:         Optional[str] = Field(None, alias="bank_name")
+    DocName:          Optional[str] = Field(None, alias="doc_name")
+    CompanyName:      Optional[str] = Field(None, alias="company_name")
+    DocDate:          Optional[str] = Field(None, alias="doc_date")
+    DocNo:            Optional[str] = Field(None, alias="doc_no")
+    MerchantName:     Optional[str] = Field(None, alias="merchant_name")
+    MerchantId:       Optional[str] = Field(None, alias="merchant_id")
+    BankCompanyname:  Optional[str] = Field(None, alias="bank_companyname")
+    BranchNo:         Optional[str] = Field(None, alias="branch_no")
 
 class SubmitPayload(BaseModel):
     model_config = ConfigDict(extra='ignore', populate_by_name=True)
@@ -73,8 +75,8 @@ router = APIRouter(prefix="/api/v1/ocr", tags=["OCR"])
 # POST /api/v1/ocr/extract
 # ═══════════════════════════════════════════════════
 
-@router.post("/extract", response_model=List[ExtractedReceiptData])
-async def extract_receipt(
+@router.post("/extract", response_model=List[ExtractedCreditCardData])
+async def extract_card(
     request: Request,
     files: List[UploadFile] = File(..., description="รูปใบเสร็จ (JPG, PNG, PDF)"),
     bank_type: Optional[BankType] = Query(None, description="ประเภทธนาคาร BBL/KBANK/SCB"),
@@ -118,7 +120,7 @@ async def extract_receipt(
         task = OCRTask(
             id=str(uuid.uuid4()),
             original_filename=upload_file.filename,
-            file_path="STATELESS_EXTRACTION",
+            tenant=current_tenant.get() or None,
             status=TaskStatus.COMPLETED,
             ocr_engine=settings.ocr_engine,
         )
@@ -135,9 +137,9 @@ async def extract_receipt(
 
         if extracted.doc_no:
             dup = await db.execute(
-                select(Receipt).where(
-                    Receipt.doc_no == extracted.doc_no,
-                    Receipt.submitted_at.isnot(None),
+                select(CreditCard).where(
+                    CreditCard.doc_no == extracted.doc_no,
+                    CreditCard.submitted_at.isnot(None),
                 )
             )
             if dup.scalars().first():
@@ -191,14 +193,14 @@ async def get_task(
     try:
         result = await db.execute(
             select(OCRTask)
-            .options(selectinload(OCRTask.receipt))
+            .options(selectinload(OCRTask.credit_card))
             .where(OCRTask.id == task_id)
         )
         task = result.scalar_one_or_none()
         if not task:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-        receipt = task.receipt
+        credit_card = task.credit_card
 
         return JSONResponse(content={
             "id": task.id,
@@ -208,20 +210,20 @@ async def get_task(
             "error_message": task.error_message,
             "created_at": task.created_at.isoformat() if task.created_at else None,
             "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-            "receipt": {
-                "id": receipt.id,
-                "task_id": receipt.task_id,
-                "bank_name": receipt.bank_name,
-                "bank_type": receipt.bank_type.value if receipt.bank_type and hasattr(receipt.bank_type, "value") else receipt.bank_type,
-                "doc_name": receipt.doc_name,
-                "company_name": receipt.company_name,
-                "doc_date": receipt.doc_date,
-                "doc_no": receipt.doc_no,
-                "merchant_name": receipt.merchant_name,
-                "submitted_at": receipt.submitted_at.isoformat() if receipt.submitted_at else None,
-                "created_at": receipt.created_at.isoformat() if receipt.created_at else None,
-                "transactions": receipt.transactions or [],
-            } if receipt else None,
+            "credit_card": {
+                "id": credit_card.id,
+                "task_id": credit_card.task_id,
+                "bank_name": credit_card.bank_name,
+                "bank_type": credit_card.bank_type.value if credit_card.bank_type and hasattr(credit_card.bank_type, "value") else credit_card.bank_type,
+                "doc_name": credit_card.doc_name,
+                "company_name": credit_card.company_name,
+                "doc_date": credit_card.doc_date,
+                "doc_no": credit_card.doc_no,
+                "merchant_name": credit_card.merchant_name,
+                "submitted_at": credit_card.submitted_at.isoformat() if credit_card.submitted_at else None,
+                "created_at": credit_card.created_at.isoformat() if credit_card.created_at else None,
+                "transactions": credit_card.transactions or [],
+            } if credit_card else None,
         })
     except HTTPException:
         raise
@@ -231,22 +233,22 @@ async def get_task(
 
 
 # ═══════════════════════════════════════════════════
-# PATCH /api/v1/ocr/receipts/{receipt_id}/submit
+# PATCH /api/v1/ocr/credit-cards/{card_id}/submit
 # ═══════════════════════════════════════════════════
 
-@router.patch("/receipts/{receipt_id}/submit")
-async def mark_receipt_submitted(
-    receipt_id: str,
+@router.patch("/credit-cards/{card_id}/submit")
+async def mark_card_submitted(
+    card_id: str,
     db: AsyncSession = Depends(get_db),
     _session: SessionInfo = Depends(get_current_session),
 ):
-    result = await db.execute(select(Receipt).where(Receipt.id == receipt_id))
-    receipt = result.scalar_one_or_none()
-    if not receipt:
-        raise HTTPException(status_code=404, detail=f"Receipt {receipt_id} not found")
-    receipt.submitted_at = datetime.utcnow()
+    result = await db.execute(select(CreditCard).where(CreditCard.id == card_id))
+    card = result.scalar_one_or_none()
+    if not card:
+        raise HTTPException(status_code=404, detail=f"CreditCard {card_id} not found")
+    card.submitted_at = datetime.utcnow()
     await db.commit()
-    return {"ok": True, "submitted_at": receipt.submitted_at.isoformat()}
+    return {"ok": True, "submitted_at": card.submitted_at.isoformat()}
 
 
 # ═══════════════════════════════════════════════════
@@ -276,6 +278,8 @@ async def submit_receipt_stateless(
         doc_name=payload.Header.DocName,
         company_name=payload.Header.CompanyName,
         merchant_name=payload.Header.MerchantName,
+        bank_companyname=payload.Header.BankCompanyname,
+        branch_no=payload.Header.BranchNo,
         details=[
             {"transaction": d.Transaction}
             for d in payload.Details

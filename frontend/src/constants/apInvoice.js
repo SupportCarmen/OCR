@@ -99,6 +99,7 @@ export const AP_I18N = {
     errProcess: 'เกิดข้อผิดพลาดในการประมวลผล OCR กรุณาลองใหม่อีกครั้ง',
     itemCount: 'จำนวนรายการ', items: 'รายการ',
     tableTotal: 'ยอดรวมตาราง',
+    duplicateDoc: 'เอกสารซ้ำ! เลขที่เอกสารนี้และผู้ขายรายนี้มีอยู่ในระบบแล้ว',
   },
   en: {
     appTitle: 'Carmen ERP', appSub: 'AP Invoice OCR',
@@ -145,5 +146,6 @@ export const AP_I18N = {
     errProcess: 'OCR processing error. Please try again.',
     itemCount: 'Total Items', items: 'items',
     tableTotal: 'Table Total',
+    duplicateDoc: 'Duplicate Document! This document number and vendor already exist in the system.',
   },
 }

@@ -1,17 +1,10 @@
-"""
-FastAPI Application Entry Point
-================================
-AI OCR Bank Receipt / Invoice Automation Backend
-
-Start the server:
-    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-"""
-
 import sys
 import io
 import logging
+import asyncio
 import traceback
 from contextlib import asynccontextmanager
+from datetime import datetime, time as dtime
 
 # ── Force UTF-8 on Windows (prevents 'charmap' codec errors with Thai text) ──
 if sys.platform == "win32":
@@ -46,6 +39,7 @@ from app.routers.carmen import router as carmen_router
 from app.routers.tools import router as tools_router
 from app.routers.feedback import router as feedback_router
 from app.routers.ap_invoice import router as ap_invoice_router
+from app.routers.admin import router as admin_router
 
 
 # ── Logging Setup (uses the reconfigured UTF-8 stderr) ──
@@ -58,10 +52,75 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ── Background Scheduler ─────────────────────────────────────────────────────
+
+async def _scheduler_loop():
+    """
+    Lightweight background scheduler — runs inside the FastAPI event loop.
+    No external dependencies needed (no APScheduler, no celery).
+
+    Schedule:
+      - Every 24h: archive + cleanup old logs, build daily summary
+      - Every 30d: check / create future partitions
+    """
+    logger.info("📅 Background scheduler started")
+    await asyncio.sleep(60)  # wait for app to fully start
+
+    day_counter = 0
+    while True:
+        try:
+            now = datetime.utcnow()
+
+            # ── Daily: retention cleanup ──
+            if settings.retention_enabled:
+                from app.services.retention_service import archive_and_cleanup
+                logger.info("[scheduler] Running retention archive + cleanup...")
+                result = await archive_and_cleanup()
+                for table, info in result.items():
+                    if info.get("archived", 0) > 0:
+                        logger.info("[scheduler] %s: archived=%d deleted=%d",
+                                    table, info["archived"], info["deleted"])
+
+            # ── Daily: build yesterday's summary ──
+            from app.services.summary_service import build_daily_summary
+            logger.info("[scheduler] Building daily summary...")
+            await build_daily_summary()  # defaults to yesterday
+
+            # ── Monthly: check partitions ──
+            day_counter += 1
+            if day_counter % 30 == 1:  # first run + every 30 days
+                from app.services.partition_manager import ensure_partitions
+                logger.info("[scheduler] Checking partitions...")
+                part_result = await ensure_partitions()
+                for table, created in part_result.items():
+                    if created:
+                        logger.info("[scheduler] %s: created partitions %s", table, created)
+
+        except Exception as exc:
+            logger.error("[scheduler] Error: %s", exc)
+
+        # Sleep 24 hours
+        await asyncio.sleep(86400)
+
+
+async def _pricing_sync_loop():
+    """Update OpenRouter model pricing every 8 hours."""
+    while True:
+        try:
+            from app.services.usage_service import fetch_openrouter_pricing
+            await fetch_openrouter_pricing()
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.error("[pricing_scheduler] Error: %s", exc)
+        
+        await asyncio.sleep(8 * 3600)
+
+
 # ── Lifespan (startup / shutdown) ──
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
+    """Initialize database on startup, start background scheduler."""
     logger.info("🚀 Starting AI OCR Bank Receipt Backend...")
     logger.info(f"   OCR Model  : {settings.openrouter_ocr_model}")
     logger.info(f"   Sugg Model : {settings.openrouter_suggestion_model}")
@@ -69,12 +128,23 @@ async def lifespan(app: FastAPI):
     logger.info(f"   Upload Dir : {settings.upload_dir}")
     logger.info(f"   Database   : {settings.database_url}")
 
-    await init_db()
     await migrate_db()
+    await init_db()
     logger.info("✅ Database initialized")
+
+    # Start background schedulers
+    scheduler_task = asyncio.create_task(_scheduler_loop())
+    pricing_task = asyncio.create_task(_pricing_sync_loop())
 
     yield
 
+    # Cancel schedulers on shutdown
+    scheduler_task.cancel()
+    pricing_task.cancel()
+    try:
+        await asyncio.gather(scheduler_task, pricing_task)
+    except asyncio.CancelledError:
+        pass
     logger.info("👋 Shutting down AI OCR Backend")
 
 
@@ -151,13 +221,14 @@ app.include_router(carmen_router)
 app.include_router(tools_router)
 app.include_router(feedback_router)
 app.include_router(ap_invoice_router)
+app.include_router(admin_router)
 
 
 # ── Root ──
 @app.get("/", tags=["Root"])
 async def root():
     return {
-        "app": "AI OCR Bank Receipt Backend",
+        "app": "AI OCR Credit Card Statement Backend",
         "version": settings.app_version,
         "docs": "/docs",
         "health": "/api/v1/ocr/health",

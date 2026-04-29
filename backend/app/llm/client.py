@@ -90,6 +90,7 @@ async def call_vision_llm(
             total_tokens=response.usage.total_tokens,
             task_id=task_id,
             usage_type=usage_type,
+            duration_ms=(time.perf_counter() - start) * 1000,
         )
 
     content = (
@@ -152,6 +153,7 @@ async def call_text_llm(
             total_tokens=response.usage.total_tokens,
             task_id=task_id,
             usage_type=usage_type,
+            duration_ms=duration_ms,
         )
 
     content = (

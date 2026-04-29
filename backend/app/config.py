@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     session_encryption_key: str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="  # dev default — MUST override in prod
     session_ttl_hours: int = 8
 
+    # Data retention & archival
+    archive_dir: str = "./archives"
+    retention_enabled: bool = True
+
+    # Multi-tenancy
+    carmen_tenant_default: str = "dev"  # Fallback for localhost or missing Origin header
+
     class Config:
         env_file = Path(__file__).parent.parent / ".env"
         env_file_encoding = "utf-8"
@@ -55,6 +62,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Ensure upload/export directories exist
+# Ensure upload/export/archive directories exist
 os.makedirs(settings.upload_dir, exist_ok=True)
 os.makedirs(settings.export_dir, exist_ok=True)
+os.makedirs(settings.archive_dir, exist_ok=True)

@@ -1,4 +1,5 @@
 import { fmt } from '../../constants/apInvoice'
+import { getCarmenUrl } from '../../lib/url'
 
 export default function APSuccessStep({ t, headerData, lineItems, invoiceSeq, onReset }) {
   const SUMMARY_ROWS = [
@@ -55,7 +56,7 @@ export default function APSuccessStep({ t, headerData, lineItems, invoiceSeq, on
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
           {invoiceSeq && (
             <a
-              href={`https://dev.carmen4.com/#/apInvoice/${invoiceSeq}/show`}
+              href={getCarmenUrl(`/apInvoice/${invoiceSeq}/show`)}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-outline"

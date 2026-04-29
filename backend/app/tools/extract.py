@@ -1,13 +1,13 @@
 """
-Tool: extract_receipt
+Tool: extract_card
 
 Wraps the stateless OCR pipeline:
-  preprocess image → Vision LLM → ExtractedReceiptData
+  preprocess image → Vision LLM → ExtractedCreditCardData
 
 Usage:
     result = await extract.run(file_bytes, filename, bank_type)
     if result.success:
-        data = result.output  # ExtractedReceiptData dict
+        data = result.output  # ExtractedCreditCardData dict
 """
 
 import logging
@@ -18,7 +18,7 @@ from app.services import ocr_service
 
 logger = logging.getLogger(__name__)
 
-TOOL_NAME = "extract_receipt"
+TOOL_NAME = "extract_card"
 
 
 async def run(
@@ -35,7 +35,7 @@ async def run(
         bank_type:  "SCB" | "BBL" | "KBANK" — selects bank-specific prompt
 
     Returns:
-        ToolResult with output=ExtractedReceiptData dict on success
+        ToolResult with output=ExtractedCreditCardData dict on success
     """
     tool_input = {"filename": filename, "bank_type": bank_type}
     try:

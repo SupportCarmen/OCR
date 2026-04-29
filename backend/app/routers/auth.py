@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.models.orm import OcrSession
+from app.context import current_tenant
 from app.auth.session import (
     create_session_jwt,
     decode_session_jwt,
@@ -40,18 +41,6 @@ def _carmen_base(tenant: str) -> str:
     return f"https://{tenant}.carmen4.com/Carmen.API/api/interface"
 
 
-def _extract_tenant(request: Request) -> str:
-    """Derive tenant identifier from the Origin header subdomain.
-    e.g. 'https://dev.carmen4.com' → 'dev'
-    Falls back to 'unknown' if header is absent or malformed."""
-    origin = request.headers.get("origin", "")
-    try:
-        host = urlparse(origin).hostname or ""
-        # "dev.carmen4.com" → "dev"
-        subdomain = host.split(".")[0]
-        return subdomain if subdomain else "unknown"
-    except Exception:
-        return "unknown"
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -101,7 +90,7 @@ async def exchange_sso_token(
     if not token or not bu:
         raise HTTPException(status_code=400, detail="token and bu are required")
 
-    tenant = _extract_tenant(request)
+    tenant = current_tenant.get() or settings.carmen_tenant_default
 
     # Validate token is live against the tenant's Carmen instance
     await _validate_token(token, tenant)

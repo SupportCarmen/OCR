@@ -16,6 +16,7 @@ export default function APAccountMappingStep({
   onAISuggest, onAcceptAll, hasSuggestions = false, suggestLoading = false,
   onConfirmSuggest, onRejectSuggest,
   allMapped = false,
+  isDuplicate = false,
 }) {
   const taxProfile  = fmt(systemVendor.taxProfileCode1, systemVendor.taxProfileDesc1)
   const debitDept   = fmt(systemVendor.vat1DrDeptCode,  systemVendor.vat1DrDeptDesc)

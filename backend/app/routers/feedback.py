@@ -29,7 +29,7 @@ async def log_correction(
     if feedback.original_value == feedback.corrected_value:
         return CorrectionFeedbackResponse(
             id=-1,
-            receipt_id=feedback.receipt_id,
+            doc_no=feedback.doc_no,
             bank_type=feedback.bank_type,
             field_name=feedback.field_name,
             original_value=feedback.original_value,
@@ -41,16 +41,19 @@ async def log_correction(
     stmt = (
         mysql_insert(CorrectionFeedback)
         .values(
-            receipt_id=feedback.receipt_id,
+            tenant=_session.tenant,
+            doc_no=feedback.doc_no,
             bank_type=feedback.bank_type,
             field_name=feedback.field_name,
             original_value=feedback.original_value,
             corrected_value=feedback.corrected_value,
+            user_id=_session.user_id or None,
         )
         .on_duplicate_key_update(
             bank_type=feedback.bank_type,
             original_value=feedback.original_value,
             corrected_value=feedback.corrected_value,
+            user_id=_session.user_id or None,
         )
     )
     await db.execute(stmt)
@@ -59,7 +62,7 @@ async def log_correction(
     # Fetch back the full record for the response
     result = await db.execute(
         select(CorrectionFeedback).where(
-            CorrectionFeedback.receipt_id == feedback.receipt_id,
+            CorrectionFeedback.doc_no == feedback.doc_no,
             CorrectionFeedback.field_name == feedback.field_name,
         )
     )

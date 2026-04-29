@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchAccountCodes } from '../../lib/api/carmen'
+import { getCarmenUrl } from '../../lib/url'
 import Card from '../common/Card'
 import Badge from '../common/Badge'
 import CustomModal from '../common/CustomModal'
@@ -33,7 +34,7 @@ export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSou
 
   const handleOpenJv = () => {
     if (carmenJvId) {
-      window.open(`https://dev.carmen4.com/#/glJv/${carmenJvId}/show`, '_blank')
+      window.open(getCarmenUrl(`/glJv/${carmenJvId}/show`), '_blank')
     } else {
       setNoJvModal(true)
     }

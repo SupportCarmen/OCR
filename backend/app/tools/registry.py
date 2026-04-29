@@ -5,8 +5,8 @@ Usage:
     from app.tools import registry
 
     names  = registry.list_tools()
-    schema = registry.get_schema("extract_receipt")
-    result = await registry.invoke("extract_receipt", file_bytes=b"...", filename="r.jpg")
+    schema = registry.get_schema("extract_card")
+    result = await registry.invoke("extract_card", file_bytes=b"...", filename="r.jpg")
 
 Each registered tool declares a JSON Schema for its inputs.
 `invoke()` validates inputs against the schema before calling the function,
@@ -81,12 +81,12 @@ _SCHEMA_GL_PAYMENT = {
 _REGISTRY: Dict[str, Dict] = {
     extract.TOOL_NAME: {
         "fn":          extract.run,
-        "description": "Extract structured data from a bank receipt image using Vision LLM",
+        "description": "Extract structured data from a bank receipt/credit card document using Vision LLM",
         "input_schema": _SCHEMA_EXTRACT,
     },
     submit.TOOL_NAME: {
         "fn":          submit.run,
-        "description": "Persist confirmed receipt data to the local database",
+        "description": "Persist confirmed credit card document data to the local database",
         "input_schema": _SCHEMA_SUBMIT,
     },
     map_gl.TOOL_FIXED: {
