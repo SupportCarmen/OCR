@@ -17,6 +17,7 @@ class SessionInfo:
     user_id: str
     username: str
     bu: str
+    tenant: str = ""
 
 
 # ── JWT ──────────────────────────────────────────────────────────────────────

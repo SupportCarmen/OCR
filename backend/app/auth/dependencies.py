@@ -13,7 +13,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.orm import OcrSession
 from app.auth.session import SessionInfo, decode_session_jwt, decrypt_carmen_token
-from app.context import current_session_id, current_user_id, current_username, current_bu, current_carmen_token
+from app.context import current_session_id, current_user_id, current_username, current_bu, current_carmen_token, current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -48,10 +48,9 @@ async def get_current_session(
     if not session:
         raise HTTPException(status_code=401, detail="Session not found or revoked")
 
-    if session.expires_at and session.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=401, detail="Session expired — please re-enter from Carmen")
-
-    # Update last_used_at without blocking the response
+    # JWT exp claim already verified in decode_session_jwt above; Carmen 401 (caught
+    # in services/carmen_service._on_response) flips is_active=False — those two
+    # signals replace the per-row expires_at column.
     session.last_used_at = datetime.utcnow()
 
     try:
@@ -66,6 +65,7 @@ async def get_current_session(
         user_id=session.user_id or "",
         username=session.username or "",
         bu=session.bu or "",
+        tenant=session.tenant or "",
     )
 
     # Populate request-scoped context vars for middleware and services
@@ -74,6 +74,7 @@ async def get_current_session(
     current_username.set(info.username)
     current_bu.set(info.bu)
     current_carmen_token.set(info.carmen_token)
+    current_tenant.set(info.tenant)
 
     return info
 

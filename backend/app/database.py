@@ -149,6 +149,117 @@ async def _m007_create_outbound_call_logs(conn):
     """))
 
 
+async def _m013_add_tenant(conn):
+    """Add tenant to all tenant-scoped tables for multi-tenant isolation."""
+    changes = [
+        ("ocr_sessions",       "tenant VARCHAR(100) NULL AFTER id"),
+        ("receipts",           "tenant VARCHAR(100) NULL AFTER task_id"),
+        ("mapping_history",    "tenant VARCHAR(100) NULL AFTER id"),
+        ("correction_feedback","tenant VARCHAR(100) NULL AFTER id"),
+        ("llm_usage_logs",     "tenant VARCHAR(100) NULL"),
+        ("audit_logs",         "tenant VARCHAR(100) NULL AFTER id"),
+    ]
+    for table, defn in changes:
+        try:
+            await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {defn}"))
+            logger.info(f"  + {table}.tenant")
+        except Exception:
+            pass  # already exists
+
+    # Indexes for fast per-tenant queries
+    indexes = [
+        ("receipts",           "idx_receipts_tenant",     "tenant"),
+        ("mapping_history",    "idx_mapping_tenant",      "tenant"),
+        ("correction_feedback","idx_feedback_tenant",     "tenant"),
+        ("llm_usage_logs",     "idx_llm_tenant",          "tenant"),
+        ("audit_logs",         "idx_audit_tenant",        "tenant"),
+    ]
+    for table, idx_name, col in indexes:
+        try:
+            await conn.execute(text(f"ALTER TABLE {table} ADD INDEX {idx_name} ({col})"))
+            logger.info(f"  + {table}.{idx_name}")
+        except Exception:
+            pass
+
+    # Update mapping_history unique constraint to include tenant
+    try:
+        await conn.execute(text("ALTER TABLE mapping_history DROP INDEX uq_mapping_bank_field_choice"))
+    except Exception:
+        pass
+    try:
+        await conn.execute(text(
+            "ALTER TABLE mapping_history ADD CONSTRAINT uq_mapping_tenant_bank_field_choice "
+            "UNIQUE (tenant, bank_name, field_type, dept_code, acc_code)"
+        ))
+        logger.info("  + mapping_history.uq_mapping_tenant_bank_field_choice")
+    except Exception:
+        pass
+
+
+async def _m012_drop_session_expires_at(conn):
+    """Drop ocr_sessions.expires_at + its composite index.
+    JWT exp + Carmen 401 deactivation now cover everything this column did."""
+    try:
+        await conn.execute(text("ALTER TABLE ocr_sessions DROP INDEX idx_session_active_exp"))
+        logger.info("  - ocr_sessions.idx_session_active_exp")
+    except Exception:
+        pass
+    try:
+        await conn.execute(text("ALTER TABLE ocr_sessions DROP COLUMN expires_at"))
+        logger.info("  - ocr_sessions.expires_at")
+    except Exception:
+        pass
+
+
+async def _m011_merge_receipt_details_into_transactions(conn):
+    """Add receipts.transactions JSON column and drop the receipt_details table."""
+    try:
+        await conn.execute(text("ALTER TABLE receipts ADD COLUMN transactions JSON NULL"))
+        logger.info("  + receipts.transactions")
+    except Exception:
+        pass  # already exists
+    try:
+        await conn.execute(text("DROP TABLE IF EXISTS receipt_details"))
+        logger.info("  - receipt_details")
+    except Exception:
+        pass
+
+
+async def _m010_drop_sensitive_receipt_columns(conn):
+    """Drop PII / amount columns from receipts that we no longer persist."""
+    cols = [
+        "company_tax_id",
+        "company_address",
+        "account_no",
+        "merchant_id",
+        "wht_rate",
+        "wht_amount",
+        "net_amount",
+        "bank_tax_id",
+        "bank_address",
+    ]
+    for col in cols:
+        try:
+            await conn.execute(text(f"ALTER TABLE receipts DROP COLUMN {col}"))
+            logger.info(f"  - receipts.{col}")
+        except Exception:
+            pass  # column already absent
+
+
+async def _m009_drop_llm_usage_token_hash(conn):
+    """Drop unused token_hash column (and its index) from llm_usage_logs."""
+    try:
+        await conn.execute(text("ALTER TABLE llm_usage_logs DROP INDEX idx_llm_usage_token_hash"))
+        logger.info("  - llm_usage_logs.idx_llm_usage_token_hash")
+    except Exception:
+        pass
+    try:
+        await conn.execute(text("ALTER TABLE llm_usage_logs DROP COLUMN token_hash"))
+        logger.info("  - llm_usage_logs.token_hash")
+    except Exception:
+        pass
+
+
 async def _m008_create_ocr_sessions(conn):
     await conn.execute(text("""
         CREATE TABLE IF NOT EXISTS ocr_sessions (
@@ -179,6 +290,11 @@ _MIGRATIONS = [
     ("006_create_performance_logs",  _m006_create_performance_logs),
     ("007_create_outbound_call_logs", _m007_create_outbound_call_logs),
     ("008_create_ocr_sessions",      _m008_create_ocr_sessions),
+    ("009_drop_llm_usage_token_hash", _m009_drop_llm_usage_token_hash),
+    ("010_drop_sensitive_receipt_columns", _m010_drop_sensitive_receipt_columns),
+    ("011_merge_receipt_details_into_transactions", _m011_merge_receipt_details_into_transactions),
+    ("012_drop_session_expires_at", _m012_drop_session_expires_at),
+    ("013_add_tenant", _m013_add_tenant),
 ]
 
 

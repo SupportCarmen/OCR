@@ -15,8 +15,14 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL = "https://dev.carmen4.com/Carmen.API/api/interface"
-_TIMEOUT  = 30.0
+_TIMEOUT = 30.0
+
+
+def _base_url() -> str:
+    """Derive Carmen API base URL from the current request's tenant context var."""
+    from app.context import current_tenant
+    tenant = current_tenant.get() or "dev"
+    return f"https://{tenant}.carmen4.com/Carmen.API/api/interface"
 
 
 def _headers(carmen_token: str) -> Dict[str, str]:
@@ -41,7 +47,7 @@ async def _on_request(request: httpx.Request) -> None:
 
 
 async def _on_response(response: httpx.Response) -> None:
-    """Fire-and-forget log entry after Carmen responds."""
+    """Fire-and-forget log entry after Carmen responds, plus session deactivation on 401."""
     from app.services.outbound_log_service import log_outbound
     start = response.request.extensions.get("_start", time.perf_counter())
     duration_ms = (time.perf_counter() - start) * 1000
@@ -53,6 +59,30 @@ async def _on_response(response: httpx.Response) -> None:
         duration_ms=duration_ms,
         request_size_bytes=int(response.request.headers.get("content-length", 0) or 0),
     )
+    if response.status_code == 401:
+        await _deactivate_current_session()
+
+
+async def _deactivate_current_session() -> None:
+    """Mark the current request's OcrSession as inactive after a Carmen 401.
+    Carmen is the source of truth for token validity — once it rejects the token,
+    further calls in this session are pointless. Failure to update is swallowed
+    so the calling request continues to surface the 401 to the user."""
+    from app.context import current_session_id
+    from app.database import async_session
+    from app.models.orm import OcrSession
+    from sqlalchemy import update
+
+    sid = current_session_id.get() or ""
+    if not sid:
+        return
+    try:
+        async with async_session() as db:
+            await db.execute(update(OcrSession).where(OcrSession.id == sid).values(is_active=False))
+            await db.commit()
+        logger.info("Carmen returned 401 — session %s deactivated", sid)
+    except Exception:
+        logger.exception("Failed to deactivate session %s after Carmen 401", sid)
 
 
 def _client(carmen_token: str) -> httpx.AsyncClient:
@@ -68,7 +98,7 @@ def _client(carmen_token: str) -> httpx.AsyncClient:
 
 async def get_account_codes(carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.get(f"{_BASE_URL}/accountCode")
+        resp = await client.get(f"{_base_url()}/accountCode")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
@@ -76,7 +106,7 @@ async def get_account_codes(carmen_token: str) -> Any:
 
 async def get_departments(carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.get(f"{_BASE_URL}/department")
+        resp = await client.get(f"{_base_url()}/department")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
@@ -84,7 +114,7 @@ async def get_departments(carmen_token: str) -> Any:
 
 async def get_gl_prefix(carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.get(f"{_BASE_URL}/glPrefix")
+        resp = await client.get(f"{_base_url()}/glPrefix")
         if resp.status_code != 200:
             return {"Data": [], "Status": f"upstream_{resp.status_code}"}
         return resp.json()
@@ -92,7 +122,7 @@ async def get_gl_prefix(carmen_token: str) -> Any:
 
 async def post_gljv(body: dict, carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.post(f"{_BASE_URL}/gljv", json=body)
+        resp = await client.post(f"{_base_url()}/gljv", json=body)
         try:
             return resp.json()
         except Exception:
@@ -101,7 +131,7 @@ async def post_gljv(body: dict, carmen_token: str) -> Any:
 
 async def put_gljv(jvh_seq: int, body: dict, carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.put(f"{_BASE_URL}/gljv/{jvh_seq}", json=body)
+        resp = await client.put(f"{_base_url()}/gljv/{jvh_seq}", json=body)
         try:
             return resp.json()
         except Exception:
@@ -118,7 +148,7 @@ _VENDOR_FIELDS = frozenset({
 
 async def get_vendors(carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.get(f"{_BASE_URL}/vendor")
+        resp = await client.get(f"{_base_url()}/vendor")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         data = resp.json()
@@ -132,7 +162,7 @@ async def get_vendors(carmen_token: str) -> Any:
 
 async def get_tax_profiles(carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.get(f"{_BASE_URL}/taxProfile")
+        resp = await client.get(f"{_base_url()}/taxProfile")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
@@ -140,7 +170,7 @@ async def get_tax_profiles(carmen_token: str) -> Any:
 
 async def get_period_list(carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.get(f"{_BASE_URL}/getPeriodList")
+        resp = await client.get(f"{_base_url()}/getPeriodList")
         if resp.status_code != 200:
             raise CarmenAPIError(resp.status_code, resp.text)
         return resp.json()
@@ -148,7 +178,7 @@ async def get_period_list(carmen_token: str) -> Any:
 
 async def post_input_tax(body: dict, carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.post(f"{_BASE_URL}/inputTaxRec", json=body)
+        resp = await client.post(f"{_base_url()}/inputTaxRec", json=body)
         try:
             return resp.json()
         except Exception:
@@ -157,7 +187,7 @@ async def post_input_tax(body: dict, carmen_token: str) -> Any:
 
 async def put_input_tax(rec_seq: int, body: dict, carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.put(f"{_BASE_URL}/inputTaxRec/{rec_seq}", json=body)
+        resp = await client.put(f"{_base_url()}/inputTaxRec/{rec_seq}", json=body)
         try:
             return resp.json()
         except Exception:
@@ -166,7 +196,7 @@ async def put_input_tax(rec_seq: int, body: dict, carmen_token: str) -> Any:
 
 async def post_invoice(body: dict, carmen_token: str) -> Any:
     async with _client(carmen_token) as client:
-        resp = await client.post(f"{_BASE_URL}/invoice", json=body)
+        resp = await client.post(f"{_base_url()}/invoice", json=body)
         try:
             return resp.json()
         except Exception:

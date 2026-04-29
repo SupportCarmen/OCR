@@ -43,6 +43,7 @@ async def log_action(
     try:
         async with async_session() as db:
             db.add(AuditLog(
+                tenant=session.tenant,
                 user_id=session.user_id,
                 username=session.username,
                 bu=session.bu,

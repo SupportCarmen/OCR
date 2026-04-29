@@ -12,6 +12,7 @@ current_user_id:       ContextVar[str] = ContextVar("current_user_id",       def
 current_username:      ContextVar[str] = ContextVar("current_username",       default="")
 current_bu:            ContextVar[str] = ContextVar("current_bu",             default="")
 current_carmen_token:  ContextVar[str] = ContextVar("current_carmen_token",   default="")
+current_tenant:   ContextVar[str] = ContextVar("current_tenant",    default="")
 
 # Set by route handlers after they know which document is being processed
 current_document_ref: ContextVar[str] = ContextVar("current_document_ref", default="")

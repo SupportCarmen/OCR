@@ -1,4 +1,3 @@
-import hashlib
 import logging
 from typing import Optional
 from app.database import async_session
@@ -21,12 +20,9 @@ async def log_llm_usage(
     from request context vars so callers don't need to pass them.
     Never raises — logging must not interrupt the main flow.
     """
-    from app.context import current_session_id, current_user_id, current_bu, current_carmen_token
+    from app.context import current_session_id, current_user_id, current_bu, current_tenant
 
     try:
-        raw_token = current_carmen_token.get() or ""
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest() if raw_token else None
-
         async with async_session() as db:
             db.add(LLMUsageLog(
                 task_id=task_id,
@@ -38,7 +34,7 @@ async def log_llm_usage(
                 session_id=current_session_id.get() or None,
                 user_id=current_user_id.get() or None,
                 bu_name=current_bu.get() or bu_name or None,
-                token_hash=token_hash,
+                tenant=current_tenant.get() or None,
             ))
             await db.commit()
             logger.debug("LLM usage logged: %s %s tokens session=%s",
