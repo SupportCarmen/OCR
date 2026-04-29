@@ -24,6 +24,11 @@ from app.services.carmen_service import (
     put_gljv,
     put_input_tax,
 )
+from app.database import get_db
+from app.models.orm import APInvoice
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +120,24 @@ async def proxy_update_input_tax(rec_seq: int, request: Request, session: Sessio
 
 
 @router.post("/invoice")
-async def proxy_create_invoice(request: Request, session: SessionInfo = Depends(get_current_session)):
+async def proxy_create_invoice(
+    request: Request,
+    ap_invoice_id: str = None,
+    db: AsyncSession = Depends(get_db),
+    session: SessionInfo = Depends(get_current_session)
+):
     body = await request.json()
     try:
-        return await post_invoice(body, session.carmen_token)
+        res = await post_invoice(body, session.carmen_token)
+        # If Carmen submission is successful, mark the internal APInvoice as submitted
+        if res and res.get("Code", 0) >= 0 and ap_invoice_id:
+            stmt = select(APInvoice).where(APInvoice.id == ap_invoice_id)
+            result = await db.execute(stmt)
+            inv = result.scalar_one_or_none()
+            if inv:
+                inv.submitted_at = datetime.utcnow()
+                await db.commit()
+                logger.info(f"Marked AP Invoice {ap_invoice_id} as submitted at {inv.submitted_at}")
+        return res
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen Invoice ล้มเหลว: {e.detail}")

@@ -38,8 +38,12 @@ export async function submitToCarmen(payload) {
   return res.json()
 }
 
-export async function submitAPInvoiceToCarmen(payload) {
-  const res = await apiFetch('/api/v1/ocr/carmen/invoice', {
+export async function submitAPInvoiceToCarmen(payload, ap_invoice_id = null) {
+  const url = ap_invoice_id 
+    ? `/api/v1/ocr/carmen/invoice?ap_invoice_id=${ap_invoice_id}`
+    : '/api/v1/ocr/carmen/invoice'
+    
+  const res = await apiFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

@@ -79,10 +79,12 @@ CREATE TABLE IF NOT EXISTS ap_invoices (
     doc_no            VARCHAR(100) NULL,
     doc_date          VARCHAR(50)  NULL,
     original_filename VARCHAR(255) NULL,
+    submitted_at      DATETIME     NULL        COMMENT 'NULL = pending',
     created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (id),
     INDEX idx_ap_task (task_id),
+    INDEX idx_ap_submitted_at (submitted_at),
     CONSTRAINT fk_ap_task FOREIGN KEY (task_id) REFERENCES ocr_tasks(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

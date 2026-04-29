@@ -75,6 +75,7 @@ async def extract_ap_invoice(
         ap_invoice_id = str(uuid.uuid4())
 
         # Check for duplicates (same doc_no + vendor_name) — tenant isolation by DB
+        # Match only documents that have been successfully submitted (submitted_at is not null)
         is_duplicate = False
         doc_no      = data.get("documentNumber")
         vendor_name = data.get("vendorName")
@@ -84,25 +85,31 @@ async def extract_ap_invoice(
                 select(APInvoice).where(
                     APInvoice.doc_no == doc_no,
                     APInvoice.vendor_name == vendor_name,
+                    APInvoice.submitted_at.isnot(None),
                 )
             )
             if dup_check.scalars().first():
                 is_duplicate = True
                 logger.info(f"Duplicate AP Invoice detected: {doc_no} for {vendor_name}")
 
-        ap_inv = APInvoice(
-            id=ap_invoice_id,
-            task_id=task.id,
-            user_id=current_user_id.get() or session.user_id,
-            vendor_name=vendor_name,
-            doc_no=doc_no,
-            doc_date=data.get("documentDate"),
-            original_filename=file.filename,
-        )
-        db.add(ap_inv)
-        await db.commit()
-        
-        data["id"] = ap_invoice_id
+        # Only save to ap_invoices if NOT a duplicate
+        if not is_duplicate:
+            ap_inv = APInvoice(
+                id=ap_invoice_id,
+                task_id=task.id,
+                user_id=current_user_id.get() or session.user_id,
+                vendor_name=vendor_name,
+                doc_no=doc_no,
+                doc_date=data.get("documentDate"),
+                original_filename=file.filename,
+            )
+            db.add(ap_inv)
+            await db.commit()
+            data["id"] = ap_invoice_id
+        else:
+            # For duplicates, we don't save a new APInvoice record, 
+            # but we still return the extracted data for UI display.
+            data["id"] = None
         data["is_duplicate"] = is_duplicate
         return data
 

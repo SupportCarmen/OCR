@@ -203,4 +203,5 @@ class APInvoice(Base):
     doc_no            = Column(String(100), nullable=True)
     doc_date          = Column(String(50),  nullable=True)
     original_filename = Column(String(255), nullable=True)
+    submitted_at      = Column(DateTime,    nullable=True)
     created_at        = Column(DateTime,    server_default=func.now())

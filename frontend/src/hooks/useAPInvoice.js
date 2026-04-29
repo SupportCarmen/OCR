@@ -137,6 +137,7 @@ export function useAPInvoice() {
   const [glLoaded, setGlLoaded] = useState(false)
   const [modal, setModal] = useState({ show: false })
   const [isDuplicate, setIsDuplicate] = useState(false)
+  const [apInvoiceId, setApInvoiceId] = useState(null)
 
   const fileInputRef = useRef(null)
 
@@ -302,7 +303,8 @@ export function useAPInvoice() {
             })
             return
           }
-
+          
+          setApInvoiceId(data.id)
           setIsDuplicate(!!data.is_duplicate)
 
           setHeaderData({
@@ -482,7 +484,7 @@ export function useAPInvoice() {
     showToast('กำลังส่ง AP Invoice ไปยัง Carmen ERP...', 'info')
     try {
       const payload = buildInvoicePayload(headerData, lineItems, systemVendor)
-      const result = await submitAPInvoiceToCarmen(payload)
+      const result = await submitAPInvoiceToCarmen(payload, apInvoiceId)
       if (result?.Code < 0) {
         showToast('Carmen ERP ไม่ยอมรับข้อมูล กรุณาตรวจสอบ', 'warning')
         setModal({
@@ -519,6 +521,7 @@ export function useAPInvoice() {
     setLineItems([]); setFieldMappings(DEFAULT_MAPPINGS); setStep(1)
     setGlLoaded(false)
     setIsDuplicate(false)
+    setApInvoiceId(null)
   }
 
   return {
