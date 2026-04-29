@@ -94,18 +94,21 @@ async def _aggregate(db, params: dict) -> dict:
     """), params)
     perf = perf_result.mappings().fetchone()
 
-    p95_result = await db.execute(text("""
+    # Calculate P95 latency: fetch count first to determine offset in Python
+    # (MySQL doesn't support expressions/subqueries in OFFSET)
+    p95_count_res = await db.execute(text("""
+        SELECT COUNT(*) FROM performance_logs
+        WHERE created_at >= :start AND created_at < :end
+    """), params)
+    total_perf = p95_count_res.scalar() or 0
+    
+    p95_offset = max(0, int(total_perf * 0.95) - 1)
+    
+    p95_result = await db.execute(text(f"""
         SELECT duration_ms FROM performance_logs
         WHERE created_at >= :start AND created_at < :end
         ORDER BY duration_ms ASC
-        LIMIT 1
-        OFFSET GREATEST(0,
-            CAST(
-                (SELECT COUNT(*) FROM performance_logs
-                 WHERE created_at >= :start AND created_at < :end
-                ) * 0.95 AS UNSIGNED
-            ) - 1
-        )
+        LIMIT 1 OFFSET {p95_offset}
     """), params)
     p95_row = p95_result.fetchone()
 

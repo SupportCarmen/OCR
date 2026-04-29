@@ -65,7 +65,7 @@ async def get_current_session(
         user_id=session.user_id or "",
         username=session.username or "",
         bu=session.bu or "",
-        tenant=session.tenant or "",
+        tenant=current_tenant.get("") or "",
     )
 
     # Populate request-scoped context vars for middleware and services

@@ -134,7 +134,8 @@ async def lifespan(_app: FastAPI):
     logger.info(f"   Sugg Model : {settings.openrouter_suggestion_model}")
     logger.info(f"   OpenRouter : {'✅ Configured' if settings.openrouter_api_key else '❌ Not set'}")
     logger.info(f"   Upload Dir : {settings.upload_dir}")
-    logger.info(f"   Database   : {settings.database_url}")
+    from app.database import _db_root_url
+    logger.info(f"   Database   : {_db_root_url()} (Schema pattern: carmen_ai_*)")
 
     await migrate_all_tenants()
     await init_db()

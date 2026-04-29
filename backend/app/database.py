@@ -36,8 +36,16 @@ logger = logging.getLogger(__name__)
 # ── URL helpers ───────────────────────────────────────────────────────────────
 
 def _db_root_url() -> str:
-    """Strip the database name from DATABASE_URL."""
-    return settings.database_url.rsplit("/", 1)[0]
+    """
+    Returns the database root URL without the database name.
+    Handles URLs with or without a trailing slash/database name.
+    """
+    url = settings.database_url.rstrip("/")
+    # If the URL contains more than 2 slashes (e.g., mysql://user:pass@host/db)
+    # the last part is the database name; strip it.
+    if url.count("/") > 2:
+        return url.rsplit("/", 1)[0]
+    return url
 
 def _tenant_db_url(tenant: str) -> str:
     return f"{_db_root_url()}/carmen_ai_{tenant}"
@@ -155,6 +163,17 @@ async def provision_tenant(tenant: str) -> None:
             )
 
     logger.info("Tables and migrations initialised for tenant: %s", tenant)
+
+    # Pre-sync model pricing for the new tenant
+    from app.services.usage_service import fetch_openrouter_pricing
+    from app.context import current_tenant
+    token = current_tenant.set(tenant)
+    try:
+        await fetch_openrouter_pricing()
+    except Exception as e:
+        logger.warning("[%s] Initial pricing sync failed: %s", tenant, e)
+    finally:
+        current_tenant.reset(token)
 
 
 async def get_all_tenants() -> list[str]:
