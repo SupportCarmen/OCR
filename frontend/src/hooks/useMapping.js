@@ -489,7 +489,7 @@ export function useMapping() {
     saving, saveAllSettings,
     acceptAllModal, setAcceptAllModal, handleAcceptAll,
     suggestionMeta, mainSuggestions, suggestLoading, autoSuggest, confirmMainSuggestion, rejectMainSuggestion,
-    paymentSuggestions, paymentSuggestLoading, autoSuggestPaymentTypes, confirmPaymentSuggestion, rejectPaymentSuggestion,
+    paymentSuggestions, setPaymentSuggestions, paymentSuggestLoading, autoSuggestPaymentTypes, confirmPaymentSuggestion, rejectPaymentSuggestion,
     loadInitialData,
     companyRequiredFields, missingCompanyFields, missingTopFields,
     allPaymentTypes: [...activeScan.paymentTypes, ...customPaymentTypes.filter(t => !activeScan.paymentTypes.has(t))],

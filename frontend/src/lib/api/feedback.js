@@ -17,7 +17,6 @@ const FIELD_NAME_MAP = {
   pay_amt: 'pay_amt',
   commis_amt: 'commis_amt',
   tax_amt: 'tax_amt',
-  wht_amount: 'wht_amount',
   total: 'total',
 }
 

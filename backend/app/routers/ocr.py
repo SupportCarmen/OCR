@@ -40,31 +40,23 @@ from app.context import current_document_ref
 
 
 # ── Pydantic schemas for submit endpoint ────────────
+# Frontend sends amount fields too (PayAmt/CommisAmt/TaxAmt/WHTAmount/Total)
+# but only Transaction is persisted; the rest are silently ignored.
 class SubmitDetailItem(BaseModel):
     model_config = ConfigDict(extra='ignore', populate_by_name=True)
     Transaction: Optional[str] = Field(None, alias="transaction")
-    PayAmt:      Optional[float] = Field(0,    alias="pay_amt")
-    CommisAmt:   Optional[float] = Field(0,    alias="commis_amt")
-    TaxAmt:      Optional[float] = Field(0,    alias="tax_amt")
-    WHTAmount:   Optional[float] = Field(0,    alias="wht_amount")
-    Total:       Optional[float] = Field(0,    alias="total")
 
 class SubmitHeader(BaseModel):
+    # Accepts MerchantId from frontend for display continuity but it is NOT persisted.
     model_config = ConfigDict(extra='ignore', populate_by_name=True)
     DateProcessed:  Optional[str] = Field(None, alias="date_processed")
     BankName:       Optional[str] = Field(None, alias="bank_name")
     DocName:        Optional[str] = Field(None, alias="doc_name")
     CompanyName:    Optional[str] = Field(None, alias="company_name")
-    CompanyTaxId:   Optional[str] = Field(None, alias="company_tax_id")
-    CompanyAddress: Optional[str] = Field(None, alias="company_address")
-    AccountNo:      Optional[str] = Field(None, alias="account_no")
     DocDate:        Optional[str] = Field(None, alias="doc_date")
     DocNo:          Optional[str] = Field(None, alias="doc_no")
     MerchantName:   Optional[str] = Field(None, alias="merchant_name")
     MerchantId:     Optional[str] = Field(None, alias="merchant_id")
-    WhtRate:        Optional[str] = Field(None, alias="wht_rate")
-    WhtAmount:      Optional[float] = Field(None, alias="wht_amount")
-    NetAmount:      Optional[float] = Field(None, alias="net_amount")
 
 class SubmitPayload(BaseModel):
     model_config = ConfigDict(extra='ignore', populate_by_name=True)
@@ -199,7 +191,7 @@ async def get_task(
     try:
         result = await db.execute(
             select(OCRTask)
-            .options(selectinload(OCRTask.receipt).selectinload(Receipt.details))
+            .options(selectinload(OCRTask.receipt))
             .where(OCRTask.id == task_id)
         )
         task = result.scalar_one_or_none()
@@ -207,17 +199,6 @@ async def get_task(
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
         receipt = task.receipt
-        details = []
-        if receipt:
-            for d in receipt.details:
-                details.append({
-                    "transaction": d.transaction,
-                    "pay_amt": float(d.pay_amt) if d.pay_amt is not None else None,
-                    "commis_amt": float(d.commis_amt) if d.commis_amt is not None else None,
-                    "tax_amt": float(d.tax_amt) if d.tax_amt is not None else None,
-                    "wht_amount": float(d.wht_amount) if d.wht_amount is not None else None,
-                    "total": float(d.total) if d.total is not None else None,
-                })
 
         return JSONResponse(content={
             "id": task.id,
@@ -234,19 +215,12 @@ async def get_task(
                 "bank_type": receipt.bank_type.value if receipt.bank_type and hasattr(receipt.bank_type, "value") else receipt.bank_type,
                 "doc_name": receipt.doc_name,
                 "company_name": receipt.company_name,
-                "company_tax_id": receipt.company_tax_id,
-                "company_address": receipt.company_address,
-                "account_no": receipt.account_no,
                 "doc_date": receipt.doc_date,
                 "doc_no": receipt.doc_no,
                 "merchant_name": receipt.merchant_name,
-                "merchant_id": receipt.merchant_id,
-                "wht_rate": receipt.wht_rate,
-                "wht_amount": float(receipt.wht_amount) if receipt.wht_amount is not None else None,
-                "net_amount": float(receipt.net_amount) if receipt.net_amount is not None else None,
                 "submitted_at": receipt.submitted_at.isoformat() if receipt.submitted_at else None,
                 "created_at": receipt.created_at.isoformat() if receipt.created_at else None,
-                "details": details,
+                "transactions": receipt.transactions or [],
             } if receipt else None,
         })
     except HTTPException:
@@ -301,23 +275,9 @@ async def submit_receipt_stateless(
         bank_name=payload.Header.BankName,
         doc_name=payload.Header.DocName,
         company_name=payload.Header.CompanyName,
-        company_tax_id=payload.Header.CompanyTaxId,
-        company_address=payload.Header.CompanyAddress,
-        account_no=payload.Header.AccountNo,
         merchant_name=payload.Header.MerchantName,
-        merchant_id=payload.Header.MerchantId,
-        wht_rate=payload.Header.WhtRate,
-        wht_amount=payload.Header.WhtAmount,
-        net_amount=payload.Header.NetAmount,
         details=[
-            {
-                "transaction": d.Transaction,
-                "pay_amt":     d.PayAmt,
-                "commis_amt":  d.CommisAmt,
-                "tax_amt":     d.TaxAmt,
-                "wht_amount":  d.WHTAmount,
-                "total":       d.Total,
-            }
+            {"transaction": d.Transaction}
             for d in payload.Details
         ],
     )

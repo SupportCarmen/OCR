@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import BigInteger, Boolean, Column, Float, String, DateTime, Text, Integer, ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Boolean, Column, Float, String, DateTime, Text, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -32,54 +32,30 @@ class Receipt(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     task_id = Column(String(36), ForeignKey("ocr_tasks.id"), nullable=False)
 
+    tenant = Column(String(100), nullable=True, index=True)
     bank_name = Column(String(255), nullable=True)
     bank_type = Column(SAEnum(BankType, values_callable=lambda obj: [e.value for e in obj]), nullable=True)
     doc_name = Column(String(255), nullable=True)
     company_name = Column(String(255), nullable=True)
-    company_tax_id = Column(String(50), nullable=True)
-    company_address = Column(Text, nullable=True)
-    account_no = Column(String(100), nullable=True)
     doc_date = Column(String(50), nullable=True)
     doc_no = Column(String(100), nullable=True, index=True)
     merchant_name = Column(String(255), nullable=True)
-    merchant_id = Column(String(100), nullable=True)
-    wht_rate = Column(String(20), nullable=True)
-    wht_amount = Column(Numeric(15, 2), nullable=True)
-    net_amount = Column(Numeric(15, 2), nullable=True)
     bank_companyname = Column(String(255), nullable=True)
-    bank_tax_id = Column(String(50), nullable=True)
-    bank_address = Column(Text, nullable=True)
     branch_no = Column(String(50), nullable=True)
+    transactions = Column(JSON, nullable=True)
 
     submitted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     task = relationship("OCRTask", back_populates="receipt")
-    details = relationship("ReceiptDetail", back_populates="receipt", cascade="all, delete-orphan")
-
-
-class ReceiptDetail(Base):
-    """Payment item — many per receipt."""
-    __tablename__ = "receipt_details"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    receipt_id = Column(String(36), ForeignKey("receipts.id"), nullable=False)
-
-    transaction = Column(String(255), nullable=True)
-    pay_amt = Column(Numeric(15, 2), nullable=True)
-    commis_amt = Column(Numeric(15, 2), nullable=True)
-    tax_amt = Column(Numeric(15, 2), nullable=True)
-    wht_amount = Column(Numeric(15, 2), nullable=True)
-    total = Column(Numeric(15, 2), nullable=True)
-
-    receipt = relationship("Receipt", back_populates="details")
 
 
 class MappingHistory(Base):
-    """Confirmed account mapping history — one row per (bank_name, field_type)."""
+    """Confirmed account mapping history — one row per (tenant, bank_name, field_type)."""
     __tablename__ = "mapping_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant = Column(String(100), nullable=True, index=True)
     bank_name = Column(String(100), nullable=False, index=True)
     field_type = Column(String(100), nullable=False)
     dept_code = Column(String(100), nullable=True)
@@ -87,7 +63,7 @@ class MappingHistory(Base):
     confirmed_count = Column(Integer, default=1)
     updated_at = Column(DateTime, server_default=func.now())
 
-    __table_args__ = (UniqueConstraint("bank_name", "field_type", "dept_code", "acc_code", name="uq_mapping_bank_field_choice"),)
+    __table_args__ = (UniqueConstraint("tenant", "bank_name", "field_type", "dept_code", "acc_code", name="uq_mapping_tenant_bank_field_choice"),)
 
 
 class CorrectionFeedback(Base):
@@ -95,6 +71,7 @@ class CorrectionFeedback(Base):
     __tablename__ = "correction_feedback"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant = Column(String(100), nullable=True, index=True)
     receipt_id = Column(String(100), nullable=False, index=True)
     bank_type = Column(String(50), nullable=False, index=True)
     field_name = Column(String(100), nullable=False, index=True)
@@ -118,10 +95,10 @@ class LLMUsageLog(Base):
     prompt_tokens     = Column(Integer,     default=0)
     completion_tokens = Column(Integer,     default=0)
     total_tokens      = Column(Integer,     default=0)
-    session_id        = Column(String(36),  nullable=True, index=True)   # ocr_sessions.id
+    session_id        = Column(String(36),  nullable=True, index=True)
     user_id           = Column(String(100), nullable=True, index=True)
     bu_name           = Column(String(100), nullable=True, index=True)
-    token_hash        = Column(String(64),  nullable=True)   # kept for backward compat — no longer written
+    tenant       = Column(String(100), nullable=True, index=True)
     created_at        = Column(DateTime,    server_default=func.now())
 
     task = relationship("OCRTask")
@@ -132,13 +109,13 @@ class OcrSession(Base):
     __tablename__ = "ocr_sessions"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    carmen_token_encrypted = Column(Text, nullable=False)   # Fernet-encrypted Carmen token
+    carmen_token_encrypted = Column(Text, nullable=False)
+    tenant = Column(String(100), nullable=True, index=True)
     user_id = Column(String(100), nullable=True, index=True)
     username = Column(String(100), nullable=True)
     bu = Column(String(100), nullable=True, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
-    expires_at = Column(DateTime, nullable=True)
     last_used_at = Column(DateTime, nullable=True)
 
 
@@ -147,6 +124,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id           = Column(BigInteger, primary_key=True, autoincrement=True)
+    tenant  = Column(String(100), nullable=True, index=True)
     user_id      = Column(String(100), nullable=True, index=True)
     username     = Column(String(100), nullable=True)
     bu           = Column(String(100), nullable=True, index=True)

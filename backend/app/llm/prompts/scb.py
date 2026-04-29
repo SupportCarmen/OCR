@@ -13,11 +13,6 @@ Document layout:
 - "MERCHANT NUMBER"       → merchant_id (header field)
 - "MERCHANT NAME"         → merchant_name (header field)
 - "NAME" (address section) → company_name
-- "TAX ID" or tax number  → company_tax_id (digits only)
-- "ACCOUNT NO" or A/C NO  → account_no
-- "WITHHOLDING TAX = X.XX" → wht_amount (document-level header field)
-- "NET AMOUNT = X.XX"     → net_amount (document-level grand total)
-- wht_rate: look for "อัตรา 3.00%" or "3.00%" near the WHT sentence → extract "3.00"
 
 Main table columns:
   CARD TYPE | S/D AMOUNT | DISCOUNT AMOUNT | VALUE ADDED TAX | AMOUNT CREDIT TO MERCHANT

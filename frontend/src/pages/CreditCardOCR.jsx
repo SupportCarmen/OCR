@@ -6,7 +6,7 @@ export default function CreditCardOCR() {
   const {
     step, bank, files, previewUrl, previewType,
     loading, submitting, status,
-    headerData, receiptMeta, details,
+    headerData, details,
     fileInputRef,
     toasts, modal, showToast, showModal, closeModal,
     setBank, setStep,

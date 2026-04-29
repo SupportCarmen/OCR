@@ -1,7 +1,6 @@
 from .enums import TaskStatus, BankType
-from .orm import OCRTask, Receipt, ReceiptDetail, MappingHistory, CorrectionFeedback
+from .orm import OCRTask, Receipt, MappingHistory, CorrectionFeedback
 from .schemas import (
-    ReceiptDetailSchema,
     ReceiptSchema,
     OCRTaskResponse,
     OCRTaskListResponse,
@@ -14,8 +13,8 @@ from .schemas import (
 
 __all__ = [
     "TaskStatus", "BankType",
-    "OCRTask", "Receipt", "ReceiptDetail", "MappingHistory", "CorrectionFeedback",
-    "ReceiptDetailSchema", "ReceiptSchema", "OCRTaskResponse", "OCRTaskListResponse",
+    "OCRTask", "Receipt", "MappingHistory", "CorrectionFeedback",
+    "ReceiptSchema", "OCRTaskResponse", "OCRTaskListResponse",
     "OCRUploadResponse", "ExtractedDetailRow", "ExtractedReceiptData",
     "CorrectionFeedbackRequest", "CorrectionFeedbackResponse",
 ]

@@ -15,14 +15,13 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import OCRTask, Receipt, ReceiptDetail, TaskStatus
+from app.models import OCRTask, Receipt, TaskStatus
 from app.tools.base import ToolResult
 
 logger = logging.getLogger(__name__)
@@ -40,14 +39,7 @@ class SubmitInput:
     bank_name: Optional[str]
     doc_name: Optional[str]
     company_name: Optional[str]
-    company_tax_id: Optional[str]
-    company_address: Optional[str]
-    account_no: Optional[str]
     merchant_name: Optional[str]
-    merchant_id: Optional[str]
-    wht_rate: Optional[str]
-    wht_amount: Optional[float]
-    net_amount: Optional[float]
     details: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -91,7 +83,11 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
         db.add(task)
         await db.flush()
 
-        # 3. Create Receipt (header)
+        # 3. Create Receipt (header) — only payment-type labels are persisted from details.
+        transactions = [
+            t for t in (str(item.get("transaction") or "").strip() for item in inp.details)
+            if t
+        ]
         bt = str(inp.bank_type or "").upper()
         receipt = Receipt(
             task_id=task.id,
@@ -99,32 +95,14 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
             bank_type=bt if bt in ("BBL", "KBANK", "SCB") else None,
             doc_name=inp.doc_name,
             company_name=inp.company_name,
-            company_tax_id=inp.company_tax_id,
-            company_address=inp.company_address,
-            account_no=inp.account_no,
             doc_date=inp.doc_date,
             doc_no=inp.doc_no,
             merchant_name=inp.merchant_name,
-            merchant_id=inp.merchant_id,
-            wht_rate=inp.wht_rate,
-            wht_amount=inp.wht_amount,
-            net_amount=inp.net_amount,
+            transactions=transactions or None,
             submitted_at=datetime.utcnow(),
         )
         db.add(receipt)
         await db.flush()
-
-        # 4. Create ReceiptDetail rows
-        for item in inp.details:
-            db.add(ReceiptDetail(
-                receipt_id=receipt.id,
-                transaction=item.get("transaction"),
-                pay_amt=Decimal(str(item.get("pay_amt") or 0)),
-                commis_amt=Decimal(str(item.get("commis_amt") or 0)),
-                tax_amt=Decimal(str(item.get("tax_amt") or 0)),
-                wht_amount=Decimal(str(item.get("wht_amount") or 0)),
-                total=Decimal(str(item.get("total") or 0)),
-            ))
 
         await db.commit()
         logger.info(f"[{TOOL_NAME}] saved doc_no={inp.doc_no}, receipt_id={receipt.id}")
@@ -138,7 +116,7 @@ async def run(inp: SubmitInput, db: AsyncSession) -> ToolResult:
                 "doc_no": inp.doc_no,
                 "submitted_at": receipt.submitted_at.isoformat(),
             },
-            metadata={"task_id": task_id, "detail_rows": len(inp.details)},
+            metadata={"task_id": task_id, "transaction_count": len(transactions)},
         )
 
     except Exception as exc:

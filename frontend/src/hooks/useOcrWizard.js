@@ -27,7 +27,6 @@ export function useOcrWizard() {
   const [status, setStatus] = useState('')
   const [receiptId, setReceiptId] = useState(saved?.receiptId || null)
   const [headerData, setHeaderData] = useState(saved?.headerData || {})
-  const [receiptMeta, setReceiptMeta] = useState(saved?.receiptMeta || {})
   const [details, setDetails] = useState(saved?.details || [])
   const [originalDetails, setOriginalDetails] = useState(saved?.originalDetails || [])
   const [originalHeader, setOriginalHeader] = useState(saved?.originalHeader || {})
@@ -63,10 +62,10 @@ export function useOcrWizard() {
 
   useEffect(() => {
     if (step > 1) {
-      const state = { step, bank, receiptId, headerData, receiptMeta, details, originalDetails, originalHeader }
+      const state = { step, bank, receiptId, headerData, details, originalDetails, originalHeader }
       localStorage.setItem('ocr_wizard_state', JSON.stringify(state))
     }
-  }, [step, bank, receiptId, headerData, receiptMeta, details, originalDetails])
+  }, [step, bank, receiptId, headerData, details, originalDetails])
 
   function handleFileChange(e) {
     const selectedFiles = e.target.files
@@ -107,28 +106,18 @@ export function useOcrWizard() {
       MerchantId:   ext.merchant_id   || '',
     }
     setHeaderData(header)
-    setReceiptMeta({
-      CompanyTaxId:   ext.company_tax_id  || '',
-      CompanyAddress: ext.company_address || '',
-      AccountNo:      ext.account_no      || '',
-      WhtRate:        ext.wht_rate        || '',
-      WhtAmount: ext.wht_amount != null ? parseFloat(ext.wht_amount) || null : null,
-      NetAmount: ext.net_amount != null ? parseFloat(ext.net_amount) || null : null,
-    })
     const detailsList = ext.details?.length ? ext.details : [{ ...EMPTY_DETAIL_ROW }]
     setDetails(detailsList)
     setOriginalDetails(JSON.parse(JSON.stringify(detailsList)))
     setOriginalHeader(JSON.parse(JSON.stringify(header)))
 
-    if (ext.bank_companyname || ext.bank_tax_id || ext.bank_address || ext.branch_no) {
+    if (ext.bank_companyname || ext.branch_no) {
       try {
         const existing = JSON.parse(localStorage.getItem('accountingConfig') || '{}')
         existing.company = {
           ...existing.company,
           ...(ext.bank_companyname && { name: ext.bank_companyname }),
-          ...((ext.bank_tax_id || ext.back_tax_id) && { taxId: ext.bank_tax_id || ext.back_tax_id }),
-          ...(ext.bank_address && { address: ext.bank_address }),
-          ...(ext.branch_no    && { branch:  ext.branch_no }),
+          ...(ext.branch_no        && { branch: ext.branch_no }),
         }
         const detectedBankCode = detectBankFromCompanyName(ext.bank_companyname)
         const BANK_CODE_TO_NAME = {
@@ -275,16 +264,10 @@ export function useOcrWizard() {
         BankName:       headerData.BankName        || '',
         DocName:        headerData.DocName         || '',
         CompanyName:    headerData.CompanyName     || '',
-        CompanyTaxId:   receiptMeta.CompanyTaxId   || '',
-        CompanyAddress: receiptMeta.CompanyAddress || '',
-        AccountNo:      receiptMeta.AccountNo      || '',
         DocDate:        headerData.DocDate         || '',
         DocNo:          headerData.DocNo           || '',
         MerchantName:   headerData.MerchantName    || '',
         MerchantId:     headerData.MerchantId      || '',
-        WhtRate:        receiptMeta.WhtRate        || '',
-        WhtAmount:      receiptMeta.WhtAmount      || null,
-        NetAmount:      receiptMeta.NetAmount      || null,
       },
       Details: details.map(row => ({
         Transaction: row.Transaction || row.transaction || '',
@@ -393,7 +376,6 @@ export function useOcrWizard() {
     setPreviewUrl(null)
     setPreviewType(null)
     setHeaderData({})
-    setReceiptMeta({})
     setDetails([])
     setJvRows([])
     setCarmenJvId(null)
@@ -421,7 +403,7 @@ export function useOcrWizard() {
     // State
     step, bank, files, previewUrl, previewType,
     loading, submitting, status,
-    headerData, receiptMeta, details,
+    headerData, details,
     jvRows, filePrefix, fileSource, jvDescription, carmenJvId,
     // Refs
     fileInputRef,
