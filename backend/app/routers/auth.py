@@ -11,11 +11,12 @@ Flow:
 import logging
 import uuid
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -25,14 +26,32 @@ from app.auth.session import (
     create_session_jwt,
     decode_session_jwt,
     encrypt_carmen_token,
-    extract_user_id_from_token,  # parses user_id from "<hash>|<uuid>" token format
+    extract_user_id_from_token,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
-_CARMEN_BASE = "https://dev.carmen4.com/Carmen.API/api/interface"
 _VALIDATE_TIMEOUT = 10.0
+
+
+def _carmen_base(tenant: str) -> str:
+    """Build Carmen API base URL from tenant subdomain."""
+    return f"https://{tenant}.carmen4.com/Carmen.API/api/interface"
+
+
+def _extract_tenant(request: Request) -> str:
+    """Derive tenant identifier from the Origin header subdomain.
+    e.g. 'https://dev.carmen4.com' → 'dev'
+    Falls back to 'unknown' if header is absent or malformed."""
+    origin = request.headers.get("origin", "")
+    try:
+        host = urlparse(origin).hostname or ""
+        # "dev.carmen4.com" → "dev"
+        subdomain = host.split(".")[0]
+        return subdomain if subdomain else "unknown"
+    except Exception:
+        return "unknown"
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -52,14 +71,14 @@ class ExchangeResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-async def _validate_token(token: str) -> None:
+async def _validate_token(token: str, tenant: str) -> None:
     """
     Confirms the Carmen token is live by probing a lightweight endpoint.
     Raises HTTPException(401) if Carmen rejects it.
     """
     headers = {"Authorization": token, "User-Agent": "OCR-SSO-Validator"}
     async with httpx.AsyncClient(timeout=_VALIDATE_TIMEOUT) as client:
-        resp = await client.get(f"{_CARMEN_BASE}/department", headers=headers)
+        resp = await client.get(f"{_carmen_base(tenant)}/department", headers=headers)
     if resp.status_code == 401:
         raise HTTPException(status_code=401, detail="Carmen token rejected — please re-login to Carmen")
     if resp.status_code not in (200, 204):
@@ -71,6 +90,7 @@ async def _validate_token(token: str) -> None:
 
 @router.post("/exchange", response_model=ExchangeResponse)
 async def exchange_sso_token(
+    request: Request,
     body: ExchangeRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -81,8 +101,10 @@ async def exchange_sso_token(
     if not token or not bu:
         raise HTTPException(status_code=400, detail="token and bu are required")
 
-    # Validate token is live against Carmen
-    await _validate_token(token)
+    tenant = _extract_tenant(request)
+
+    # Validate token is live against the tenant's Carmen instance
+    await _validate_token(token, tenant)
 
     # user_id extracted from Carmen token format "<hash>|<uuid>"; username from URL param
     user_id = extract_user_id_from_token(token)
@@ -95,7 +117,16 @@ async def exchange_sso_token(
         raise HTTPException(status_code=500, detail="Session creation failed")
 
     session_id = str(uuid.uuid4())
-    expires_at = datetime.utcnow() + timedelta(hours=settings.session_ttl_hours)
+
+    # ── Auto Cleanup: ลบ session เก่าที่ created_at เกิน TTL หรือถูก deactivate แล้ว ──
+    cutoff = datetime.utcnow() - timedelta(hours=settings.session_ttl_hours)
+    deleted = await db.execute(
+        delete(OcrSession).where(
+            (OcrSession.created_at < cutoff) | (OcrSession.is_active == False)  # noqa: E712
+        )
+    )
+    if deleted.rowcount:
+        logger.info("Auto cleanup: removed %d stale session(s)", deleted.rowcount)
 
     db.add(OcrSession(
         id=session_id,
@@ -103,12 +134,13 @@ async def exchange_sso_token(
         user_id=user_id,
         username=username,
         bu=bu,
+        tenant=tenant,
         is_active=True,
-        expires_at=expires_at,
     ))
     await db.commit()
 
-    logger.info("SSO exchange OK — user=%s bu=%s session=%s", username, bu, session_id)
+    logger.info("SSO exchange OK — tenant=%s user=%s bu=%s session=%s",
+                tenant, username, bu, session_id)
 
     return ExchangeResponse(
         access_token=create_session_jwt(
