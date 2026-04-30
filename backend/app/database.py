@@ -214,6 +214,16 @@ async def init_db() -> None:
 # Brand-new DBs provisioned via provision_tenant() skip all of these because
 # create_all() already produces the final schema and migrations are pre-marked.
 
+async def _m022_add_ap_invoices_submitted_at(conn: AsyncConnection) -> None:
+    try:
+        await conn.execute(text(
+            "ALTER TABLE ap_invoices ADD COLUMN submitted_at DATETIME NULL"
+        ))
+        logger.info("  + ap_invoices.submitted_at")
+    except Exception:
+        pass  # column already exists
+
+
 async def _m021_remove_tenant_columns(conn: AsyncConnection) -> None:
     """
     Remove tenant column (and its index) from all tables.
@@ -306,6 +316,7 @@ _MIGRATIONS: list[tuple[str, object]] = [
     # ── Live migrations (021+) ───────────────────────────────────────────────
     # These run on DBs migrated from the old shared schema.
     ("021_remove_tenant_columns",                       _m021_remove_tenant_columns),
+    ("022_add_ap_invoices_submitted_at",                _m022_add_ap_invoices_submitted_at),
 ]
 
 

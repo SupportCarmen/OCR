@@ -67,13 +67,18 @@ async def get_current_session(
         logger.error("Failed to decrypt carmen token for session %s", session_id)
         raise HTTPException(status_code=500, detail="Session data corrupted — please re-enter from Carmen")
 
+    # Use JWT tenant claim as authoritative — prevents SSRF where an attacker
+    # could supply a crafted Origin header to redirect Carmen proxy calls to an
+    # arbitrary host. The JWT tenant was validated against Carmen at login time.
+    authoritative_tenant = token_tenant or current_tenant.get("") or ""
+
     info = SessionInfo(
         session_id=session.id,
         carmen_token=carmen_token,
         user_id=session.user_id or "",
         username=session.username or "",
         bu=session.bu or "",
-        tenant=current_tenant.get("") or "",
+        tenant=authoritative_tenant,
     )
 
     # Populate request-scoped context vars for middleware and services

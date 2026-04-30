@@ -32,17 +32,17 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
   const taxPeriod = parts.length === 3 ? `${parts[1]}/${parts[2]}` : ''
 
   const detail = lineItems.map(item => {
-    const netAmt  = parseNum(item.lineSubTotal)
-    const taxAmt  = parseNum(item.taxAmt)
-    const total   = parseNum(item.lineTotal)
+    const netAmt = parseNum(item.lineSubTotal)
+    const taxAmt = parseNum(item.taxAmt)
+    const total = parseNum(item.lineTotal)
     const taxRate = parseNum(item.taxPct) || 7
-    const qty     = parseNum(item.qty) || 1
+    const qty = parseNum(item.qty) || 1
 
     // Send net unit price (after discount) to Carmen — no separate discount field needed
     const grossPrice = parseNum(item.unitPrice)
-    const discAmt    = parseNum(item.discountAmt)
-    const grossLine  = grossPrice * qty
-    const netPrice   = grossLine > 0
+    const discAmt = parseNum(item.discountAmt)
+    const grossLine = grossPrice * qty
+    const netPrice = grossLine > 0
       ? parseFloat(((grossLine - discAmt) / qty).toFixed(2))
       : grossPrice
 
@@ -85,7 +85,7 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
   return {
     VnCode: systemVendor.code || '',
     InvhDate: now,
-    InvhDesc: headerData.invhDesc ||'',
+    InvhDesc: headerData.invhDesc || '',
     InvhSource: 'OAPI',
     InvhInvNo: headerData.documentNumber || '',
     InvhInvDate: invDate,
@@ -147,24 +147,24 @@ export function useAPInvoice() {
       .then(r => r.json())
       .then(data => {
         const list = (data.Data || []).map(v => ({
-          code:            v.VnCode          || '',
-          name:            v.VnName          || '',
-          taxId:           String(v.VnTaxNo  || '').replace(/\D/g, ''),
-          active:          v.Active,
-          catCode:         v.VnCateCode,
-          catDesc:         v.VnCateDesc,
-          vat1DrAccCode:   v.VnVat1DrAccCode,
-          vat1DrAccDesc:   v.VnVat1DrAccDesc,
-          vat1DrDeptCode:  v.VnVat1DrDeptCode,
-          vat1DrDeptDesc:  v.VnVat1DrDeptDesc,
-          vatCrAccCode:    v.VnVatCrAccCode,
-          vatCrAccDesc:    v.VnVatCrAccDesc,
-          crDeptCode:      v.VnCrDeptCode,
-          crDeptDesc:      v.VnCrDeptDesc,
+          code: v.VnCode || '',
+          name: v.VnName || '',
+          taxId: String(v.VnTaxNo || '').replace(/\D/g, ''),
+          active: v.Active,
+          catCode: v.VnCateCode,
+          catDesc: v.VnCateDesc,
+          vat1DrAccCode: v.VnVat1DrAccCode,
+          vat1DrAccDesc: v.VnVat1DrAccDesc,
+          vat1DrDeptCode: v.VnVat1DrDeptCode,
+          vat1DrDeptDesc: v.VnVat1DrDeptDesc,
+          vatCrAccCode: v.VnVatCrAccCode,
+          vatCrAccDesc: v.VnVatCrAccDesc,
+          crDeptCode: v.VnCrDeptCode,
+          crDeptDesc: v.VnCrDeptDesc,
           taxProfileCode1: v.TaxProfileCode1,
           taxProfileDesc1: v.TaxProfileDesc1,
-          branchNo:        v.BranchNo,
-          term:            v.VnTerm ?? 0,
+          branchNo: v.BranchNo,
+          term: v.VnTerm ?? 0,
         }))
         setVendors(list)
         const db = {}
@@ -185,14 +185,14 @@ export function useAPInvoice() {
       .then(([accs, depts]) => {
         setMasterAccounts(
           accs.filter(a => a.AccCode && a.AccCode !== 'AccCode')
-              .map(a => ({ code: a.AccCode, name: a.Description || '', name2: a.Description2 || '' }))
+            .map(a => ({ code: a.AccCode, name: a.Description || '', name2: a.Description2 || '' }))
         )
         setMasterDepts(
           depts.filter(d => d.DeptCode && d.DeptCode !== 'CodeDep')
-               .map(d => ({ code: d.DeptCode, name: d.Description || '', name2: d.Description2 || '' }))
+            .map(d => ({ code: d.DeptCode, name: d.Description || '', name2: d.Description2 || '' }))
         )
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [step])
 
   useEffect(() => {
@@ -223,33 +223,33 @@ export function useAPInvoice() {
 
   // Computed totals
   const sumLineSubTotal = lineItems.reduce((s, i) => s + Math.round(parseNum(i.lineSubTotal) * 100), 0) / 100
-  const sumLineTotal    = lineItems.reduce((s, i) => s + Math.round(parseNum(i.lineTotal) * 100), 0) / 100
-  const sumDiscount     = lineItems.reduce((s, i) => s + Math.round(parseNum(i.discountAmt) * 100), 0) / 100
-  const sumTax          = lineItems.reduce((s, i) => s + Math.round(parseNum(i.taxAmt) * 100), 0) / 100
+  const sumLineTotal = lineItems.reduce((s, i) => s + Math.round(parseNum(i.lineTotal) * 100), 0) / 100
+  const sumDiscount = lineItems.reduce((s, i) => s + Math.round(parseNum(i.discountAmt) * 100), 0) / 100
+  const sumTax = lineItems.reduce((s, i) => s + Math.round(parseNum(i.taxAmt) * 100), 0) / 100
 
   const tgtSubTotal = round2(headerData.subTotal)
   const tgtDiscount = round2(headerData.totalDiscount)
-  const tgtTax      = round2(headerData.taxAmount)
-  const tgtGrand    = round2(headerData.grandTotal)
+  const tgtTax = round2(headerData.taxAmount)
+  const tgtGrand = round2(headerData.grandTotal)
 
   const isInclude = headerData.taxType === 'Include'
 
-  const isSubDiff   = sumLineSubTotal !== tgtSubTotal
-  const isDiscDiff  = sumDiscount !== tgtDiscount
-  const isTaxDiff   = sumTax !== tgtTax
+  const isSubDiff = sumLineSubTotal !== tgtSubTotal
+  const isDiscDiff = sumDiscount !== tgtDiscount
+  const isTaxDiff = sumTax !== tgtTax
   const calcGrandFromLines = sumLineTotal
   const isGrandDiff = calcGrandFromLines !== tgtGrand
 
   const validationErrors = [
-    isSubDiff  && t.subTotal,
+    isSubDiff && t.subTotal,
     isDiscDiff && t.discount,
-    isTaxDiff  && t.tax,
+    isTaxDiff && t.tax,
     isGrandDiff && t.grandTotal,
   ].filter(Boolean)
   const isValid = validationErrors.length === 0
 
   const availableFields = getAvailableFields(t)
-  const activeCols = [1,2,3,4,5,6,7,8,9,10,11].filter(c => {
+  const activeCols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(c => {
     const fld = fieldMappings[`col${c}`]
     return fld !== 'ignore' && fld !== 'category'
   })
@@ -303,22 +303,22 @@ export function useAPInvoice() {
             })
             return
           }
-          
+
           setApInvoiceId(data.id)
           setIsDuplicate(!!data.is_duplicate)
 
           setHeaderData({
-            vendorName:     data.vendorName     || '',
-            vendorTaxId:    data.vendorTaxId    || '',
-            vendorBranch:   data.vendorBranch   || '',
-            documentName:   data.documentName   || '',
-            documentDate:   data.documentDate   || '',
+            vendorName: data.vendorName || '',
+            vendorTaxId: data.vendorTaxId || '',
+            vendorBranch: data.vendorBranch || '',
+            documentName: data.documentName || '',
+            documentDate: data.documentDate || '',
             documentNumber: data.documentNumber || '',
-            taxType:        data.taxType        || '',
-            subTotal:       fmt(data.subTotal),
-            taxAmount:      fmt(data.taxAmount),
-            totalDiscount:  fmt(data.totalDiscount),
-            grandTotal:     fmt(data.grandTotal),
+            taxType: data.taxType || '',
+            subTotal: fmt(data.subTotal),
+            taxAmount: fmt(data.taxAmount),
+            totalDiscount: fmt(data.totalDiscount),
+            grandTotal: fmt(data.grandTotal),
           })
 
           const formattedItems = (data.items || []).map(item => {
@@ -359,13 +359,13 @@ export function useAPInvoice() {
   }
 
   const updateHeader = (key, val) => setHeaderData(p => ({ ...p, [key]: val }))
-  const blurHeader   = (key, val) => { if (val) setHeaderData(p => ({ ...p, [key]: fmt(val) })) }
-  const updateItem   = (idx, key, val) => setLineItems(items => items.map((r, i) => {
+  const blurHeader = (key, val) => { if (val) setHeaderData(p => ({ ...p, [key]: fmt(val) })) }
+  const updateItem = (idx, key, val) => setLineItems(items => items.map((r, i) => {
     if (i !== idx) return r
     const clearSuggest = key === 'deptCode' ? { _suggestDept: undefined } : key === 'accountCode' ? { _suggestAcc: undefined } : {}
     return { ...r, [key]: val, ...clearSuggest }
   }))
-  const blurItem     = (idx, key, val) => { if (val) setLineItems(items => items.map((r, i) => i === idx ? { ...r, [key]: fmt(val) } : r)) }
+  const blurItem = (idx, key, val) => { if (val) setLineItems(items => items.map((r, i) => i === idx ? { ...r, [key]: fmt(val) } : r)) }
 
   const confirmMapping = () => {
     if (headerData.vendorTaxId) {
@@ -388,7 +388,7 @@ export function useAPInvoice() {
         confirmText: t.proceed,
         cancelText: t.backEdit,
         onConfirm: () => { setModal({ show: false }); setStep(4) },
-        onCancel:  () => setModal({ show: false }),
+        onCancel: () => setModal({ show: false }),
       })
     } else {
       setStep(4)
@@ -426,15 +426,15 @@ export function useAPInvoice() {
         setLineItems(prev => prev.map((item, idx) => {
           const s = suggestions[idx]
           if (!s) return item
-          const newDept = !item.deptCode    && s.deptCode    ? s.deptCode    : null
-          const newAcc  = !item.accountCode && s.accountCode ? s.accountCode : null
+          const newDept = !item.deptCode && s.deptCode ? s.deptCode : null
+          const newAcc = !item.accountCode && s.accountCode ? s.accountCode : null
           if (newDept || newAcc) suggestedCount++
           return {
             ...item,
-            deptCode:     newDept ?? item.deptCode,
-            accountCode:  newAcc  ?? item.accountCode,
+            deptCode: newDept ?? item.deptCode,
+            accountCode: newAcc ?? item.accountCode,
             _suggestDept: newDept || undefined,
-            _suggestAcc:  newAcc  || undefined,
+            _suggestAcc: newAcc || undefined,
           }
         }))
         showToast(
@@ -458,7 +458,7 @@ export function useAPInvoice() {
         title: 'Add Invoice Description for Better Results',
         message: 'Adding an Invoice Description helps AI suggest more accurate GL accounts.\nYou can add it in the Invoice Description field above.',
         confirmText: 'Proceed Anyway',
-        cancelText: '← Back to fill description',
+        cancelText: 'Back to fill description',
         onConfirm: () => { setModal({ show: false }); runSuggest() },
         onCancel: () => setModal({ show: false }),
       })
@@ -474,7 +474,7 @@ export function useAPInvoice() {
     setLineItems(prev => prev.map(item => ({
       ...item,
       _suggestDept: undefined,
-      _suggestAcc:  undefined,
+      _suggestAcc: undefined,
     })))
     showToast('ยืนยันรหัสบัญชีทั้งหมดแล้ว', 'success')
   }
@@ -489,10 +489,10 @@ export function useAPInvoice() {
     setLineItems(prev => prev.map((item, i) =>
       i !== idx ? item : {
         ...item,
-        deptCode:    item._suggestDept ? '' : item.deptCode,
-        accountCode: item._suggestAcc  ? '' : item.accountCode,
+        deptCode: item._suggestDept ? '' : item.deptCode,
+        accountCode: item._suggestAcc ? '' : item.accountCode,
         _suggestDept: undefined,
-        _suggestAcc:  undefined,
+        _suggestAcc: undefined,
       }
     ))
   }

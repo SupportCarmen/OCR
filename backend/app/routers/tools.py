@@ -14,9 +14,10 @@ calling stateless tools: suggest_gl_fixed_fields, suggest_gl_payment_types.
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
+from app.auth import get_current_session, SessionInfo
 from app.tools import registry
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ _REQUIRES_INJECTION = {"extract_receipt", "submit_receipt"}
 
 
 @router.get("")
-async def list_tools():
+async def list_tools(_session: SessionInfo = Depends(get_current_session)):
     """List all registered tools with their descriptions and input schemas."""
     tools = []
     for name in registry.list_tools():
@@ -41,7 +42,7 @@ async def list_tools():
 
 
 @router.get("/{name}")
-async def get_tool_schema(name: str):
+async def get_tool_schema(name: str, _session: SessionInfo = Depends(get_current_session)):
     """Return description and input schema for a single tool."""
     schema = registry.get_schema(name)
     if schema is None:
@@ -53,7 +54,7 @@ async def get_tool_schema(name: str):
 
 
 @router.post("/{name}")
-async def invoke_tool(name: str, body: dict = {}):
+async def invoke_tool(name: str, body: dict = {}, _session: SessionInfo = Depends(get_current_session)):
     """
     Invoke a registered tool by name.
 
