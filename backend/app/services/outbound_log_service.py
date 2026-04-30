@@ -3,7 +3,7 @@ Outbound Call Log Service — records every HTTP call to external services.
 
 Proves that data only leaves the system via approved destinations:
   - openrouter.ai  (LLM vision + suggestion calls)
-  - dev.carmen4.com (Carmen ERP proxy calls)
+  - dev.carmen4.com (Carmen Cloud proxy calls)
 
 Usage:
     await log_outbound(service="openrouter", url="...", method="POST",

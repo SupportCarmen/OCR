@@ -30,6 +30,7 @@ def create_session_jwt(
     bu: str,
     user_id: str,
     username: str,
+    tenant: str,
     secret: str,
     ttl_hours: int = 8,
 ) -> str:
@@ -39,6 +40,7 @@ def create_session_jwt(
         "bu": bu,
         "user_id": user_id,
         "username": username,
+        "tenant": tenant,
         "iat": now,
         "exp": now + timedelta(hours=ttl_hours),
     }

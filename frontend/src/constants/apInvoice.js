@@ -55,7 +55,7 @@ export const getAvailableFields = (t) => [
 
 export const AP_I18N = {
   th: {
-    appTitle: 'Carmen ERP', appSub: 'AP Invoice OCR',
+    appTitle: 'Carmen Cloud', appSub: 'AP Invoice OCR',
     uploadTitle: 'อัปโหลดเอกสารใบแจ้งหนี้',
     uploadDesc: 'รองรับไฟล์รูปภาพ JPG, PNG และ PDF (สูงสุด 20 MB)',
     uploadBtn: 'เลือกไฟล์เอกสาร',
@@ -102,7 +102,7 @@ export const AP_I18N = {
     duplicateDoc: 'เอกสารซ้ำ! เลขที่เอกสารนี้และผู้ขายรายนี้มีอยู่ในระบบแล้ว',
   },
   en: {
-    appTitle: 'Carmen ERP', appSub: 'AP Invoice OCR',
+    appTitle: 'Carmen Cloud', appSub: 'AP Invoice OCR',
     uploadTitle: 'Upload Invoice Document',
     uploadDesc: 'Supports JPG, PNG, and PDF files (max 20 MB)',
     uploadBtn: 'Select Document',
@@ -127,9 +127,9 @@ export const AP_I18N = {
     taxProfile: 'Tax Profile', deptCode: 'Dept. Code',
     accountCode: 'Account Code', vendorGroup: 'Vendor Group',
     expenseDesc: 'Map expense accounts based on extracted items',
-    generateInv: 'Generate AR Invoice',
+    generateInv: 'Generate AP Invoice',
     successTitle: 'Saved Successfully!',
-    successDesc: 'AR Invoice No.', successDesc2: 'has been created and mapped to ERP.',
+    successDesc: 'AP Invoice No.', successDesc2: 'has been created and mapped to ERP.',
     uploadNew: 'Upload New Document',
     ignore: 'Ignore',
     category: 'Category (Account)', description: 'Description',

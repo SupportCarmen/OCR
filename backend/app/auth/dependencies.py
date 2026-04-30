@@ -37,6 +37,14 @@ async def get_current_session(
         raise HTTPException(status_code=401, detail="Invalid or expired OCR token")
 
     session_id = payload.get("sid")
+    token_tenant = payload.get("tenant")
+    current_req_tenant = current_tenant.get()
+    
+    if token_tenant and current_req_tenant and token_tenant != current_req_tenant:
+        logger.warning("Cross-tenant access attempt blocked: JWT tenant=%s vs Request tenant=%s", 
+                       token_tenant, current_req_tenant)
+        raise HTTPException(status_code=403, detail="Cross-tenant access denied")
+
     result = await db.execute(
         select(OcrSession).where(
             OcrSession.id == session_id,

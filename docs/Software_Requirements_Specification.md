@@ -28,14 +28,14 @@
 
 ## 1. บทนำ (Introduction)
 
-เอกสารฉบับนี้จัดทำขึ้นเพื่อกำหนดขอบเขตและความต้องการในการเชื่อมต่อระบบ (Interface Requirements) ระหว่างระบบ **Bank Receipt OCR System** และ **Carmen ERP** ผ่านรูปแบบ RESTful API (JSON Format) โดยมีวัตถุประสงค์เพื่อลดขั้นตอนการทำงานซ้ำซ้อน (Double Entry) และเพิ่มความแม่นยำในการนำเข้าข้อมูลบัญชีรายวันจากรายงานของธนาคาร
+เอกสารฉบับนี้จัดทำขึ้นเพื่อกำหนดขอบเขตและความต้องการในการเชื่อมต่อระบบ (Interface Requirements) ระหว่างระบบ **Bank Receipt OCR System** และ **Carmen Cloud** ผ่านรูปแบบ RESTful API (JSON Format) โดยมีวัตถุประสงค์เพื่อลดขั้นตอนการทำงานซ้ำซ้อน (Double Entry) และเพิ่มความแม่นยำในการนำเข้าข้อมูลบัญชีรายวันจากรายงานของธนาคาร
 
 ## 2. ขอบเขตงาน (Scope of Work)
 
 การเชื่อมต่อข้อมูลประกอบด้วย 5 ส่วนหลัก เรียงตามลำดับความสำคัญดังนี้:
 
 1. **Outbound Interface - OCR Extraction**: ประมวลผลไฟล์ภาพหรือ PDF ผ่าน Vision LLM เพื่อดึงข้อมูลออกมาเป็นรูปแบบ JSON (Stateless Extraction)
-2. **Inbound Interface - Master Data Sync**: แบคเอนด์ทำหน้าที่เป็น Proxy ดึงข้อมูลรหัสบัญชีและแผนกจาก Carmen ERP เพื่อใช้ในการตั้งค่า Mapping
+2. **Inbound Interface - Master Data Sync**: แบคเอนด์ทำหน้าที่เป็น Proxy ดึงข้อมูลรหัสบัญชีและแผนกจาก Carmen Cloud เพื่อใช้ในการตั้งค่า Mapping
 3. **Inbound Interface - AI Accounting Mapping**: ระบบ AI แนะนำรหัสบัญชีอัตโนมัติ พร้อมการบันทึกประวัติการแมปแยกตามธนาคารและประเภทการชำระเงิน
 4. **Inbound Interface - Accounting Journal Review**: กระบวนการแสดง Journal Entry (Debit/Credit) และยืนยัน Journal Voucher ก่อน Submit
 5. **Inbound Interface - Data Submission**: ส่งข้อมูลชุดสมบูรณ์ที่ผ่านการตรวจสอบแล้วบันทึกลงในฐานข้อมูล MySQL/MariaDB พร้อมการตรวจสอบการซ้ำซ้อน
@@ -76,7 +76,7 @@ flowchart LR
     subgraph External["☁️ External APIs"]
         direction TB
         OpenRouter["🧠 OpenRouter<br/>(Vision LLM)"]
-        Carmen["📊 Carmen ERP<br/>(Master Data)"]
+        Carmen["📊 Carmen Cloud<br/>(Master Data)"]
     end
 
     User -->|Upload & Select| Frontend
@@ -103,7 +103,7 @@ sequenceDiagram
     participant UI as Frontend
     participant BE as Backend
     participant LLM as OpenRouter
-    participant Carmen as Carmen ERP
+    participant Carmen as Carmen Cloud
     participant DB as Database
 
     rect rgb(66, 135, 245)
@@ -225,7 +225,7 @@ sequenceDiagram
 sequenceDiagram
     participant UI as Web Frontend (Mapping Page)
     participant API as API Service (Proxy)
-    participant Carmen as Carmen ERP API
+    participant Carmen as Carmen Cloud API
 
     UI->>API: GET /api/v1/ocr/carmen/account-codes
     activate API
@@ -243,7 +243,7 @@ sequenceDiagram
 sequenceDiagram
     participant UI as Web Frontend (Mapping Page)
     participant API as API Service (Proxy)
-    participant Carmen as Carmen ERP API
+    participant Carmen as Carmen Cloud API
 
     UI->>API: GET /api/v1/ocr/carmen/departments
     activate API
@@ -980,7 +980,7 @@ EXPORT_DIR=./exports
 # API Configuration
 APP_PORT=8010
 
-# Carmen ERP Integration
+# Carmen Cloud Integration
 CARMEN_AUTHORIZATION=Bearer <token>
 CARMEN_BASE_URL=https://carmen.example.com
 ```
@@ -997,7 +997,7 @@ CARMEN_BASE_URL=https://carmen.example.com
 | `EXPORT_DIR` | No | ./exports | โฟลเดอร์เก็บไฟล์ส่งออก (CSV) |
 | `APP_PORT` | No | 8010 | Port ของ FastAPI server |
 | `CARMEN_AUTHORIZATION` | Yes | - | Bearer token สำหรับ Carmen API |
-| `CARMEN_BASE_URL` | Yes | - | Base URL ของ Carmen ERP |
+| `CARMEN_BASE_URL` | Yes | - | Base URL ของ Carmen Cloud |
 
 ---
 

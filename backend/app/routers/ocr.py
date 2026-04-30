@@ -28,6 +28,7 @@ from app.models import (
     OCRTask,
     CreditCard,
     ExtractedCreditCardData,
+    DocumentType,
 )
 from app.services import ocr_service
 from app.services.correction_service import get_correction_hints
@@ -36,6 +37,8 @@ from app.tools.submit import SubmitInput
 from app.utils.image_processing import is_valid_image
 from app.auth import get_current_session, SessionInfo
 from app.services import audit_service
+from app.services.audit_service import AuditAction
+from app.services.file_service import file_service
 from app.context import current_document_ref
 
 
@@ -91,10 +94,10 @@ async def extract_card(
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
-    filenames = ", ".join(f.filename for f in files)
+    filenames = file_service.get_filenames_string(files)
     current_document_ref.set(filenames)
     await audit_service.log_action(
-        _session, audit_service.EXTRACT, audit_service.CREDIT_CARD,
+        _session, AuditAction.EXTRACT, DocumentType.CREDIT_CARD,
         document_ref=filenames, ip_address=request.client.host if request.client else None,
     )
 
@@ -103,19 +106,8 @@ async def extract_card(
     hints = await get_correction_hints(bank_type_str, db) if bank_type_str else {}
 
     for upload_file in files:
-        if not is_valid_image(upload_file.filename):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type: {upload_file.filename}",
-            )
-
-        file_bytes = await upload_file.read()
-        max_bytes = settings.max_file_size_mb * 1024 * 1024
-        if len(file_bytes) > max_bytes:
-            raise HTTPException(
-                status_code=400,
-                detail=f"{upload_file.filename} exceeds {settings.max_file_size_mb}MB limit",
-            )
+        # Use centralized file validation and reading
+        file_bytes = await file_service.validate_and_read(upload_file)
 
         task = OCRTask(
             id=str(uuid.uuid4()),
@@ -265,7 +257,7 @@ async def submit_receipt_stateless(
     doc_ref = payload.Header.DocNo or payload.OriginalFilename or ""
     current_document_ref.set(doc_ref)
     await audit_service.log_action(
-        session, audit_service.SUBMIT, audit_service.CREDIT_CARD,
+        session, AuditAction.SUBMIT, DocumentType.CREDIT_CARD,
         document_ref=doc_ref, ip_address=request.client.host if request.client else None,
     )
     inp = SubmitInput(
@@ -304,7 +296,7 @@ async def export_csv(
     session: SessionInfo = Depends(get_current_session),
 ):
     await audit_service.log_action(
-        session, audit_service.EXPORT, audit_service.CREDIT_CARD,
+        session, AuditAction.EXPORT, DocumentType.CREDIT_CARD,
         ip_address=request.client.host if request.client else None,
     )
     csv_path = await ocr_service.export_tasks_to_csv(db)

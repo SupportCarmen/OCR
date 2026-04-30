@@ -1,4 +1,5 @@
 import '../styles/pages/home.css'
+import logo from '../assets/logo.png'
 
 const MODULES = [
   {
@@ -7,6 +8,7 @@ const MODULES = [
     name: 'Credit Card Report OCR',
     description: 'ระบบ AI อ่านใบเสร็จ Credit Card Report จากธนาคาร แปลงเป็นข้อมูลอัตโนมัติ พร้อมส่งเข้า Carmen GL',
     icon: 'fa-file-invoice-dollar',
+    useLogo: true,
     iconBg: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
     iconColor: '#fff',
     accent: '#2563eb',
@@ -19,6 +21,7 @@ const MODULES = [
     name: 'AP Invoice Processing',
     description: 'ระบบจัดการใบแจ้งหนี้ผู้จัดจำหน่าย (AP Invoice) อ่านข้อมูลอัตโนมัติ และบันทึกเข้าระบบบัญชี',
     icon: 'fa-receipt',
+    useLogo: true,
     iconBg: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
     iconColor: '#fff',
     accent: '#7c3aed',
@@ -49,7 +52,7 @@ export default function Home() {
       {/* ─── Hero Header ─── */}
       <div className="home-hero">
         <div className="home-logo">
-          <i className="fas fa-brain" />
+          <img src={logo} alt="Carmen AI Logo" className="home-logo-img" />
         </div>
         <h1 className="home-title">
           Carmen <span>AI Automation</span>
@@ -90,7 +93,11 @@ export default function Home() {
                     className="module-card-icon"
                     style={{ background: mod.iconBg, color: mod.iconColor }}
                   >
-                    <i className={`fas ${mod.icon}`} />
+                    {mod.useLogo ? (
+                      <img src={logo} alt="Module Logo" style={{ width: '28px', height: '28px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+                    ) : (
+                      <i className={`fas ${mod.icon}`} />
+                    )}
                   </div>
                   <div className="module-card-info">
                     <div className="module-card-name">{mod.name}</div>
@@ -128,7 +135,7 @@ export default function Home() {
 
       {/* ─── Footer ─── */}
       <div className="home-footer">
-        Carmen AI Automation Platform • Powered by AI OCR & LLM
+        Carmen AI Automation Platform
       </div>
     </div>
   )

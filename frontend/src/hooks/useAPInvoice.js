@@ -377,7 +377,7 @@ export function useAPInvoice() {
 
   const goToAccount = () => {
     if (!systemVendor.code) {
-      showToast('กรุณาเลือกผู้ขายจากระบบ Carmen ERP ก่อนดำเนินการต่อ', 'warning')
+      showToast('กรุณาเลือกผู้ขายจากระบบ Carmen Cloud ก่อนดำเนินการต่อ', 'warning')
       return
     }
     if (!isValid) {
@@ -479,25 +479,25 @@ export function useAPInvoice() {
       return
     }
     setLoading(true)
-    setStatus('กำลังส่ง AP Invoice ไปยัง Carmen ERP...')
+    setStatus('กำลังส่ง AP Invoice ไปยัง Carmen Cloud...')
     setError(null)
-    showToast('กำลังส่ง AP Invoice ไปยัง Carmen ERP...', 'info')
+    showToast('กำลังส่ง AP Invoice ไปยัง Carmen Cloud...', 'info')
     try {
       const payload = buildInvoicePayload(headerData, lineItems, systemVendor)
       const result = await submitAPInvoiceToCarmen(payload, apInvoiceId)
       if (result?.Code < 0) {
-        showToast('Carmen ERP ไม่ยอมรับข้อมูล กรุณาตรวจสอบ', 'warning')
+        showToast('Carmen Cloud ไม่ยอมรับข้อมูล กรุณาตรวจสอบ', 'warning')
         setModal({
           show: true, type: 'warning',
           title: 'ไม่สามารถสร้าง AP Invoice ได้',
-          message: result.UserMessage || 'เกิดข้อผิดพลาดจาก Carmen ERP',
+          message: result.UserMessage || 'เกิดข้อผิดพลาดจาก Carmen Cloud',
           confirmText: 'ตกลง',
           onConfirm: () => { setModal({ show: false }); handleReset() },
         })
         return
       }
       setInvoiceSeq(result?.InternalMessage ?? null)
-      showToast('สร้าง AP Invoice เข้า Carmen ERP สำเร็จ', 'success')
+      showToast('สร้าง AP Invoice เข้า Carmen Cloud สำเร็จ', 'success')
       setStep(5)
     } catch (err) {
       console.error('AP Invoice submit error:', err)

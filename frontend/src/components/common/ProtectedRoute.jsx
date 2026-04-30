@@ -1,5 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext'
 import { useCarmenSSO } from '../../hooks/useCarmenSSO'
+import logo from '../../assets/logo.png'
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
 
@@ -54,7 +55,7 @@ function AuthScreen({ state, message }) {
 
         {/* brand mark */}
         <div style={styles.brand}>
-          <i className="fas fa-brain" style={styles.brandIcon} />
+          <img src={logo} alt="Carmen AI Logo" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />
           <span style={styles.brandText}>Carmen <span style={styles.brandAccent}>AI</span></span>
         </div>
 

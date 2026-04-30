@@ -139,6 +139,7 @@ async def exchange_sso_token(
             bu=bu,
             user_id=user_id,
             username=username,
+            tenant=tenant,
             secret=settings.ocr_jwt_secret,
             ttl_hours=settings.session_ttl_hours,
         ),

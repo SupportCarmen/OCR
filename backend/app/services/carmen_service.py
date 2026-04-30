@@ -1,5 +1,5 @@
 """
-Carmen API Service — all HTTP calls to the Carmen ERP API.
+Carmen API Service — all HTTP calls to the Carmen Cloud API.
 
 Every public function accepts `carmen_token: str` so the caller's session token
 is used per-request instead of a shared env-var credential.

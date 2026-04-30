@@ -56,9 +56,9 @@ function SummaryRow({ t, label, isDiff, tableVal, tableStyle, docVal, onAdjust, 
             <i className="fas fa-arrows-rotate" /> {t.adjust}
           </button>
         )}
-        <span className={`ar-sum-from-table ${isDiff ? 'diff' : ''}`} style={tableStyle}>{tableVal}</span>
+        <span className={`ap-sum-from-table ${isDiff ? 'diff' : ''}`} style={tableStyle}>{tableVal}</span>
         <input
-          className={`ar-sum-from-doc ${isDiff ? 'diff' : ''}`}
+          className={`ap-sum-from-doc ${isDiff ? 'diff' : ''}`}
           value={docVal}
           onChange={e => onChange(e.target.value)}
           onBlur={e => onBlur(e.target.value)}

@@ -12,28 +12,27 @@ from typing import Optional
 
 from app.database import async_session
 from app.models.orm import AuditLog
+from app.models.enums import DocumentType
 from app.auth.session import SessionInfo
 from app.context import current_session_id, current_document_ref
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
 # ── Action constants ──────────────────────────────────────────────────────────
-EXTRACT    = "EXTRACT"
-SUBMIT     = "SUBMIT"
-SUGGEST_GL = "SUGGEST_GL"
-EXPORT     = "EXPORT"
-LOGIN      = "LOGIN"
-LOGOUT     = "LOGOUT"
-
-# ── Resource constants ────────────────────────────────────────────────────────
-CREDIT_CARD = "CREDIT_CARD"
-AP_INVOICE  = "AP_INVOICE"
+class AuditAction(str, Enum):
+    EXTRACT    = "EXTRACT"
+    SUBMIT     = "SUBMIT"
+    SUGGEST_GL = "SUGGEST_GL"
+    EXPORT     = "EXPORT"
+    LOGIN      = "LOGIN"
+    LOGOUT     = "LOGOUT"
 
 
 async def log_action(
     session: SessionInfo,
-    action: str,
-    resource: Optional[str] = None,
+    action: AuditAction | str,
+    resource: Optional[DocumentType | str] = None,
     document_ref: Optional[str] = None,
     ip_address: Optional[str] = None,
 ) -> None:

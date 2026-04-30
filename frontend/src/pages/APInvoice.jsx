@@ -7,6 +7,7 @@ import APAccountMappingStep from '../components/ap-invoice/APAccountMappingStep'
 import APSuccessStep from '../components/ap-invoice/APSuccessStep'
 import { useAPInvoice } from '../hooks/useAPInvoice'
 import { AP_STEPS } from '../constants/apInvoice'
+import logo from '../assets/logo.png'
 
 export default function APInvoice() {
   const ctrl = useAPInvoice()
@@ -67,10 +68,12 @@ export default function APInvoice() {
         {/* Page Header */}
         <div className="app-header ap-header">
           <div className="brand">
-            <div className="logo-box"><i className="fas fa-receipt" /></div>
+            <div className="logo-box">
+              <img src={logo} alt="Logo" style={{ width: '20px', height: '20px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            </div>
             <div>
-              <h1>{t.appTitle}</h1>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: '0.1rem' }}>
+              <h1 style={{ margin: 0 }}>{t.appTitle}</h1>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: '-0.1rem' }}>
                 {t.appSub}
               </div>
             </div>

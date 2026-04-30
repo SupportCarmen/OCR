@@ -30,7 +30,7 @@ class DuplicateDocumentError(RuntimeError):
 
 
 class CarmenServiceError(RuntimeError):
-    """Carmen ERP API call failed. → 503"""
+    """Carmen Cloud API call failed. → 503"""
 
 
 class ValidationError(RuntimeError):

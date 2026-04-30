@@ -1,5 +1,5 @@
 /**
- * Carmen API — proxy calls to the Carmen ERP system.
+ * Carmen API — proxy calls to the Carmen Cloud system.
  */
 
 import { apiFetch } from './client'

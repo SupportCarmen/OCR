@@ -12,8 +12,11 @@ from app.services.ap_invoice_service import extract_ap_invoice_data, suggest_gl_
 from app.services.carmen_service import get_account_codes, get_departments, CarmenAPIError
 from app.database import get_db
 from app.models.orm import OCRTask, TaskStatus
+from app.models.enums import DocumentType
 from app.auth import get_current_session, SessionInfo
 from app.services import audit_service
+from app.services.audit_service import AuditAction
+from app.services.file_service import file_service
 from app.context import current_document_ref
 import uuid
 
@@ -27,7 +30,7 @@ def _get_mime_type(filename: str) -> str:
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
         ".png": "image/png",
-        ".bmp": "image/bmp",
+        ".webp": "image/webp",
         ".pdf": "application/pdf",
     }.get(ext, "image/jpeg")
 
@@ -42,16 +45,14 @@ async def extract_ap_invoice(
     """Stateless AP Invoice OCR extraction using Vision LLM (OpenRouter)."""
     current_document_ref.set(file.filename or "")
     await audit_service.log_action(
-        session, audit_service.EXTRACT, audit_service.AP_INVOICE,
+        session, AuditAction.EXTRACT, DocumentType.AP_INVOICE,
         document_ref=file.filename, ip_address=request.client.host if request.client else None,
     )
     if not settings.openrouter_api_key:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY is not configured")
 
-    file_bytes = await file.read()
-    max_bytes = settings.max_file_size_mb * 1024 * 1024
-    if len(file_bytes) > max_bytes:
-        raise HTTPException(status_code=400, detail=f"File exceeds {settings.max_file_size_mb}MB limit")
+    # Use centralized file validation and reading
+    file_bytes = await file_service.validate_and_read(file)
 
     mime_type = _get_mime_type(file.filename)
     data_url = f"data:{mime_type};base64,{base64.b64encode(file_bytes).decode()}"
@@ -135,7 +136,7 @@ async def suggest_gl(
 ):
     """AI-suggest dept/acc for AP invoice expense items using category + description."""
     await audit_service.log_action(
-        session, audit_service.SUGGEST_GL, audit_service.AP_INVOICE,
+        session, AuditAction.SUGGEST_GL, DocumentType.AP_INVOICE,
         ip_address=request.client.host if request.client else None,
     )
     if not settings.openrouter_api_key:

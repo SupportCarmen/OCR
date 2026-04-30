@@ -71,7 +71,7 @@ def _distribute_footer_discount(items: list[dict], doc_disc: float) -> None:
 
 def _compute_line_totals(item: dict, tax_type: str, has_footer_disc: bool = False) -> None:
     """Fill lineSubTotal / taxAmt / lineTotal, then normalise unitPrice to the
-    net-per-unit price (after discount) so Carmen ERP always receives the
+    net-per-unit price (after discount) so Carmen Cloud always receives the
     final net price without a separate discount field.
 
     Amount-column (lineAmt) semantics depend on where the discount came from:

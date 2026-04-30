@@ -1,6 +1,7 @@
 import { useOcrWizard } from '../hooks/useOcrWizard'
 import { StepWizard, FormActions, CustomModal, LoadingOverlay, DocumentPreview } from '../components/common'
 import { UploadSection, ActionBar, HeaderCard, DetailTable, AccountingReview, InputTaxReconciliation } from '../components/credit-card'
+import logo from '../assets/logo.png'
 
 export default function CreditCardOCR() {
   const {
@@ -44,11 +45,11 @@ export default function CreditCardOCR() {
         <div className="app-header">
           <div className="brand">
             <div className="logo-box" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)', color: 'white' }}>
-              <i className="fas fa-file-invoice-dollar" />
+              <img src={logo} alt="Logo" style={{ width: '20px', height: '20px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
             </div>
             <div>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>Carmen ERP</h1>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: '0.1rem' }}>
+              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>Carmen Cloud</h1>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: '-0.1rem' }}>
                 Credit Card Report OCR
               </div>
             </div>

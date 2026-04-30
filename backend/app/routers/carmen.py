@@ -1,5 +1,5 @@
 """
-Carmen Proxy Router — thin HTTP layer for Carmen ERP API calls.
+Carmen Proxy Router — thin HTTP layer for Carmen Cloud API calls.
 
 All business logic and HTTP construction lives in `services/carmen_service.py`.
 Session injection (get_current_session) supplies the per-user Carmen token.

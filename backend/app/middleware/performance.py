@@ -33,19 +33,34 @@ def _user_id_from_request(request: Request) -> str | None:
 
 
 def _tenant_from_request(request: Request) -> str:
-    """Derive tenant from Origin header."""
+    """
+    Derive tenant from Origin header.
+    Strictly validates the subdomain to prevent SQL injection or path traversal.
+    """
+    from app.config import settings
+    default = settings.carmen_tenant_default
     try:
         from urllib.parse import urlparse
-        from app.config import settings
         origin = request.headers.get("origin", "")
+        if not origin:
+            return default
+            
         host = urlparse(origin).hostname or ""
-        subdomain = host.split(".")[0]
-        if not subdomain or subdomain == "localhost":
-            return settings.carmen_tenant_default
+        if not host or host == "localhost" or host == "127.0.0.1":
+            return default
+            
+        subdomain = host.split(".")[0].lower()
+        
+        # Security: Only allow alphanumeric and hyphens. Length 2-63.
+        # This prevents SQL Injection since the tenant name is used in DB queries.
+        if not re.match(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$", subdomain):
+            logger.warning("Invalid tenant/subdomain blocked: %s", subdomain)
+            return default
+            
         return subdomain
-    except Exception:
-        from app.config import settings
-        return settings.carmen_tenant_default
+    except Exception as exc:
+        logger.error("Error extracting tenant: %s", exc)
+        return default
 
 
 class PerformanceMiddleware(BaseHTTPMiddleware):
