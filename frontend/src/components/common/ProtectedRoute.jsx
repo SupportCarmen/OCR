@@ -1,5 +1,6 @@
 import { useAuth } from '../../contexts/AuthContext'
 import { useCarmenSSO } from '../../hooks/useCarmenSSO'
+import { getCarmenUrl } from '../../lib/url'
 import logo from '../../assets/logo.png'
 
 const DEV_BYPASS = import.meta.env.VITE_DEV_AUTH_BYPASS === 'true'
@@ -79,10 +80,35 @@ function AuthScreen({ state, message }) {
             <div style={styles.progressBar} />
           </div>
         )}
+
+        {state === 'unauthenticated' && (
+          <a
+            href={getCarmenUrl('/')}
+            style={{
+              marginTop: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              width: '100%',
+              padding: '0.75rem',
+              background: 'linear-gradient(135deg, var(--primary) 0%, #818cf8 50%, var(--teal) 100%)',
+              color: 'white',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              boxShadow: '0 4px 14px rgba(79,70,229,0.3)',
+              transition: 'all 0.2s',
+            }}
+          >
+            ไปที่หน้าเข้าสู่ระบบ Carmen
+          </a>
+        )}
       </div>
 
       <div style={styles.footer}>
-        Carmen AI Automation Platform • Powered by AI OCR &amp; LLM
+        Carmen Cloud AI Automation Platform • Powered by AI OCR &amp; LLM
       </div>
 
       <style>{`

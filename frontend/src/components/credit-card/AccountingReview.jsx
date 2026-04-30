@@ -148,7 +148,7 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
           </>
         }
         right={
-          <div style={{ display: 'flex', gap: '0.5rem', marginRight: '2rem' }}>
+          <div className="card-title-badges">
             {configBadges.map(({ label, variant }) => (
               <Badge key={label} variant={variant} pill={false}>{label}</Badge>
             ))}

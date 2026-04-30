@@ -54,25 +54,6 @@ export default function CreditCardOCR() {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button
-              className="btn btn-sm btn-outline"
-              onClick={() => {
-                if (step <= 1) { window.location.hash = '/'; return }
-                showModal({
-                  title: 'ออกจากหน้านี้?',
-                  message: 'ข้อมูลที่กรอกทั้งหมดจะหายไป คุณต้องการกลับหน้าหลักใช่ไหม?',
-                  type: 'warning',
-                  confirmText: 'กลับหน้าหลัก',
-                  cancelText: 'อยู่หน้านี้ต่อ',
-                  onConfirm: () => { closeModal(); window.location.hash = '/' },
-                  onCancel: closeModal,
-                })
-              }}
-            >
-              <i className="fas fa-arrow-left" /> กลับหน้าหลัก
-            </button>
-          </div>
         </div>
 
         <StepWizard step={step} />

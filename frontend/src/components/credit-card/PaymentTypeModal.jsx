@@ -41,7 +41,8 @@ export default function PaymentTypeModal({
             </span>
           </div>
         </div>
-        <div className="mapping-modal-body" style={{ padding: '1rem', overflowY: 'auto' }}>
+        <div className="mapping-modal-body table-wrapper" style={{ padding: '1rem', overflowY: 'auto' }}>
+          <div style={{ minWidth: '700px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr auto', gap: '1rem', fontWeight: 'bold', marginBottom: '1rem', paddingRight: '0.5rem' }}>
             <div>Payment Type</div>
             <div>Department Code</div>
@@ -220,6 +221,7 @@ export default function PaymentTypeModal({
               </button>
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-4)', gridColumn: 'span 2' }}>เพิ่ม Payment Type ที่กำหนดเอง</div>
+          </div>
           </div>
         </div>
         <div className="mapping-modal-footer" style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>

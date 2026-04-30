@@ -128,9 +128,10 @@
     .app-header { flex-wrap: wrap; gap: 0.75rem; padding: 0.875rem 1rem; margin-bottom: 1.25rem; }
     .app-header-sub { display: none; } /* hide subtitle on small header */
     .action-bar { flex-wrap: wrap; }
-    .form-actions { flex-direction: column; }
-    .btn-cancel, .btn-submit, .btn-danger { width: 100%; justify-content: center; }
-    .btn-icon { width: 100%; height: auto; padding: 0.6rem; }
+    .form-actions { flex-wrap: wrap; flex-direction: row; }
+    .form-actions > .btn-submit, .form-actions > .btn-danger { width: 100%; order: -1; justify-content: center; }
+    .form-actions > .btn-cancel { flex: 1; justify-content: center; margin-right: 0 !important; }
+    .form-actions > .btn-icon { flex: 0 0 auto; width: auto; }
     .form-actions-sep { display: none; }
     .btn-add-row { margin: 0.75rem 1rem; width: calc(100% - 2rem); }
     .total-summary-grid { grid-template-columns: 1fr 1fr; }
@@ -139,7 +140,9 @@
 }
 
 @media (max-width: 480px) {
-    .app-header { border-radius: var(--radius-lg); padding: 0.75rem; margin-bottom: 1rem; }
+    .app-header { flex-direction: column; align-items: flex-start; border-radius: var(--radius-lg); padding: 0.75rem; margin-bottom: 1rem; }
+    .app-header > div:last-child { width: 100%; margin-top: 0.75rem; }
+    .app-header .btn { width: 100%; justify-content: center; }
     .logo-box { width: 34px !important; height: 34px !important; }
     .main-content { gap: 1rem; }
     .section-title { font-size: 0.62rem; }

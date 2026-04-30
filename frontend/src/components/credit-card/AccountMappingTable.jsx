@@ -28,125 +28,127 @@ export default function AccountMappingTable({
         />
       </div>
 
-      <div className="mapping-container" style={{ display: 'grid', gridTemplateColumns: '95px 150px 1fr 1fr auto', gap: '1rem', alignItems: 'center' }}>
-        <div></div>
-        <div></div>
-        <div className="mapping-header" style={{ fontWeight: 600 }}>Department Code</div>
-        <div className="mapping-header" style={{ fontWeight: 600 }}>Account Code</div>
-        <div></div>
+      <div className="table-wrapper" style={{ paddingBottom: '0.5rem' }}>
+        <div className="mapping-container" style={{ display: 'grid', gridTemplateColumns: '95px 150px minmax(200px, 1fr) minmax(200px, 1fr) auto', gap: '1rem', alignItems: 'center', minWidth: '850px' }}>
+          <div></div>
+          <div></div>
+          <div className="mapping-header" style={{ fontWeight: 600 }}>Department Code</div>
+          <div className="mapping-header" style={{ fontWeight: 600 }}>Account Code</div>
+          <div></div>
 
-        <div className="mapping-type type-credit" style={{ color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Credit</div>
-        <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
-        <div style={{ gridColumn: 'span 3' }}>
-          <div id="amountMappingStatus" style={{
-            fontSize: '0.85rem',
-            padding: '0.7rem 1rem',
-            borderRadius: '8px',
-            border: '1px solid',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            color: requiredMissingCount > 0 ? '#dc2626' : 'var(--teal)',
-            background: requiredMissingCount > 0 ? '#fff1f2' : 'var(--teal-light)',
-            borderColor: requiredMissingCount > 0 ? '#fca5a5' : 'var(--teal)'
-          }}>
-            <div>
-              {requiredMissingCount > 0
-                ? <><i className="fas fa-exclamation-triangle" style={{ color: '#dc2626' }}></i> <strong>พบ {activeScan.paymentTypes.size} รายการในเอกสาร</strong> (ค้าง Mapping <strong>{requiredMissingCount}</strong> รายการ)</>
-                : amountMappedCount > 0
-                  ? <><i className="fas fa-check-circle"></i> ตั้งค่าแล้ว {amountMappedCount}/{allPaymentTypes.length} รายการ (เรียบร้อย)</>
-                  : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Amount เพื่อเปิด Modal / ปุ่ม Suggest เพื่อให้ AI แนะนำ</>
-              }
+          <div className="mapping-type type-credit" style={{ color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Credit</div>
+          <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <div id="amountMappingStatus" style={{
+              fontSize: '0.85rem',
+              padding: '0.7rem 1rem',
+              borderRadius: '8px',
+              border: '1px solid',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: requiredMissingCount > 0 ? '#dc2626' : 'var(--teal)',
+              background: requiredMissingCount > 0 ? '#fff1f2' : 'var(--teal-light)',
+              borderColor: requiredMissingCount > 0 ? '#fca5a5' : 'var(--teal)'
+            }}>
+              <div>
+                {requiredMissingCount > 0
+                  ? <><i className="fas fa-exclamation-triangle" style={{ color: '#dc2626' }}></i> <strong>พบ {activeScan.paymentTypes.size} รายการในเอกสาร</strong> (ค้าง Mapping <strong>{requiredMissingCount}</strong> รายการ)</>
+                  : amountMappedCount > 0
+                    ? <><i className="fas fa-check-circle"></i> ตั้งค่าแล้ว {amountMappedCount}/{allPaymentTypes.length} รายการ (เรียบร้อย)</>
+                    : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Amount เพื่อเปิด Modal / ปุ่ม Suggest เพื่อให้ AI แนะนำ</>
+                }
+              </div>
+              {requiredMissingCount > 0 && <span style={{ fontSize: '0.75rem', background: '#dc2626', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>Required for this scan</span>}
             </div>
-            {requiredMissingCount > 0 && <span style={{ fontSize: '0.75rem', background: '#dc2626', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>Required for this scan</span>}
           </div>
-        </div>
 
-        {['commission', 'tax', 'net'].map((key) => {
-          const labelMap = { commission: 'Commission', tax: 'Tax Amount', net: 'Net Amount' };
-          const natureStyle = { color: '#d97706', background: '#fef3c7', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' };
-          const meta = suggestionMeta[key];
-          const badge = meta === 'history'
-            ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
-            : meta === 'ai'
-              ? { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-wand-magic-sparkles' }
+          {['commission', 'tax', 'net'].map((key) => {
+            const labelMap = { commission: 'Commission', tax: 'Tax Amount', net: 'Net Amount' };
+            const natureStyle = { color: '#d97706', background: '#fef3c7', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' };
+            const meta = suggestionMeta[key];
+            const badge = meta === 'history'
+              ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
+              : meta === 'ai'
+                ? { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-wand-magic-sparkles' }
+                : null;
+
+            const suggestion = mainSuggestions[key] || null;
+            const detFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
+            const deptTopChoice = suggestion?.dept
+              ? {
+                code: suggestion.dept,
+                name: detFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
+                name2: detFromMaster?.name2,
+                source: suggestion.source
+              }
               : null;
 
-          const suggestion = mainSuggestions[key] || null;
-          const detFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
-          const deptTopChoice = suggestion?.dept
-            ? {
-              code: suggestion.dept,
-              name: detFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
-              name2: detFromMaster?.name2,
-              source: suggestion.source
-            }
-            : null;
+            const accFromMaster = suggestion?.acc ? masterAccounts.find(a => a.code === suggestion.acc) : null;
+            const accTopChoice = suggestion?.acc
+              ? {
+                code: suggestion.acc,
+                name: accFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
+                name2: accFromMaster?.name2,
+                source: suggestion.source
+              }
+              : null;
 
-          const accFromMaster = suggestion?.acc ? masterAccounts.find(a => a.code === suggestion.acc) : null;
-          const accTopChoice = suggestion?.acc
-            ? {
-              code: suggestion.acc,
-              name: accFromMaster?.name || '(รหัสจาก AI/ประวัติ)',
-              name2: accFromMaster?.name2,
-              source: suggestion.source
-            }
-            : null;
-
-          return (
-            <React.Fragment key={key}>
-              <div className="mapping-type type-debit" style={natureStyle}>Debit</div>
-              <div className="mapping-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>{labelMap[key]}</span>
-                {badge && (
-                  <span style={{ fontSize: '0.75rem', color: badge.color, background: badge.bg, padding: '3px 8px', borderRadius: '4px', border: `1px solid ${badge.border}`, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <i className={`fas ${badge.icon}`}></i> {badge.label}
-                  </span>
-                )}
-              </div>
-              <div>
-                <CustomSearchSelect
-                  value={mappings[key].dept}
-                  onChange={(val) => handleMappingChange(key, 'dept', val)}
-                  options={masterDepartments}
-                  placeholder="พิมพ์ Dept. Code..."
-                  topChoice={deptTopChoice?.code ? deptTopChoice : null}
-                  suggestedValue={suggestion?.dept || null}
-                />
-              </div>
-              <div>
-                <CustomSearchSelect
-                  value={mappings[key].acc}
-                  onChange={(val) => handleMappingChange(key, 'acc', val)}
-                  options={masterAccounts}
-                  placeholder="พิมพ์ Account Code..."
-                  topChoice={accTopChoice?.code ? accTopChoice : null}
-                  suggestedValue={suggestion?.acc || null}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.3rem' }}>
-                {badge && (
-                  <>
-                    <button
-                      onClick={() => confirmMainSuggestion(key)}
-                      title="ยอมรับค่าแนะนำ"
-                      style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
-                    >
-                      <i className="fas fa-check"></i>
-                    </button>
-                    <button
-                      onClick={() => rejectMainSuggestion(key)}
-                      title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                      style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
-                    >
-                      <i className="fas fa-times"></i>
-                    </button>
-                  </>
-                )}
-              </div>
-            </React.Fragment>
-          );
-        })}
+            return (
+              <React.Fragment key={key}>
+                <div className="mapping-type type-debit" style={natureStyle}>Debit</div>
+                <div className="mapping-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>{labelMap[key]}</span>
+                  {badge && (
+                    <span style={{ fontSize: '0.75rem', color: badge.color, background: badge.bg, padding: '3px 8px', borderRadius: '4px', border: `1px solid ${badge.border}`, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <i className={`fas ${badge.icon}`}></i> {badge.label}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <CustomSearchSelect
+                    value={mappings[key].dept}
+                    onChange={(val) => handleMappingChange(key, 'dept', val)}
+                    options={masterDepartments}
+                    placeholder="พิมพ์ Dept. Code..."
+                    topChoice={deptTopChoice?.code ? deptTopChoice : null}
+                    suggestedValue={suggestion?.dept || null}
+                  />
+                </div>
+                <div>
+                  <CustomSearchSelect
+                    value={mappings[key].acc}
+                    onChange={(val) => handleMappingChange(key, 'acc', val)}
+                    options={masterAccounts}
+                    placeholder="พิมพ์ Account Code..."
+                    topChoice={accTopChoice?.code ? accTopChoice : null}
+                    suggestedValue={suggestion?.acc || null}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.3rem' }}>
+                  {badge && (
+                    <>
+                      <button
+                        onClick={() => confirmMainSuggestion(key)}
+                        title="ยอมรับค่าแนะนำ"
+                        style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                      >
+                        <i className="fas fa-check"></i>
+                      </button>
+                      <button
+                        onClick={() => rejectMainSuggestion(key)}
+                        title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
+                        style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

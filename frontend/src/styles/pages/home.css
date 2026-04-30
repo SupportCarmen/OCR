@@ -266,3 +266,13 @@
     .home-title { font-size: 1.4rem; }
     .home-hero { padding: 2rem 1rem 1.75rem; }
 }
+
+@media (max-width: 480px) {
+    .home-title { font-size: 1.25rem; }
+    .home-subtitle { font-size: 0.85rem; }
+    .home-hero { padding: 1.5rem 1rem 1.25rem; }
+    .module-card { padding: 1.25rem; }
+    .module-card-icon { width: 40px; height: 40px; font-size: 1rem; }
+    .module-card-name { font-size: 0.95rem; }
+}
+

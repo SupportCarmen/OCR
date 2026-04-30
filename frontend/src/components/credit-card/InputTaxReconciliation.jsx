@@ -110,7 +110,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           <div className="card-title-left">
             <i className="fas fa-balance-scale" /> Input Tax Reconciliation
           </div>
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginRight: '0.5rem' }}>
+          <div className="card-title-badges">
             <span style={{
               background: 'var(--primary-light)', color: 'var(--primary)',
               border: '1px solid var(--primary-mid)', borderRadius: '4px',
@@ -234,11 +234,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
         }}>
-          <div style={{
-            background: '#fff', borderRadius: '12px', padding: '2rem 2.25rem',
-            maxWidth: '440px', width: '90%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
-            textAlign: 'center',
-          }}>
+          <div className="modal-box" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem', color: 'var(--teal)' }}>
               <i className="fas fa-file-invoice" />
             </div>
@@ -268,7 +264,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
                 {submitError}
               </div>
             )}
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+            <div className="modal-actions">
               <button
                 className="btn-cancel"
                 onClick={() => setShowConfirm(false)}
@@ -297,11 +293,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
         }}>
-          <div style={{
-            background: '#fff', borderRadius: '12px', padding: '2rem 2.25rem',
-            maxWidth: '420px', width: '90%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
-            textAlign: 'center',
-          }}>
+          <div className="modal-box" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem', color: 'var(--rose)' }}>
               <i className="fas fa-flag-checkered" />
             </div>
@@ -319,7 +311,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
               <i className="fas fa-flag-checkered" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
               <span>การดำเนินการนี้จะ<strong>จบกระบวนการทั้งหมด</strong>และกลับสู่หน้าเริ่มต้น</span>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+            <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowDiscardConfirm(false)}>
                 <i className="fas fa-arrow-left" /> กลับไปตรวจสอบ
               </button>

@@ -78,11 +78,6 @@ export default function APInvoice() {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <a href="#/" className="btn btn-sm btn-outline">
-              <i className="fas fa-arrow-left" /> กลับหน้าหลัก
-            </a>
-          </div>
         </div>
 
         <StepWizard step={step} steps={AP_STEPS} />

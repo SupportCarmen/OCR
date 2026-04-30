@@ -21,7 +21,8 @@ _TIMEOUT = 30.0
 def _base_url() -> str:
     """Derive Carmen API base URL from the current request's tenant context var."""
     from app.context import current_tenant
-    tenant = current_tenant.get() or "dev"
+    from app.config import settings
+    tenant = current_tenant.get() or settings.carmen_tenant_default
     return f"https://{tenant}.carmen4.com/Carmen.API/api/interface"
 
 
