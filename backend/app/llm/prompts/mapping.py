@@ -61,16 +61,18 @@ def build_ap_expense_prompt(
     dept_lines: str,
     expense_acc_lines: str,
     expense_acc_count: int,
+    invoice_desc: str = "",
 ) -> str:
     items_block = "\n".join(
-        f'  {i["index"]}: {i["category"]} — {i["description"]}'
+        f'  {i["index"]}: {i["category"]} — {i["description"]} (unit price: {i.get("unit_price", 0):.2f})'
         for i in items
     )
     keys = ", ".join(f'"{i["index"]}"' for i in items)
-    template = ", ".join(f'"{i["index"]}":{{"dept":null,"acc":null}}' for i in items)
+    template = ", ".join(f'"{i["index"]}":{{"dept":"","acc":""}}' for i in items)
+    invoice_context = f"Invoice Description: {invoice_desc.strip()}\n\n" if invoice_desc.strip() else ""
     return f"""Map AP invoice expense lines to Thai accounting codes. Return JSON only — no markdown.
 
-Items (index: category — description):
+{invoice_context}Items (index: category — description | unit price):
 {items_block}
 
 Departments:
@@ -79,7 +81,10 @@ Departments:
 Expense accounts ({expense_acc_count}):
 {expense_acc_lines or "  (none)"}
 
-Match category+description to the best expense account and department.
-Rules: use codes exactly as listed; null if no match.
+Instructions:
+- Match each item's category and description to the most suitable expense account and department.
+- Always provide your best guess — never leave dept or acc empty.
+- Use codes exactly as listed above.
+- If truly uncertain, pick the closest match by name similarity.
 Keys must be: {keys}
 {{{template}}}"""

@@ -12,7 +12,7 @@ import logo from '../assets/logo.png'
 export default function APInvoice() {
   const ctrl = useAPInvoice()
   const {
-    t, lang, setLang,
+    t,
     step, setStep,
     file, previewUrl, previewType, fileInputRef,
     loading, status, error, setError, suggestLoading,
@@ -79,10 +79,6 @@ export default function APInvoice() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button className="lang-toggle" onClick={() => setLang(l => l === 'th' ? 'en' : 'th')}>
-              <i className="fas fa-globe" />
-              {lang === 'th' ? 'EN' : 'TH'}
-            </button>
             <a href="#/" className="btn btn-sm btn-outline">
               <i className="fas fa-arrow-left" /> กลับหน้าหลัก
             </a>

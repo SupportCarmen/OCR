@@ -7,6 +7,7 @@ export default function DocumentPreview({ previewUrl, previewType, fileName }) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const frameRef = useRef(null)
+  const pinchRef = useRef(null) // stores last pinch distance
 
   // Reset on new file
   useEffect(() => {
@@ -15,21 +16,72 @@ export default function DocumentPreview({ previewUrl, previewType, fileName }) {
     setPan({ x: 0, y: 0 })
   }, [previewUrl])
 
-  // Scroll-to-zoom (image only)
+  // Scroll-to-zoom (image only, non-passive so preventDefault works)
   const handleWheel = useCallback((e) => {
     e.preventDefault()
     const delta = e.deltaY > 0 ? -0.15 : 0.15
     setZoom(prev => Math.min(Math.max(prev + delta, 0.25), 5))
   }, [])
 
+  // Touch handlers (non-passive, attached via useEffect)
+  const handleTouchStart = useCallback((e) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      pinchRef.current = Math.sqrt(dx * dx + dy * dy)
+      return
+    }
+    if (e.touches.length === 1) {
+      const touch = e.touches[0]
+      setIsDragging(true)
+      setDragStart(prev => ({ x: touch.clientX - prev.x, y: touch.clientY - prev.y }))
+      // store actual start relative to current pan
+      setDragStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y })
+    }
+  }, [pan])
+
+  const handleTouchMove = useCallback((e) => {
+    if (e.touches.length === 2 && pinchRef.current !== null) {
+      e.preventDefault()
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      const newDist = Math.sqrt(dx * dx + dy * dy)
+      const ratio = newDist / pinchRef.current
+      setZoom(prev => Math.min(Math.max(prev * ratio, 0.25), 5))
+      pinchRef.current = newDist
+      return
+    }
+    if (e.touches.length === 1 && isDragging) {
+      e.preventDefault()
+      const touch = e.touches[0]
+      setPan(prev => {
+        // dragStart is captured in closure — use ref instead
+        return { x: touch.clientX - dragStart.x, y: touch.clientY - dragStart.y }
+      })
+    }
+  }, [isDragging, dragStart])
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false)
+    pinchRef.current = null
+  }, [])
+
   useEffect(() => {
     const el = frameRef.current
     if (!el || previewType !== 'image') return
     el.addEventListener('wheel', handleWheel, { passive: false })
-    return () => el.removeEventListener('wheel', handleWheel)
-  }, [handleWheel, previewType])
+    el.addEventListener('touchstart', handleTouchStart, { passive: true })
+    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    el.addEventListener('touchend', handleTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('wheel', handleWheel)
+      el.removeEventListener('touchstart', handleTouchStart)
+      el.removeEventListener('touchmove', handleTouchMove)
+      el.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd, previewType])
 
-  // Drag-to-pan (image only)
+  // Mouse drag-to-pan
   const onMouseDown = (e) => {
     if (zoom <= 1) return
     e.preventDefault()
@@ -69,16 +121,16 @@ export default function DocumentPreview({ previewUrl, previewType, fileName }) {
           {isImage && (
             <>
               <div className="prev-tool-group">
-                <button className="prev-tool-btn" onClick={zoomOut} disabled={zoom <= 0.25} title="ย่อ (scroll ลง)">
+                <button className="prev-tool-btn" onClick={zoomOut} disabled={zoom <= 0.25} title="ย่อ">
                   <i className="fas fa-search-minus" />
                 </button>
                 <span className="prev-zoom-pct">{Math.round(zoom * 100)}%</span>
-                <button className="prev-tool-btn" onClick={zoomIn} disabled={zoom >= 5} title="ขยาย (scroll ขึ้น)">
+                <button className="prev-tool-btn" onClick={zoomIn} disabled={zoom >= 5} title="ขยาย">
                   <i className="fas fa-search-plus" />
                 </button>
               </div>
               <div className="prev-tool-sep" />
-              <button className="prev-tool-btn" onClick={resetView} title="Reset มุมมอง">
+              <button className="prev-tool-btn" onClick={resetView} title="Reset">
                 <i className="fas fa-compress-arrows-alt" />
               </button>
               <button className="prev-tool-btn" onClick={rotateCW} title="หมุน 90°">
@@ -96,11 +148,7 @@ export default function DocumentPreview({ previewUrl, previewType, fileName }) {
             </>
           )}
 
-          <button
-            className="prev-tool-btn"
-            onClick={openNewTab}
-            title="เปิดในแท็บใหม่"
-          >
+          <button className="prev-tool-btn" onClick={openNewTab} title="เปิดในแท็บใหม่">
             <i className="fas fa-external-link-alt" />
           </button>
         </div>
@@ -135,7 +183,7 @@ export default function DocumentPreview({ previewUrl, previewType, fileName }) {
           <iframe
             src={previewUrl}
             title="PDF Preview"
-            style={{ width: '100%', height: '500px', border: 'none', display: 'block', flexShrink: 0 }}
+            className="preview-pdf-iframe"
           />
         )}
 
@@ -166,7 +214,6 @@ export default function DocumentPreview({ previewUrl, previewType, fileName }) {
           )}
         </div>
       )}
-
     </div>
   )
 }

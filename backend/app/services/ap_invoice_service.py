@@ -25,9 +25,9 @@ _CATEGORY_KW: dict[str, list[str]] = {
     "เงินมัดจำ":     ["มัดจำ", "deposit", "advance"],
 }
 
-def _filter_expense_accounts(accounts: list[dict], items: list[dict], max_acc: int = 60) -> list[dict]:
+def _filter_expense_accounts(accounts: list[dict], items: list[dict], max_acc: int = 60, invoice_desc: str = "") -> list[dict]:
     """Return the most relevant expense accounts for the given items by
-    keyword-scoring against category + description. Falls back to the first
+    keyword-scoring against category + description + invoice_desc. Falls back to the first
     `max_acc` accounts when nothing matches."""
     if not accounts:
         return []
@@ -39,6 +39,9 @@ def _filter_expense_accounts(accounts: list[dict], items: list[dict], max_acc: i
             if cat_key in cat or any(kw in cat for kw in kws):
                 keywords.update(kws)
         keywords.update(w for w in desc.split() if len(w) >= 3)
+    # Also score using invoice description words
+    if invoice_desc:
+        keywords.update(w.lower() for w in invoice_desc.split() if len(w) >= 3)
 
     if not keywords:
         return accounts[:max_acc]
@@ -84,7 +87,7 @@ async def extract_ap_invoice_data(data_url: str, filename: str, task_id: str) ->
     return postprocess_ap_invoice(data)
 
 
-async def suggest_gl_for_items(items_payload: List[Dict[str, Any]], accounts_raw: Dict[str, Any], depts_raw: Dict[str, Any]) -> Dict[str, Any]:
+async def suggest_gl_for_items(items_payload: List[Dict[str, Any]], accounts_raw: Dict[str, Any], depts_raw: Dict[str, Any], invoice_desc: str = "") -> Dict[str, Any]:
     """AI-suggest dept/acc for AP invoice expense items using category + description."""
     
     accounts = [
@@ -100,8 +103,8 @@ async def suggest_gl_for_items(items_payload: List[Dict[str, Any]], accounts_raw
 
     expense_accounts = [a for a in accounts if a["type"] in ("e", "expense")] or accounts
 
-    # Pre-filter to the most relevant accounts
-    filtered_accounts = _filter_expense_accounts(expense_accounts, items_payload)
+    # Pre-filter to the most relevant accounts (include invoice_desc as extra keywords)
+    filtered_accounts = _filter_expense_accounts(expense_accounts, items_payload, invoice_desc=invoice_desc)
 
     dept_lines = "\n".join(f"  {d['code']} {d['name']}" for d in departments[:50])
     expense_acc_lines = "\n".join(f"  {a['code']} {a['name']}" for a in filtered_accounts)
@@ -111,6 +114,7 @@ async def suggest_gl_for_items(items_payload: List[Dict[str, Any]], accounts_raw
         dept_lines=dept_lines,
         expense_acc_lines=expense_acc_lines,
         expense_acc_count=len(filtered_accounts),
+        invoice_desc=invoice_desc,
     )
 
     data = await call_text_llm(prompt, usage_type="AP_GL_SUGGESTION")

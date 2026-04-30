@@ -133,7 +133,7 @@ export default function APReviewStep({ ctrl }) {
       </Card>
 
       {/* Validation + Amount Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1rem' }}>
         <div className={isValid ? 'ap-valid-ok' : 'ap-valid-err'}>
           <i className={`fas fa-${isValid ? 'circle-check' : 'circle-exclamation'}`} style={{ fontSize: '1.3rem', flexShrink: 0 }} />
           <div>
@@ -164,7 +164,7 @@ export default function APReviewStep({ ctrl }) {
           {!vendorMapped && (
             <span style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <i className="fas fa-triangle-exclamation" />
-              กรุณาเลือกผู้ขายจากระบบก่อนดำเนินการต่อ
+              {t.warnSelectVendor}
             </span>
           )}
           <button
@@ -173,7 +173,7 @@ export default function APReviewStep({ ctrl }) {
             disabled={!vendorMapped}
             style={!vendorMapped ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
           >
-            {isValid ? 'ดำเนินการต่อ' : 'ดำเนินการต่อ (ข้ามคำเตือน)'}
+            {isValid ? t.proceed : t.proceedAnyway}
             <i className="fas fa-arrow-right" />
           </button>
         </div>

@@ -85,7 +85,7 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
   return {
     VnCode: systemVendor.code || '',
     InvhDate: now,
-    InvhDesc: headerData.invhDesc || headerData.vendorName || '',
+    InvhDesc: headerData.invhDesc ||'',
     InvhSource: 'OAPI',
     InvhInvNo: headerData.documentNumber || '',
     InvhInvDate: invDate,
@@ -107,7 +107,7 @@ function buildInvoicePayload(headerData, lineItems, systemVendor) {
 }
 
 export function useAPInvoice() {
-  const [lang, setLang] = useState('th')
+  const [lang, setLang] = useState('en')
   const t = AP_I18N[lang]
   const { toasts, showToast } = useToast()
 
@@ -377,16 +377,16 @@ export function useAPInvoice() {
 
   const goToAccount = () => {
     if (!systemVendor.code) {
-      showToast('กรุณาเลือกผู้ขายจากระบบ Carmen Cloud ก่อนดำเนินการต่อ', 'warning')
+      showToast(t.warnSelectVendor, 'warning')
       return
     }
     if (!isValid) {
       setModal({
         show: true, type: 'warning',
-        title: 'ยอดเงินไม่ตรงกัน',
+        title: t.mismatchTitle,
         message: t.warnMismatch,
-        confirmText: 'ดำเนินการต่อ',
-        cancelText: 'กลับแก้ไข',
+        confirmText: t.proceed,
+        cancelText: t.backEdit,
         onConfirm: () => { setModal({ show: false }); setStep(4) },
         onCancel:  () => setModal({ show: false }),
       })
@@ -395,50 +395,75 @@ export function useAPInvoice() {
     }
   }
 
-  const handleAISuggest = async () => {
+  const handleAISuggest = () => {
     const itemsToSuggest = lineItems
-      .map((item, idx) => ({ index: idx, category: item.category || '', description: item.description || '' }))
+      .map((item, idx) => ({
+        index: idx,
+        category: item.category || '',
+        description: item.description || '',
+        unit_price: parseNum(item.unitPrice ?? item.lineTotal ?? 0),
+      }))
       .filter((_, idx) => !lineItems[idx].deptCode || !lineItems[idx].accountCode)
 
     if (!itemsToSuggest.length) return
 
-    setSuggestLoading(true)
-    showToast('AI กำลังแนะนำรหัสบัญชี...', 'info')
-    try {
-      const res = await apiFetch('/api/v1/ap-invoice/suggest-gl', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: itemsToSuggest }),
+    const runSuggest = async () => {
+      setSuggestLoading(true)
+      showToast('AI กำลังแนะนำรหัสบัญชี...', 'info')
+      try {
+        const res = await apiFetch('/api/v1/ap-invoice/suggest-gl', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: itemsToSuggest,
+            invoice_desc: headerData.invhDesc || '',
+          }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        const suggestions = data.suggestions || {}
+        let suggestedCount = 0
+        setLineItems(prev => prev.map((item, idx) => {
+          const s = suggestions[idx]
+          if (!s) return item
+          const newDept = !item.deptCode    && s.deptCode    ? s.deptCode    : null
+          const newAcc  = !item.accountCode && s.accountCode ? s.accountCode : null
+          if (newDept || newAcc) suggestedCount++
+          return {
+            ...item,
+            deptCode:     newDept ?? item.deptCode,
+            accountCode:  newAcc  ?? item.accountCode,
+            _suggestDept: newDept || undefined,
+            _suggestAcc:  newAcc  || undefined,
+          }
+        }))
+        showToast(
+          suggestedCount > 0
+            ? `AI แนะนำรหัสบัญชีสำหรับ ${suggestedCount} รายการ — กรุณาตรวจสอบ`
+            : 'ไม่มีรายการที่ต้องการแนะนำเพิ่ม',
+          suggestedCount > 0 ? 'success' : 'info',
+        )
+      } catch (err) {
+        console.error('AI suggest error:', err)
+        showToast('ไม่สามารถแนะนำรหัสบัญชีได้ กรุณาลองใหม่', 'error')
+      } finally {
+        setSuggestLoading(false)
+      }
+    }
+
+    if (!headerData.invhDesc) {
+      setModal({
+        show: true,
+        type: 'info',
+        title: 'Add Invoice Description for Better Results',
+        message: 'Adding an Invoice Description helps AI suggest more accurate GL accounts.\nYou can add it in the Invoice Description field above.',
+        confirmText: 'Proceed Anyway',
+        cancelText: '← Back to fill description',
+        onConfirm: () => { setModal({ show: false }); runSuggest() },
+        onCancel: () => setModal({ show: false }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      const suggestions = data.suggestions || {}
-      let suggestedCount = 0
-      setLineItems(prev => prev.map((item, idx) => {
-        const s = suggestions[idx]
-        if (!s) return item
-        const newDept = !item.deptCode    && s.deptCode    ? s.deptCode    : null
-        const newAcc  = !item.accountCode && s.accountCode ? s.accountCode : null
-        if (newDept || newAcc) suggestedCount++
-        return {
-          ...item,
-          deptCode:     newDept ?? item.deptCode,
-          accountCode:  newAcc  ?? item.accountCode,
-          _suggestDept: newDept || undefined,
-          _suggestAcc:  newAcc  || undefined,
-        }
-      }))
-      showToast(
-        suggestedCount > 0
-          ? `AI แนะนำรหัสบัญชีสำหรับ ${suggestedCount} รายการ — กรุณาตรวจสอบ`
-          : 'ไม่มีรายการที่ต้องการแนะนำเพิ่ม',
-        suggestedCount > 0 ? 'success' : 'info',
-      )
-    } catch (err) {
-      console.error('AI suggest error:', err)
-      showToast('ไม่สามารถแนะนำรหัสบัญชีได้ กรุณาลองใหม่', 'error')
-    } finally {
-      setSuggestLoading(false)
+    } else {
+      runSuggest()
     }
   }
 

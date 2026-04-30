@@ -33,19 +33,19 @@ export default function APAccountMappingStep({
   const docDate           = headerData.documentDate || '—'
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ maxWidth: 1080, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxSizing: 'border-box' }}>
 
       {/* Vendor info bar */}
       <div style={{
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0',
+        display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', gap: '0',
         background: '#f5f3ff', border: '1.5px solid #c4b5fd',
         borderRadius: '12px', padding: '0',
-        overflow: 'hidden',
+        overflow: 'hidden', minWidth: 0,
       }}>
         {/* Vendor name block */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.6rem',
-          padding: '0.7rem 1.1rem', borderRight: '1.5px solid #c4b5fd', flexShrink: 0,
+          padding: '0.7rem 1.1rem', borderRight: '1.5px solid #c4b5fd', flexShrink: 0, minWidth: 0,
         }}>
           <div style={{
             width: 34, height: 34, borderRadius: '8px', background: '#7c3aed',
@@ -93,7 +93,7 @@ export default function APAccountMappingStep({
       </div>
 
       {/* Fixed GL accounts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.25rem' }}>
         <GLAccountCard
           title={t.debitTax}
           iconColor="blue"

@@ -92,6 +92,7 @@ export function useOcrWizard() {
       setPreviewType(name.split('.').pop().toUpperCase() || 'other')
     }
     setStep(1)
+    processFile(fileArray)
   }
 
   function applyExtractedData(ext, taskId = null) {
@@ -142,11 +143,17 @@ export function useOcrWizard() {
       message: `เอกสารหมายเลข ${docNo} ถูกบันทึกไว้ในระบบแล้ว\nไม่สามารถนำเข้าเอกสารซ้ำได้`,
       type: 'error',
       confirmText: 'ตกลง',
-      onConfirm: () => { closeModal(); setStep(1) },
+      onConfirm: () => {
+        closeModal()
+        setStep(1)
+        setFiles([])
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      },
     })
   }
 
-  async function processFile() {
+  async function processFile(filesOverride) {
+    const filesToProcess = filesOverride ?? files
     if (!bank) {
       showModal({
         title: 'ข้อมูลไม่ครบถ้วน',
@@ -155,7 +162,7 @@ export function useOcrWizard() {
       })
       return
     }
-    if (files.length === 0) {
+    if (filesToProcess.length === 0) {
       showModal({
         title: 'ไม่พบไฟล์เอกสาร',
         message: 'กรุณาเลือกไฟล์รูปภาพหรือ PDF ที่ต้องการประมวลผล',
@@ -167,7 +174,7 @@ export function useOcrWizard() {
     setStep(2)
     setStatus('AI กำลังอ่านข้อมูลจากเอกสาร...')
     try {
-      const ext = await extractFromFile(files[0], bank)
+      const ext = await extractFromFile(filesToProcess[0], bank)
 
       if (ext.is_duplicate) {
         setStatus('พบเอกสารซ้ำ')
@@ -194,7 +201,7 @@ export function useOcrWizard() {
             setStep(2)
             setStatus('AI กำลังอ่านข้อมูลใหม่...')
             try {
-              const ext2 = await extractFromFile(files[0], detectedBank)
+              const ext2 = await extractFromFile(filesToProcess[0], detectedBank)
               if (ext2.is_duplicate) {
                 setStatus('พบเอกสารซ้ำ')
                 showDuplicateModal(ext2.doc_no)

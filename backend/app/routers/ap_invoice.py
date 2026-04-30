@@ -122,10 +122,12 @@ class SuggestGLItem(BaseModel):
     index: int
     category: str = ""
     description: str = ""
+    unit_price: float = 0.0
 
 
 class SuggestGLRequest(BaseModel):
     items: List[SuggestGLItem]
+    invoice_desc: str = ""
 
 
 @router.post("/suggest-gl")
@@ -150,6 +152,6 @@ async def suggest_gl(
     except CarmenAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=f"Carmen API error: {e.detail}")
 
-    items_payload = [{"index": i.index, "category": i.category, "description": i.description} for i in body.items]
-    suggestions = await suggest_gl_for_items(items_payload, accounts_raw, depts_raw)
+    items_payload = [{"index": i.index, "category": i.category, "description": i.description, "unit_price": i.unit_price} for i in body.items]
+    suggestions = await suggest_gl_for_items(items_payload, accounts_raw, depts_raw, invoice_desc=body.invoice_desc)
     return {"suggestions": suggestions}

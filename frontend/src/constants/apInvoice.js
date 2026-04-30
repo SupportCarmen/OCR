@@ -100,6 +100,9 @@ export const AP_I18N = {
     itemCount: 'จำนวนรายการ', items: 'รายการ',
     tableTotal: 'ยอดรวมตาราง',
     duplicateDoc: 'เอกสารซ้ำ! เลขที่เอกสารนี้และผู้ขายรายนี้มีอยู่ในระบบแล้ว',
+    proceed: 'ดำเนินการต่อ', proceedAnyway: 'ดำเนินการต่อ (ข้ามคำเตือน)',
+    warnSelectVendor: 'กรุณาเลือกผู้ขายจากระบบก่อนดำเนินการต่อ',
+    mismatchTitle: 'ยอดเงินไม่ตรงกัน', backEdit: 'กลับแก้ไข',
   },
   en: {
     appTitle: 'Carmen Cloud', appSub: 'AP Invoice OCR',
@@ -147,5 +150,8 @@ export const AP_I18N = {
     itemCount: 'Total Items', items: 'items',
     tableTotal: 'Table Total',
     duplicateDoc: 'Duplicate Document! This document number and vendor already exist in the system.',
+    proceed: 'Proceed', proceedAnyway: 'Proceed (Skip Warning)',
+    warnSelectVendor: 'Please select a vendor from the system before proceeding',
+    mismatchTitle: 'Amount Mismatch', backEdit: 'Back to Review',
   },
 }

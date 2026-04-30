@@ -4,6 +4,8 @@ import { BANKS } from '../../constants'
 export default function UploadSection({ bank, onBankChange, onFileChange, fileInputRef, fileName, multiple }) {
   const [isDragOver, setIsDragOver] = useState(false)
 
+  const hasBank = !!bank
+
   const handleDragOver = (e) => {
     e.preventDefault()
     setIsDragOver(true)
@@ -17,22 +19,23 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
     e.preventDefault()
     setIsDragOver(false)
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      // Create a spoof event to send to onFileChange
-      const fakeEvent = {
-        target: { files: e.dataTransfer.files }
-      }
+      const fakeEvent = { target: { files: e.dataTransfer.files } }
       onFileChange(fakeEvent)
-      if (fileInputRef.current) {
-        fileInputRef.current.files = e.dataTransfer.files
-      }
+      if (fileInputRef.current) fileInputRef.current.files = e.dataTransfer.files
     }
   }
 
   return (
     <div className="upload-section">
       {/* Bank Selector */}
-      <div className="panel-card">
-        <div className="field-label"><i className="fas fa-university"></i> เลือกธนาคาร</div>
+      <div className={`panel-card ${!hasBank ? 'step-active' : ''}`}>
+        <div className="field-label">
+          <i className="fas fa-university"></i> เลือกธนาคาร
+          {!hasBank
+            ? <span className="step-badge badge-now"><i className="fas fa-arrow-pointer" style={{ fontSize: '0.6rem' }} /> เริ่มที่นี่</span>
+            : <span className="step-badge badge-now" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--emerald)', border: '1px solid rgba(16,185,129,0.2)' }}><i className="fas fa-check" style={{ fontSize: '0.6rem' }} /> เลือกแล้ว</span>
+          }
+        </div>
         <div className="bank-select-grid">
           {BANKS.map((b) => {
             const isSelected = bank === b.value
@@ -61,12 +64,12 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
 
       {/* File Upload Drop Zone */}
       <div
-        className={`panel-card upload-drop ${isDragOver ? 'dragover' : ''}`}
+        className={`panel-card upload-drop ${isDragOver ? 'dragover' : ''} ${hasBank ? 'step-active-upload' : 'step-dimmed'}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         role="button"
-        tabIndex={0}
+        tabIndex={hasBank ? 0 : -1}
         aria-label="อัปโหลดไฟล์เอกสาร"
         onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') fileInputRef.current?.click() }}
       >
@@ -79,11 +82,20 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
           onChange={onFileChange}
           aria-hidden="true"
         />
-        <div className="upload-icon"><i className="fas fa-cloud-upload-alt"></i></div>
-        <div className="upload-label">
-          {fileName ? (fileName.length > 28 ? fileName.slice(0, 25) + '…' : fileName) : 'คลิกหรือลากไฟล์มาวาง'}
+        <div className="upload-icon">
+          <i className={`fas ${hasBank ? 'fa-cloud-upload-alt' : 'fa-lock'}`}></i>
         </div>
-        <div className="upload-hint">รองรับ JPG · PNG · PDF</div>
+        <div className="upload-label">
+          {!hasBank
+            ? 'เลือกธนาคารก่อน'
+            : fileName
+              ? (fileName.length > 28 ? fileName.slice(0, 25) + '…' : fileName)
+              : 'คลิกหรือลากไฟล์มาวาง'
+          }
+        </div>
+        <div className="upload-hint">
+          {hasBank ? 'รองรับ JPG · PNG · PDF' : 'ขั้นตอนที่ 2'}
+        </div>
       </div>
 
       {/* How-to Card */}
@@ -100,7 +112,7 @@ export default function UploadSection({ bank, onBankChange, onFileChange, fileIn
           </div>
           <div className="how-to-item">
             <div className="how-step-num gold">3</div>
-            <span>กด "อ่านข้อมูล" เพื่อให้ AI ดึงข้อมูล</span>
+            <span>AI จะอ่านข้อมูลอัตโนมัติทันทีที่เลือกไฟล์</span>
           </div>
           <div className="how-to-item">
             <div className="how-step-num teal">4</div>

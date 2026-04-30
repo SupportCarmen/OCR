@@ -201,4 +201,12 @@ textarea:focus-visible {
 /* ─── RESPONSIVE BASE ─── */
 @media (max-width: 768px) {
     body { padding: 1.25rem 1rem 5rem; }
+    /* Reduce aurora blob cost on mobile */
+    body::before { width: 80vw; height: 80vw; filter: blur(40px); opacity: 0.6; animation: none; }
+    body::after  { width: 70vw; height: 70vw; filter: blur(50px); opacity: 0.5; animation: none; }
+}
+
+@media (max-width: 480px) {
+    body { padding: 0.875rem 0.75rem 4rem; }
+    body::before, body::after { display: none; }
 }

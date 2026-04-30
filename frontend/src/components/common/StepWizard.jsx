@@ -20,7 +20,7 @@ export default function StepWizard({ step, steps }) {
                 <div className="step-num">
                   {isDone ? <i className="fas fa-check" style={{ fontSize: '0.6rem' }} /> : String(s.n).padStart(2, '0')}
                 </div>
-                <span>
+                <span className="step-label">
                   {s.label}
                   {s.sub && <span style={{ display: 'inline', opacity: 0.65 }}>{' '}{s.sub}</span>}
                 </span>

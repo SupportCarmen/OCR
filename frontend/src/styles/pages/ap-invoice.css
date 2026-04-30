@@ -607,3 +607,47 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
 }
+
+/* ═══════════════════════════════════════════
+   AP INVOICE — MOBILE RESPONSIVE
+   ═══════════════════════════════════════════ */
+
+/* ─── Split layout: collapse to 1-col under 900px ─── */
+@media (max-width: 900px) {
+  .ap-split-layout { grid-template-columns: 1fr; }
+  .ap-preview-side { position: static; }
+}
+
+/* ─── Tables: ensure scroll container is always present ─── */
+@media (max-width: 768px) {
+  .mapping-table-wrap { scroll-behavior: auto; }
+  .ap-edit-input { min-height: 40px; padding: 0.55rem 0.6rem; }
+  .ap-acct-table td,
+  .ap-acct-table th { padding: 0.65rem 0.75rem; }
+  .ap-review-table th { padding: 0.65rem 0.75rem; }
+  .ap-review-table td { padding: 0.5rem 0.6rem; }
+  .vendor-dropdown { max-height: 260px; }
+  .ap-step-nav { flex-wrap: wrap; gap: 0.75rem; }
+  .ap-step-nav .btn { flex: 1; justify-content: center; min-height: 44px; }
+  /* Success grid: 2-col OK at tablet */
+  .ap-success-wrap { padding: 2rem 1.5rem; }
+}
+
+/* ─── Small phones ─── */
+@media (max-width: 640px) {
+  .ap-split-layout { gap: 1rem; }
+  .ap-success-grid { grid-template-columns: 1fr; }
+  .ap-success-wrap { padding: 1.5rem 1rem; border-radius: var(--radius-lg); }
+  .ap-success-icon { width: 68px; height: 68px; font-size: 1.7rem; box-shadow: 0 0 0 8px rgba(5,150,105,0.08); }
+  .ap-step-nav { padding: 0.875rem 1rem; flex-direction: column; align-items: stretch; }
+  .ap-step-nav .btn { min-height: 44px; }
+  .ap-account-card-header { flex-wrap: wrap; gap: 0.5rem; padding: 0.875rem 1rem; }
+  .ap-account-body { padding: 0.875rem 1rem; }
+  .vendor-search-wrap { padding: 0.75rem; }
+  .ap-summary-values { flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+  .ap-sum-from-doc { width: 90px; font-size: 0.8rem; }
+  .ap-sum-from-table { min-width: 70px; font-size: 0.8rem; }
+  .ap-grand-total-row { flex-wrap: wrap; gap: 0.5rem; }
+  .mapping-table th { min-width: 80px; }
+  .mapping-table td { font-size: 0.78rem; padding: 0.55rem 0.6rem; }
+}

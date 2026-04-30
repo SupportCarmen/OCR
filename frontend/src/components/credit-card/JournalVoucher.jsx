@@ -60,12 +60,12 @@ export default function JournalVoucher({ jvRows, headerData, filePrefix, fileSou
         <div className="card-body" style={{ borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             {[
-              { label: 'Prefix',      value: filePrefix || 'IC',       flex: '0 0 100px' },
-              { label: 'Voucher No.', value: carmenJvId || '—',         flex: '0 0 180px' },
-              { label: 'Date',        value: headerData.DocDate || '—', flex: '0 0 160px' },
-              { label: 'Description', value: description || '—',        flex: '1' },
-            ].map(({ label, value, flex }) => (
-              <div key={label} className="jv-meta-field" style={{ flex }}>
+              { label: 'Prefix',      value: filePrefix || 'IC',       flex: '1 1 80px',  minWidth: '60px'  },
+              { label: 'Voucher No.', value: carmenJvId || '—',         flex: '2 1 140px', minWidth: '100px' },
+              { label: 'Date',        value: headerData.DocDate || '—', flex: '1 1 110px', minWidth: '90px'  },
+              { label: 'Description', value: description || '—',        flex: '3 1 180px', minWidth: '0'     },
+            ].map(({ label, value, flex, minWidth }) => (
+              <div key={label} className="jv-meta-field" style={{ flex, minWidth }}>
                 <span className="jv-meta-label">{label}</span>
                 <div className="jv-meta-value">{value}</div>
               </div>

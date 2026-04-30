@@ -1,6 +1,6 @@
 import { useOcrWizard } from '../hooks/useOcrWizard'
 import { StepWizard, FormActions, CustomModal, LoadingOverlay, DocumentPreview } from '../components/common'
-import { UploadSection, ActionBar, HeaderCard, DetailTable, AccountingReview, InputTaxReconciliation } from '../components/credit-card'
+import { UploadSection, HeaderCard, DetailTable, AccountingReview, InputTaxReconciliation } from '../components/credit-card'
 import logo from '../assets/logo.png'
 
 export default function CreditCardOCR() {
@@ -11,7 +11,7 @@ export default function CreditCardOCR() {
     fileInputRef,
     toasts, modal, showToast, showModal, closeModal,
     setBank, setStep,
-    handleFileChange, processFile,
+    handleFileChange,
     updateHeader, updateDetail, addRow, deleteRow,
     handleSubmitFinal, handleCancel, resetAll,
   } = useOcrWizard()
@@ -87,7 +87,6 @@ export default function CreditCardOCR() {
               fileName={files.length > 1 ? `${files.length} ไฟล์ที่เลือก` : files[0]?.name}
               multiple={true}
             />
-            <ActionBar loading={loading} status={status} onProcess={processFile} />
           </>
         )}
 
