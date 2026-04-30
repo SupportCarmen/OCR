@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   EMPTY_HEADER, DEFAULT_MAPPINGS,
-  fmt, round2, isNumFld, getAvailableFields, AP_I18N,
+  fmt, round2, isNumFld, getAvailableFields, AP_I18N, parseNum,
 } from '../constants/apInvoice'
-import { parseNum } from '../constants/apInvoice'
 import { fetchAccountCodes, fetchDepartments, submitAPInvoiceToCarmen } from '../lib/api/carmen'
 import { apiFetch } from '../lib/api/client'
 import { useToast } from './useToast'
@@ -140,40 +139,43 @@ export function useAPInvoice() {
   const [apInvoiceId, setApInvoiceId] = useState(null)
 
   const fileInputRef = useRef(null)
+  const previewUrlRef = useRef(null)
 
   const loadVendors = async (setRefreshing = false) => {
     if (setRefreshing) setVendorRefreshing(true)
-    return apiFetch('/api/v1/ocr/carmen/vendors')
-      .then(r => r.json())
-      .then(data => {
-        const list = (data.Data || []).map(v => ({
-          code: v.VnCode || '',
-          name: v.VnName || '',
-          taxId: String(v.VnTaxNo || '').replace(/\D/g, ''),
-          active: v.Active,
-          catCode: v.VnCateCode,
-          catDesc: v.VnCateDesc,
-          vat1DrAccCode: v.VnVat1DrAccCode,
-          vat1DrAccDesc: v.VnVat1DrAccDesc,
-          vat1DrDeptCode: v.VnVat1DrDeptCode,
-          vat1DrDeptDesc: v.VnVat1DrDeptDesc,
-          vatCrAccCode: v.VnVatCrAccCode,
-          vatCrAccDesc: v.VnVatCrAccDesc,
-          crDeptCode: v.VnCrDeptCode,
-          crDeptDesc: v.VnCrDeptDesc,
-          taxProfileCode1: v.TaxProfileCode1,
-          taxProfileDesc1: v.TaxProfileDesc1,
-          branchNo: v.BranchNo,
-          term: v.VnTerm ?? 0,
-        }))
-        setVendors(list)
-        const db = {}
-        list.forEach(v => { if (v.taxId) db[v.taxId] = v })
-        setVendorDbByTax(db)
-        if (setRefreshing) showToast('รายชื่อผู้ขายอัปเดตแล้ว', 'success')
-      })
-      .catch(() => { if (setRefreshing) showToast('ไม่สามารถโหลดรายชื่อผู้ขายได้', 'error') })
-      .finally(() => { if (setRefreshing) setVendorRefreshing(false) })
+    try {
+      const r = await apiFetch('/api/v1/ocr/carmen/vendors')
+      const data = await r.json()
+      const list = (data.Data || []).map(v => ({
+        code: v.VnCode || '',
+        name: v.VnName || '',
+        taxId: String(v.VnTaxNo || '').replace(/\D/g, ''),
+        active: v.Active,
+        catCode: v.VnCateCode,
+        catDesc: v.VnCateDesc,
+        vat1DrAccCode: v.VnVat1DrAccCode,
+        vat1DrAccDesc: v.VnVat1DrAccDesc,
+        vat1DrDeptCode: v.VnVat1DrDeptCode,
+        vat1DrDeptDesc: v.VnVat1DrDeptDesc,
+        vatCrAccCode: v.VnVatCrAccCode,
+        vatCrAccDesc: v.VnVatCrAccDesc,
+        crDeptCode: v.VnCrDeptCode,
+        crDeptDesc: v.VnCrDeptDesc,
+        taxProfileCode1: v.TaxProfileCode1,
+        taxProfileDesc1: v.TaxProfileDesc1,
+        branchNo: v.BranchNo,
+        term: v.VnTerm ?? 0,
+      }))
+      setVendors(list)
+      const db = {}
+      list.forEach(v => { if (v.taxId) db[v.taxId] = v })
+      setVendorDbByTax(db)
+      if (setRefreshing) showToast('รายชื่อผู้ขายอัปเดตแล้ว', 'success')
+    } catch {
+      if (setRefreshing) showToast('ไม่สามารถโหลดรายชื่อผู้ขายได้', 'error')
+    } finally {
+      if (setRefreshing) setVendorRefreshing(false)
+    }
   }
 
   const refreshVendors = () => loadVendors(true)
@@ -211,15 +213,15 @@ export function useAPInvoice() {
     }
   }, [headerData.vendorTaxId, lang, vendorDbByTax])
 
-  const filteredVendors = vendors.filter(v => {
+  const filteredVendors = useMemo(() => {
     const q = vendorSearch.toLowerCase()
-    return (
+    return vendors.filter(v =>
       v.name.toLowerCase().includes(q) ||
       v.code.toLowerCase().includes(q) ||
       v.taxId.includes(vendorSearch) ||
       String(v.branchNo || '').includes(vendorSearch)
     )
-  })
+  }, [vendors, vendorSearch])
 
   // Computed totals
   const sumLineSubTotal = lineItems.reduce((s, i) => s + Math.round(parseNum(i.lineSubTotal) * 100), 0) / 100
@@ -249,10 +251,9 @@ export function useAPInvoice() {
   const isValid = validationErrors.length === 0
 
   const availableFields = getAvailableFields(t)
-  const activeCols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].filter(c => {
-    const fld = fieldMappings[`col${c}`]
-    return fld !== 'ignore' && fld !== 'category'
-  })
+  const activeCols = Object.keys(fieldMappings)
+    .map(k => parseInt(k.replace('col', ''), 10))
+    .filter(c => fieldMappings[`col${c}`] !== 'ignore' && fieldMappings[`col${c}`] !== 'category')
 
   const adjustField = (tgt, sumCur, itemKey, adjustTotal = false, isDiscount = false) => {
     if (!lineItems.length) return
@@ -271,8 +272,11 @@ export function useAPInvoice() {
   const handleFileChange = (e) => {
     const f = e.target.files?.[0]
     if (!f) return
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    const url = URL.createObjectURL(f)
+    previewUrlRef.current = url
     setFile(f)
-    setPreviewUrl(URL.createObjectURL(f))
+    setPreviewUrl(url)
     setPreviewType(f.type === 'application/pdf' ? 'pdf' : 'image')
     runOCR(f)
   }
@@ -305,7 +309,6 @@ export function useAPInvoice() {
           }
 
           setApInvoiceId(data.id)
-          setIsDuplicate(!!data.is_duplicate)
 
           setHeaderData({
             vendorName: data.vendorName || '',
@@ -331,8 +334,10 @@ export function useAPInvoice() {
           setLineItems(formattedItems)
 
           if (data.vendorTaxId) {
-            const saved = localStorage.getItem(`ap_mapping_${data.vendorTaxId}`)
-            if (saved) setFieldMappings(JSON.parse(saved))
+            try {
+              const saved = localStorage.getItem(`ap_mapping_${data.vendorTaxId}`)
+              if (saved) setFieldMappings(JSON.parse(saved))
+            } catch { /* ignore corrupt localStorage data */ }
           }
           setStatus('อ่านข้อมูลสำเร็จ ✓')
           showToast('อ่านข้อมูลสำเร็จ — กรุณาตรวจสอบและแก้ไข', 'success')
@@ -395,6 +400,50 @@ export function useAPInvoice() {
     }
   }
 
+  const runSuggest = async (itemsToSuggest) => {
+    setSuggestLoading(true)
+    showToast('AI กำลังแนะนำรหัสบัญชี...', 'info')
+    try {
+      const res = await apiFetch('/api/v1/ap-invoice/suggest-gl', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: itemsToSuggest,
+          invoice_desc: headerData.invhDesc || '',
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const suggestions = data.suggestions || {}
+      let suggestedCount = 0
+      setLineItems(prev => prev.map((item, idx) => {
+        const s = suggestions[idx]
+        if (!s) return item
+        const newDept = !item.deptCode && s.deptCode ? s.deptCode : null
+        const newAcc = !item.accountCode && s.accountCode ? s.accountCode : null
+        if (newDept || newAcc) suggestedCount++
+        return {
+          ...item,
+          deptCode: newDept ?? item.deptCode,
+          accountCode: newAcc ?? item.accountCode,
+          _suggestDept: newDept || undefined,
+          _suggestAcc: newAcc || undefined,
+        }
+      }))
+      showToast(
+        suggestedCount > 0
+          ? `AI แนะนำรหัสบัญชีสำหรับ ${suggestedCount} รายการ — กรุณาตรวจสอบ`
+          : 'ไม่มีรายการที่ต้องการแนะนำเพิ่ม',
+        suggestedCount > 0 ? 'success' : 'info',
+      )
+    } catch (err) {
+      console.error('AI suggest error:', err)
+      showToast('ไม่สามารถแนะนำรหัสบัญชีได้ กรุณาลองใหม่', 'error')
+    } finally {
+      setSuggestLoading(false)
+    }
+  }
+
   const handleAISuggest = () => {
     const itemsToSuggest = lineItems
       .map((item, idx) => ({
@@ -407,63 +456,19 @@ export function useAPInvoice() {
 
     if (!itemsToSuggest.length) return
 
-    const runSuggest = async () => {
-      setSuggestLoading(true)
-      showToast('AI กำลังแนะนำรหัสบัญชี...', 'info')
-      try {
-        const res = await apiFetch('/api/v1/ap-invoice/suggest-gl', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: itemsToSuggest,
-            invoice_desc: headerData.invhDesc || '',
-          }),
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
-        const suggestions = data.suggestions || {}
-        let suggestedCount = 0
-        setLineItems(prev => prev.map((item, idx) => {
-          const s = suggestions[idx]
-          if (!s) return item
-          const newDept = !item.deptCode && s.deptCode ? s.deptCode : null
-          const newAcc = !item.accountCode && s.accountCode ? s.accountCode : null
-          if (newDept || newAcc) suggestedCount++
-          return {
-            ...item,
-            deptCode: newDept ?? item.deptCode,
-            accountCode: newAcc ?? item.accountCode,
-            _suggestDept: newDept || undefined,
-            _suggestAcc: newAcc || undefined,
-          }
-        }))
-        showToast(
-          suggestedCount > 0
-            ? `AI แนะนำรหัสบัญชีสำหรับ ${suggestedCount} รายการ — กรุณาตรวจสอบ`
-            : 'ไม่มีรายการที่ต้องการแนะนำเพิ่ม',
-          suggestedCount > 0 ? 'success' : 'info',
-        )
-      } catch (err) {
-        console.error('AI suggest error:', err)
-        showToast('ไม่สามารถแนะนำรหัสบัญชีได้ กรุณาลองใหม่', 'error')
-      } finally {
-        setSuggestLoading(false)
-      }
-    }
-
     if (!headerData.invhDesc) {
       setModal({
         show: true,
         type: 'info',
-        title: 'Add Invoice Description for Better Results',
-        message: 'Adding an Invoice Description helps AI suggest more accurate GL accounts.\nYou can add it in the Invoice Description field above.',
-        confirmText: 'Proceed Anyway',
-        cancelText: 'Back to fill description',
-        onConfirm: () => { setModal({ show: false }); runSuggest() },
+        title: t.invDescTitle,
+        message: t.invDescMsg,
+        confirmText: t.proceedAnyway,
+        cancelText: t.backFillDesc,
+        onConfirm: () => { setModal({ show: false }); runSuggest(itemsToSuggest) },
         onCancel: () => setModal({ show: false }),
       })
     } else {
-      runSuggest()
+      runSuggest(itemsToSuggest)
     }
   }
 
@@ -541,12 +546,17 @@ export function useAPInvoice() {
   }
 
   const handleReset = () => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current)
+      previewUrlRef.current = null
+    }
     setFile(null); setPreviewUrl(null); setPreviewType(null)
     setHeaderData(EMPTY_HEADER); setSystemVendor({ code: '', name: '' }); setVendorSearch('')
     setLineItems([]); setFieldMappings(DEFAULT_MAPPINGS); setStep(1)
     setGlLoaded(false)
     setIsDuplicate(false)
     setApInvoiceId(null)
+    setStatus(''); setError(null)
   }
 
   return {

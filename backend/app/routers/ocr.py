@@ -330,11 +330,37 @@ async def debug_last_llm_response():
 
 @router.get("/health")
 async def health_check():
-    return {
-        "health": "healthy",
+    import httpx
+
+    llm_status = "not_configured"
+    llm_error = None
+
+    if settings.openrouter_api_key:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get(
+                    f"{settings.openrouter_base_url}/models",
+                    headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
+                )
+            if r.status_code == 200:
+                llm_status = "ok"
+            else:
+                llm_status = "error"
+                llm_error = f"HTTP {r.status_code}"
+        except Exception as exc:
+            llm_status = "error"
+            llm_error = str(exc)
+
+    healthy = llm_status == "ok"
+    body = {
+        "status": "healthy" if healthy else "degraded",
+        "openrouter": llm_status,
         "ocr_engine": settings.ocr_engine,
         "openrouter_ocr_model": settings.openrouter_ocr_model,
         "openrouter_suggestion_model": settings.openrouter_suggestion_model,
-        "openrouter_configured": bool(settings.openrouter_api_key),
         "timestamp": datetime.utcnow().isoformat(),
     }
+    if llm_error:
+        body["openrouter_error"] = llm_error
+
+    return JSONResponse(status_code=200 if healthy else 503, content=body)

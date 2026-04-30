@@ -84,6 +84,18 @@ if not settings.app_debug:
             "Generate a real key: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
         )
 
+# Resolve relative paths to absolute, anchored to the backend directory.
+# This ensures the correct location regardless of the process working directory.
+_BACKEND_DIR = Path(__file__).parent.parent
+
+def _abs(path: str) -> str:
+    p = Path(path)
+    return str(p if p.is_absolute() else _BACKEND_DIR / p)
+
+settings.upload_dir = _abs(settings.upload_dir)
+settings.export_dir = _abs(settings.export_dir)
+settings.archive_dir = _abs(settings.archive_dir)
+
 # Ensure upload/export/archive directories exist
 os.makedirs(settings.upload_dir, exist_ok=True)
 os.makedirs(settings.export_dir, exist_ok=True)

@@ -103,6 +103,9 @@ export const AP_I18N = {
     proceed: 'ดำเนินการต่อ', proceedAnyway: 'ดำเนินการต่อ (ข้ามคำเตือน)',
     warnSelectVendor: 'กรุณาเลือกผู้ขายจากระบบก่อนดำเนินการต่อ',
     mismatchTitle: 'ยอดเงินไม่ตรงกัน', backEdit: 'กลับแก้ไข',
+    invDescTitle: 'เพิ่มคำอธิบายใบแจ้งหนี้เพื่อผลลัพธ์ที่ดีขึ้น',
+    invDescMsg: 'การเพิ่มคำอธิบายใบแจ้งหนี้ช่วยให้ AI แนะนำรหัสบัญชีได้แม่นยำขึ้น\nสามารถเพิ่มได้ที่ช่อง Invoice Description ด้านบน',
+    backFillDesc: 'กลับเพื่อกรอกคำอธิบาย',
   },
   en: {
     appTitle: 'Carmen Cloud', appSub: 'AP Invoice OCR',
@@ -153,5 +156,8 @@ export const AP_I18N = {
     proceed: 'Proceed', proceedAnyway: 'Proceed (Skip Warning)',
     warnSelectVendor: 'Please select a vendor from the system before proceeding',
     mismatchTitle: 'Amount Mismatch', backEdit: 'Back to Review',
+    invDescTitle: 'Add Invoice Description for Better Results',
+    invDescMsg: 'Adding an Invoice Description helps AI suggest more accurate GL accounts.\nYou can add it in the Invoice Description field above.',
+    backFillDesc: 'Back to fill description',
   },
 }
