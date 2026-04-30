@@ -28,8 +28,8 @@ export default function AccountMappingTable({
         />
       </div>
 
-      <div className="table-wrapper" style={{ paddingBottom: '0.5rem' }}>
-        <div className="mapping-container" style={{ display: 'grid', gridTemplateColumns: '95px 150px minmax(200px, 1fr) minmax(200px, 1fr) auto', gap: '1rem', alignItems: 'center', minWidth: '850px' }}>
+      <div className="table-wrapper" style={{ paddingBottom: '0' }}>
+        <div className="mapping-container" style={{ display: 'grid', gridTemplateColumns: '70px 140px minmax(0, 1fr) minmax(0, 1fr) auto', gap: '0.5rem', alignItems: 'center', width: '100%' }}>
           <div></div>
           <div></div>
           <div className="mapping-header" style={{ fontWeight: 600 }}>Department Code</div>

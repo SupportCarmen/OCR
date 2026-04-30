@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 // ─── CUSTOM SEARCH SELECT ───
 // topChoice: { code, name, name2?, source: 'ai'|'history' } | null
 export default function CustomSearchSelect({ value, onChange, options, placeholder, topChoice, suggestedValue, hasError }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dropdownStyle, setDropdownStyle] = useState({});
   const wrapperRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     setSearchTerm(value || '');
@@ -13,18 +16,59 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+      if (
+        wrapperRef.current && !wrapperRef.current.contains(event.target) &&
+        (!dropdownRef.current || !dropdownRef.current.contains(event.target))
+      ) {
         setIsOpen(false);
         setSearchTerm(value || '');
       }
     }
+
+    function handleScroll(event) {
+      if (isOpen) {
+        if (dropdownRef.current && (dropdownRef.current === event.target || dropdownRef.current.contains(event.target))) {
+          return; // Ignore scroll events from inside the dropdown
+        }
+        setIsOpen(false);
+        setSearchTerm(value || '');
+      }
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("touchstart", handleClickOutside);
+    
+    if (isOpen) {
+      window.addEventListener("scroll", handleScroll, true);
+      window.addEventListener("resize", handleScroll);
+    }
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleScroll);
     };
-  }, [value]);
+  }, [value, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        maxHeight: '240px',
+        overflowY: 'auto',
+        background: 'white',
+        border: '1px solid var(--border)',
+        borderRadius: '6px',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+        zIndex: 99999
+      });
+    }
+  }, [isOpen]);
 
   const q = searchTerm.toLowerCase();
   const filtered = options.filter(o =>
@@ -67,13 +111,8 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
         title={isAISuggested ? `AI แนะนำ: ${suggestedValue}` : value && selectedDesc ? `${value} — ${selectedDesc}` : ''}
         style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--primary)' : isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : hasError ? '#fff1f2' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
       />
-      {isOpen && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
-          maxHeight: '280px', overflowY: 'auto', background: 'white',
-          border: '1px solid var(--border)', borderRadius: '6px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 9999, marginTop: '4px'
-        }}>
+      {isOpen && createPortal(
+        <div ref={dropdownRef} style={dropdownStyle}>
           {/* ── Top Choice ── */}
           {showTopChoice && (
             <>
@@ -112,7 +151,8 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
             </div>
           ))}
           {!showTopChoice && filtered.length === 0 && <div style={{ padding: '0.8rem', color: 'var(--text-4)', fontSize: '0.8rem', textAlign: 'center' }}>ไม่พบข้อมูล</div>}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
