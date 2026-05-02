@@ -13,21 +13,21 @@ def build_fixed_fields_prompt(
     return f"""Map 3 bank-statement fields to Thai accounting codes. Return JSON only — no markdown.
 
 Fields:
-- Commission (ค่าธรรมเนียม): Income account — matches "commission", "credit card", "bank charge", "ค่าธรรมเนียม"
-- Tax Amount (ภาษีบนค่าธรรมเนียม): BalanceSheet account — matches "output tax undue", "ภาษีขายรอตัด"
-- Net Amount (ยอดรับสุทธิ): BalanceSheet account — matches "C/A", "S/A", "bank", "ธนาคาร", "กระแสรายวัน"
+- Credit card commission (ค่าธรรมเนียม): Income account — matches "commission", "credit card", "bank charge", "ค่าธรรมเนียม"
+- Input Tax (ภาษีบนค่าธรรมเนียม): BalanceSheet account — matches "output tax undue", "ภาษีขายรอตัด"
+- Bank Account (ยอดรับสุทธิ): BalanceSheet account — matches "C/A", "S/A", "bank", "ธนาคาร", "กระแสรายวัน"
 
 Departments:
 {dept_lines or "  (none)"}
 
-Commission accounts (Income, {commission_acc_count}):
+Credit card commission accounts (Income, {commission_acc_count}):
 {commission_acc_lines or "  (none)"}
 
-Tax Amount + Net Amount accounts (BalanceSheet, {balance_acc_count}):
+Input Tax + Bank Account accounts (BalanceSheet, {balance_acc_count}):
 {balance_acc_lines or "  (none)"}
 
 Rules: use codes exactly as listed; null if no match; dept optional.
-{{"Commission":{{"dept":null,"acc":null}},"Tax Amount":{{"dept":null,"acc":null}},"Net Amount":{{"dept":null,"acc":null}}}}"""
+{{"Credit card commission":{{"dept":null,"acc":null}},"Input Tax":{{"dept":null,"acc":null}},"Bank Account":{{"dept":null,"acc":null}}}}"""
 
 
 def build_payment_types_prompt(

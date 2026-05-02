@@ -4,7 +4,7 @@ Tool: map_gl
 LLM-powered GL account/department mapping suggestions.
 
 Two entry points:
-  suggest_fixed_fields()    — Commission, Tax Amount, Net Amount (always present)
+  suggest_fixed_fields()    — Credit card commission, Input Tax, Bank Account (always present)
   suggest_payment_types()   — Dynamic card/payment type rows (Visa, MCA, QR, etc.)
 
 Both return ToolResult with output = {suggestions: {field_type: {dept, acc}}, source: "ai"}
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 TOOL_FIXED   = "suggest_gl_fixed_fields"
 TOOL_PAYMENT = "suggest_gl_payment_types"
 
-FIXED_TYPES = ["Commission", "Tax Amount", "Net Amount"]
+FIXED_TYPES = ["Credit card commission", "Input Tax", "Bank Account"]
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ async def suggest_fixed_fields(
     departments: List[Dict[str, Any]],
 ) -> ToolResult:
     """
-    Suggest dept/acc for Commission, Tax Amount, Net Amount.
+    Suggest dept/acc for Credit card commission, Input Tax, Bank Account.
 
     accounts / departments: list of {code, name, type?} dicts
     """
@@ -152,9 +152,9 @@ async def suggest_fixed_fields(
         # Per-field fallback — never return null; pick top-ranked pre-filtered candidate.
         # Falls back to the broader type pool if a keyword filter found nothing.
         fallback_acc = {
-            "Commission": (commission_filtered or commission_acc or [{}])[0].get("code"),
-            "Tax Amount": (tax_filtered or balance_acc or [{}])[0].get("code"),
-            "Net Amount": (bank_filtered or balance_acc or [{}])[0].get("code"),
+            "Credit card commission": (commission_filtered or commission_acc or [{}])[0].get("code"),
+            "Input Tax":              (tax_filtered or balance_acc or [{}])[0].get("code"),
+            "Bank Account":           (bank_filtered or balance_acc or [{}])[0].get("code"),
         }
         for field in FIXED_TYPES:
             entry = suggestions.get(field) or {}

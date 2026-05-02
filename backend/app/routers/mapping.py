@@ -58,7 +58,7 @@ async def suggest_mapping(
     req: SuggestRequest,
     _session: SessionInfo = Depends(get_current_session),
 ):
-    """Suggest dept/acc codes for Commission, Tax Amount, Net Amount via LLM."""
+    """Suggest dept/acc codes for Credit card commission, Input Tax, Bank Account via LLM."""
     result = await map_gl.suggest_fixed_fields(
         accounts=[a.model_dump() for a in req.accounts],
         departments=[d.model_dump() for d in req.departments],

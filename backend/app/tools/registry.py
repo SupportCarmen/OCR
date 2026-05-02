@@ -91,7 +91,7 @@ _REGISTRY: Dict[str, Dict] = {
     },
     map_gl.TOOL_FIXED: {
         "fn":          map_gl.suggest_fixed_fields,
-        "description": "LLM-suggest GL account/dept codes for Commission, Tax Amount, Net Amount",
+        "description": "LLM-suggest GL account/dept codes for Credit card commission, Input Tax, Bank Account",
         "input_schema": _SCHEMA_GL_FIXED,
     },
     map_gl.TOOL_PAYMENT: {

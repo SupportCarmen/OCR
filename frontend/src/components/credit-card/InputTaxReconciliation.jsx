@@ -153,7 +153,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
                 {!hasData ? (
                   <tr>
                     <td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-500)' }}>
-                      ไม่มีข้อมูล Commission / Tax ในรายการ
+                      ไม่มีข้อมูล Credit card commission / Input Tax ในรายการ
                     </td>
                   </tr>
                 ) : (

@@ -225,7 +225,7 @@ export function useMapping() {
         departments: masterDepartments.map(d => ({ code: d.code, name: d.name })),
       });
 
-      const suggestKeyMap = { commission: 'Commission', tax: 'Tax Amount', net: 'Net Amount' };
+      const suggestKeyMap = { commission: 'Credit card commission', tax: 'Input Tax', net: 'Bank Account' };
       fieldsToFetch.forEach(f => {
         const s = (aiResult.suggestions || {})[suggestKeyMap[f]] || {};
         if (s.dept || s.acc) {

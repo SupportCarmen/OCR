@@ -29,10 +29,10 @@ function buildRows(details, config) {
     const taxCfg  = mappings.tax           || { dept: '', acc: '' }
     const netCfg  = mappings.net           || { dept: '', acc: '' }
 
-    addRow(amtCfg,  toNum(detail.PayAmt),    payType,      false)
-    addRow(commCfg, toNum(detail.CommisAmt), 'Commission', true)
-    addRow(taxCfg,  toNum(detail.TaxAmt),    'Tax Amount', true)
-    addRow(netCfg,  toNum(detail.Total),     'Net Payment',true)
+    addRow(amtCfg,  toNum(detail.PayAmt),    payType,                    false)
+    addRow(commCfg, toNum(detail.CommisAmt), 'Credit card commission',   true)
+    addRow(taxCfg,  toNum(detail.TaxAmt),    'Input Tax',                true)
+    addRow(netCfg,  toNum(detail.Total),     'Bank Account',             true)
   })
   return rows
 }
@@ -91,9 +91,9 @@ export default function AccountingReview({ details, headerData = {}, onBack, onS
   if (config) {
     if (!config.filePrefix) unmappedFields.push('File Prefix')
     const m = config.mappings || {}
-    if (!m.commission?.acc) unmappedFields.push('Commission')
-    if (!m.tax?.acc)        unmappedFields.push('Tax Amount')
-    if (!m.net?.acc)        unmappedFields.push('Net Amount')
+    if (!m.commission?.acc) unmappedFields.push('Credit card commission')
+    if (!m.tax?.acc)        unmappedFields.push('Input Tax')
+    if (!m.net?.acc)        unmappedFields.push('Bank Account')
     const detailTypes = [...new Set(details.map(d => d.Transaction).filter(Boolean))]
     detailTypes.forEach(pt => { if (!config.paymentAmount?.[pt]?.acc) unmappedFields.push(pt) })
   }

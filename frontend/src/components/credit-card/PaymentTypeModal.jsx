@@ -21,7 +21,7 @@ export default function PaymentTypeModal({
       <div className="mapping-modal-content" style={{ position: 'relative', zIndex: 1, background: 'var(--data-card-bg, #fff)', width: '90%', maxWidth: '800px', borderRadius: '8px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
         <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--gray-50)', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' }}>
-            <span>เลือก Payment Types สำหรับ Amount</span>
+            <span>เลือก Payment Types สำหรับ Account Receivable</span>
             {activeScan.paymentTypes.size > 0 && (
               <span style={{ fontSize: '0.8rem', color: 'var(--btn-err-text, #dc2626)', background: 'var(--btn-err-bg, #fff)', padding: '4px 12px', borderRadius: '20px', border: '1px solid var(--btn-err-border, #fca5a5)', fontWeight: 700 }}>
                 <i className="fas fa-file-invoice"></i> เอกสารชุดนี้ต้องมี: {activeScan.paymentTypes.size} รายการ

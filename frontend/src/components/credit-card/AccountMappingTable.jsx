@@ -37,7 +37,7 @@ export default function AccountMappingTable({
           <div></div>
 
           <div className="mapping-type type-credit" style={{ color: 'var(--primary)', background: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' }}>Credit</div>
-          <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Amount (Click to Map)</div>
+          <div className="mapping-label clickable" style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => setIsAmountModalOpen(true)}>Account Receivable (Click to Map)</div>
           <div style={{ gridColumn: 'span 3' }}>
             <div id="amountMappingStatus" style={{
               fontSize: '0.85rem',
@@ -56,7 +56,7 @@ export default function AccountMappingTable({
                   ? <><i className="fas fa-exclamation-triangle" style={{ color: '#dc2626' }}></i> <strong>พบ {activeScan.paymentTypes.size} รายการในเอกสาร</strong> (ค้าง Mapping <strong>{requiredMissingCount}</strong> รายการ)</>
                   : amountMappedCount > 0
                     ? <><i className="fas fa-check-circle"></i> ตั้งค่าแล้ว {amountMappedCount}/{allPaymentTypes.length} รายการ (เรียบร้อย)</>
-                    : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Amount เพื่อเปิด Modal / ปุ่ม Suggest เพื่อให้ AI แนะนำ</>
+                    : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Account Receivable เพื่อเปิด Modal / ปุ่ม Suggest เพื่อให้ AI แนะนำ</>
                 }
               </div>
               {requiredMissingCount > 0 && <span style={{ fontSize: '0.75rem', background: 'var(--rose)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>Required for this scan</span>}
@@ -64,7 +64,7 @@ export default function AccountMappingTable({
           </div>
 
           {['commission', 'tax', 'net'].map((key) => {
-            const labelMap = { commission: 'Commission', tax: 'Tax Amount', net: 'Net Amount' };
+            const labelMap = { commission: 'Credit card commission', tax: 'Input Tax', net: 'Bank Account' };
             const natureStyle = { color: '#d97706', background: 'var(--ap-include-bg, #fef3c7)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' };
             const meta = suggestionMeta[key];
             const badge = meta === 'history'
