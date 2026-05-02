@@ -1,5 +1,5 @@
 import { useOcrWizard } from '../hooks/useOcrWizard'
-import { StepWizard, FormActions, CustomModal, LoadingOverlay, DocumentPreview } from '../components/common'
+import { StepWizard, FormActions, CustomModal, LoadingOverlay, DocumentPreview, DarkModeToggle } from '../components/common'
 import { UploadSection, HeaderCard, DetailTable, AccountingReview, InputTaxReconciliation } from '../components/credit-card'
 import logo from '../assets/logo.png'
 
@@ -54,9 +54,10 @@ export default function CreditCardOCR() {
               </div>
             </div>
           </div>
+          <DarkModeToggle />
         </div>
 
-        <StepWizard step={step} />
+        <StepWizard step={step} onStepClick={(n) => !loading && !submitting && setStep(n)} />
 
         {step <= 2 && (
           <>

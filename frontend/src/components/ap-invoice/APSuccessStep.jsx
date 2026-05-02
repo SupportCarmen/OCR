@@ -36,7 +36,7 @@ export default function APSuccessStep({ t, headerData, lineItems, invoiceSeq, on
               {lineItems.length} {t.items}
             </div>
           </div>
-          <div style={{ gridRow: 'span 2', background: 'white', border: '1px solid var(--border)', borderRadius: 8, padding: '1rem' }}>
+          <div style={{ gridRow: 'span 2', background: 'var(--ap-summary-bg, white)', border: '1px solid var(--border)', borderRadius: 8, padding: '1rem' }}>
             {SUMMARY_ROWS.map(({ label, val, color }) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.83rem', marginBottom: '0.4rem' }}>
                 <span style={{ color: 'var(--text-3)' }}>{label}:</span>

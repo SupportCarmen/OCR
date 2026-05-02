@@ -20,7 +20,7 @@ export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorS
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
               padding: '0.25rem 0.65rem', fontSize: '0.75rem', fontWeight: 600,
-              color: 'var(--primary)', background: 'var(--primary-bg, #eff6ff)',
+              color: 'var(--primary)', background: 'var(--ap-exclude-bg, #eff6ff)',
               border: '1px solid var(--primary)', borderRadius: '999px',
               textDecoration: 'none', whiteSpace: 'nowrap',
             }}
@@ -35,7 +35,7 @@ export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorS
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: '1.75rem', height: '1.75rem',
-              background: 'white', border: '1px solid var(--border)',
+              background: 'var(--gray-50)', border: '1px solid var(--border)',
               borderRadius: '999px', cursor: refreshing ? 'not-allowed' : 'pointer',
               color: 'var(--text-3)', opacity: refreshing ? 0.6 : 1,
             }}
@@ -81,7 +81,7 @@ export default function VendorSearch({ t, systemVendor, setSystemVendor, vendorS
                     <div className="vd-name" style={isInactive ? { color: 'var(--text-4)' } : undefined}>
                       {v.code} — {v.name}
                       {isInactive && (
-                        <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', borderRadius: '4px', padding: '0 4px' }}>
+                        <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', fontWeight: 600, color: 'var(--rose)', background: 'var(--btn-err-bg, #fee2e2)', borderRadius: '4px', padding: '0 4px' }}>
                           Inactive
                         </span>
                       )}

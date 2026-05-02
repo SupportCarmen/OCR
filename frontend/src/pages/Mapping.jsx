@@ -34,7 +34,7 @@ export default function Mapping() {
         <h1><i className="fas fa-project-diagram"></i> Account Mapping Configuration</h1>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <button onClick={() => window.location.hash = '/CreditCardOCR'} className="btn-cancel" style={{ textDecoration: 'none', padding: '0.6rem 1.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', background: 'white', border: '1px solid var(--border)', cursor: 'pointer' }}>
+          <button onClick={() => window.location.hash = '/CreditCardOCR'} className="btn-cancel" style={{ textDecoration: 'none', padding: '0.6rem 1.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px', background: 'var(--gray-50)', color: 'var(--text-2)', border: '1px solid var(--border)', cursor: 'pointer' }}>
             <i className="fas fa-arrow-left"></i> กลับสู่หน้าหลัก
           </button>
         </div>

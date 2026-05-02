@@ -1,10 +1,11 @@
 import '../styles/pages/home.css'
 import logo from '../assets/logo.png'
+import DarkModeToggle from '../components/common/DarkModeToggle'
 
 const MODULES = [
   {
     id: 'credit-card-ocr',
-    route: '#/CreditCardOCR',
+    href: '#/CreditCardOCR',
     name: 'Credit Card Report OCR',
     description: 'ระบบ AI อ่านใบเสร็จ Credit Card Report จากธนาคาร แปลงเป็นข้อมูลอัตโนมัติ พร้อมส่งเข้า Carmen GL',
     icon: 'fa-file-invoice-dollar',
@@ -17,7 +18,7 @@ const MODULES = [
   },
   {
     id: 'ap-invoice',
-    route: '#/APInvoice', // Activated AP Invoice route
+    href: '#/APInvoice',
     name: 'AP Invoice Processing',
     description: 'ระบบจัดการใบแจ้งหนี้ผู้จัดจำหน่าย (AP Invoice) อ่านข้อมูลอัตโนมัติ และบันทึกเข้าระบบบัญชี',
     icon: 'fa-receipt',
@@ -30,7 +31,7 @@ const MODULES = [
   },
   {
     id: 'bank-reconciliation',
-    route: null, // coming soon
+    href: null,
     name: 'Bank Reconciliation',
     description: 'ระบบกระทบยอดธนาคาร เปรียบเทียบ Statement กับรายการบัญชีอัตโนมัติ',
     icon: 'fa-building-columns',
@@ -43,12 +44,12 @@ const MODULES = [
 ]
 
 export default function Home() {
-  const navigate = (route) => {
-    if (route) window.location.hash = route.replace('#', '')
-  }
-
   return (
     <div className="home-page">
+      <div className="home-dark-toggle">
+        <DarkModeToggle />
+      </div>
+
       {/* ─── Hero Header ─── */}
       <div className="home-hero">
         <div className="home-logo">
@@ -72,21 +73,16 @@ export default function Home() {
 
         <div className="module-grid">
           {MODULES.map((mod) => {
-            const isComingSoon = !mod.route
+            const isComingSoon = !mod.href
+            const Tag = isComingSoon ? 'div' : 'a'
             return (
-              <div
+              <Tag
                 key={mod.id}
+                href={isComingSoon ? undefined : mod.href}
                 className={`module-card ${isComingSoon ? 'coming-soon' : ''}`}
-                style={{ '--card-accent': mod.accent }}
-                onClick={() => !isComingSoon && navigate(mod.route)}
-                role={isComingSoon ? undefined : 'button'}
-                tabIndex={isComingSoon ? undefined : 0}
-                onKeyDown={(e) => {
-                  if (!isComingSoon && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault()
-                    navigate(mod.route)
-                  }
-                }}
+                style={{ '--card-accent': mod.accent, textDecoration: 'none' }}
+                tabIndex={isComingSoon ? -1 : undefined}
+                aria-disabled={isComingSoon ? 'true' : undefined}
               >
                 <div className="module-card-header">
                   <div
@@ -127,7 +123,7 @@ export default function Home() {
                     <i className={`fas ${isComingSoon ? 'fa-lock' : 'fa-arrow-right'}`} />
                   </div>
                 </div>
-              </div>
+              </Tag>
             )
           })}
         </div>

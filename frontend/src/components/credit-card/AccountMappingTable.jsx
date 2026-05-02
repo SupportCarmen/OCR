@@ -48,7 +48,7 @@ export default function AccountMappingTable({
               alignItems: 'center',
               justifyContent: 'space-between',
               color: requiredMissingCount > 0 ? '#dc2626' : 'var(--teal)',
-              background: requiredMissingCount > 0 ? '#fff1f2' : 'var(--teal-light)',
+              background: requiredMissingCount > 0 ? 'var(--btn-err-bg, #fff1f2)' : 'var(--teal-light)',
               borderColor: requiredMissingCount > 0 ? '#fca5a5' : 'var(--teal)'
             }}>
               <div>
@@ -59,13 +59,13 @@ export default function AccountMappingTable({
                     : <><i className="fas fa-info-circle"></i> กดที่ชื่อ Amount เพื่อเปิด Modal / ปุ่ม Suggest เพื่อให้ AI แนะนำ</>
                 }
               </div>
-              {requiredMissingCount > 0 && <span style={{ fontSize: '0.75rem', background: '#dc2626', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>Required for this scan</span>}
+              {requiredMissingCount > 0 && <span style={{ fontSize: '0.75rem', background: 'var(--rose)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>Required for this scan</span>}
             </div>
           </div>
 
           {['commission', 'tax', 'net'].map((key) => {
             const labelMap = { commission: 'Commission', tax: 'Tax Amount', net: 'Net Amount' };
-            const natureStyle = { color: '#d97706', background: '#fef3c7', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' };
+            const natureStyle = { color: '#d97706', background: 'var(--ap-include-bg, #fef3c7)', padding: '0.2rem 0.5rem', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold' };
             const meta = suggestionMeta[key];
             const badge = meta === 'history'
               ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
@@ -138,7 +138,7 @@ export default function AccountMappingTable({
                       <button
                         onClick={() => rejectMainSuggestion(key)}
                         title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                        style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                        style={{ padding: '4px 10px', background: 'var(--btn-err-bg, #fff1f2)', color: 'var(--btn-err-text, #dc2626)', border: '1px solid var(--btn-err-border, #fecaca)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                       >
                         <i className="fas fa-times"></i>
                       </button>

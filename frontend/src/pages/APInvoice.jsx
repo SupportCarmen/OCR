@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { DocumentPreview, CustomModal, StepWizard, LoadingOverlay } from '../components/common'
+import { DocumentPreview, CustomModal, StepWizard, LoadingOverlay, DarkModeToggle } from '../components/common'
 import APUploadStep from '../components/ap-invoice/APUploadStep'
 import APFieldMappingStep from '../components/ap-invoice/APFieldMappingStep'
 import APReviewStep from '../components/ap-invoice/APReviewStep'
@@ -78,9 +78,10 @@ export default function APInvoice() {
               </div>
             </div>
           </div>
+          <DarkModeToggle />
         </div>
 
-        <StepWizard step={step} steps={AP_STEPS} />
+        <StepWizard step={step} steps={AP_STEPS} onStepClick={(n) => !loading && setStep(n)} />
 
         {/* Step 1 — Upload */}
         {step === 1 && !loading && !error && (

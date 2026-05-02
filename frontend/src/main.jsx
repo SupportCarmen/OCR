@@ -1,4 +1,11 @@
 import { useState, useEffect } from 'react'
+
+// Apply saved theme synchronously before first paint to avoid flash
+;(() => {
+  const saved = localStorage.getItem('theme')
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  document.documentElement.dataset.theme = saved ?? (prefersDark ? 'dark' : 'light')
+})()
 import ReactDOM from 'react-dom/client'
 import Home from './pages/Home'
 import CreditCardOCR from './pages/CreditCardOCR'

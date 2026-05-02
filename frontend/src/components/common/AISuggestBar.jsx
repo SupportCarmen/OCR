@@ -71,7 +71,7 @@ export default function AISuggestBar({
           disabled={refreshLoading}
           style={{
             padding: '0.4rem 0.8rem',
-            background: 'white',
+            background: 'var(--gray-50)',
             border: '1px solid var(--border)',
             borderRadius: '6px',
             fontSize: '0.8rem',

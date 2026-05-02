@@ -609,6 +609,22 @@
 }
 
 /* ═══════════════════════════════════════════
+   AP INVOICE — DARK MODE VARIABLES
+   ═══════════════════════════════════════════ */
+[data-theme="dark"] {
+  --ap-vendor-bg: rgba(124, 58, 237, 0.15);
+  --ap-vendor-border: rgba(124, 58, 237, 0.4);
+  --ap-vendor-icon-bg: rgba(124, 58, 237, 0.3);
+  --ap-vendor-text: var(--text);
+  --ap-vendor-text-muted: #a78bfa;
+  --ap-vendor-pill-border: rgba(124, 58, 237, 0.3);
+  
+  --ap-inv-desc-bg: #1e293b;
+  --ap-inv-desc-border: var(--border);
+  --ap-inv-desc-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25);
+}
+
+/* ═══════════════════════════════════════════
    AP INVOICE — MOBILE RESPONSIVE
    ═══════════════════════════════════════════ */
 

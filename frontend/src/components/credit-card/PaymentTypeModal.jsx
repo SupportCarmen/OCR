@@ -18,12 +18,12 @@ export default function PaymentTypeModal({
   return ReactDOM.createPortal(
     <div className="mapping-modal" style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => { setPaymentSuggestions({}); setIsAmountModalOpen(false); }}>
       <div className="mapping-modal-overlay" style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}></div>
-      <div className="mapping-modal-content" style={{ position: 'relative', zIndex: 1, backgroundColor: '#fff', width: '90%', maxWidth: '800px', borderRadius: '8px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
-        <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#f8fafc', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
+      <div className="mapping-modal-content" style={{ position: 'relative', zIndex: 1, background: 'var(--data-card-bg, #fff)', width: '90%', maxWidth: '800px', borderRadius: '8px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+        <div className="mapping-modal-header" style={{ padding: '1rem', borderBottom: '1px solid var(--border)', fontWeight: 'bold', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--gray-50)', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' }}>
             <span>เลือก Payment Types สำหรับ Amount</span>
             {activeScan.paymentTypes.size > 0 && (
-              <span style={{ fontSize: '0.8rem', color: '#dc2626', background: '#fff', padding: '4px 12px', borderRadius: '20px', border: '1px solid #fca5a5', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--btn-err-text, #dc2626)', background: 'var(--btn-err-bg, #fff)', padding: '4px 12px', borderRadius: '20px', border: '1px solid var(--btn-err-border, #fca5a5)', fontWeight: 700 }}>
                 <i className="fas fa-file-invoice"></i> เอกสารชุดนี้ต้องมี: {activeScan.paymentTypes.size} รายการ
               </span>
             )}
@@ -52,7 +52,7 @@ export default function PaymentTypeModal({
           {/* ── Required for Scan ── */}
           {activeScan.paymentTypes.size > 0 && (
             <>
-              <div style={{ padding: '0.5rem', background: '#fef2f2', color: '#991b1b', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', marginBottom: '0.75rem', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ padding: '0.5rem', background: 'var(--btn-err-bg, #fef2f2)', color: 'var(--btn-err-text, #991b1b)', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', marginBottom: '0.75rem', border: '1px solid var(--btn-err-border, #fecaca)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <i className="fas fa-exclamation-circle"></i> รายการที่พบในเอกสารปัจจุบัน (Required for this scan)
               </div>
               {[...activeScan.paymentTypes].map(type => {
@@ -68,10 +68,10 @@ export default function PaymentTypeModal({
                 return (
                   <div key={`req-${type}`} style={{
                     display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr auto', gap: '1rem', marginBottom: '0.5rem', alignItems: 'center', padding: '0.4rem', borderRadius: '8px',
-                    background: isPending ? '#fff1f2' : '#f0fdf4', border: `1px solid ${isPending ? '#fecaca' : '#bbf7d0'}`
+                    background: isPending ? 'var(--btn-err-bg, #fff1f2)' : 'var(--btn-ok-bg, #f0fdf4)', border: `1px solid ${isPending ? 'var(--btn-err-border, #fecaca)' : 'var(--btn-ok-border, #bbf7d0)'}`
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <div style={{ background: isPending ? '#dc2626' : '#16a34a', color: '#fff', padding: '0.4rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', flex: 1 }}>{type}</div>
+                      <div style={{ background: isPending ? 'var(--rose)' : 'var(--emerald)', color: '#fff', padding: '0.4rem 0.5rem', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', flex: 1 }}>{type}</div>
                       {isPending && <i className="fas fa-exclamation-triangle" style={{ color: '#dc2626' }} title="MISSING MAPPING"></i>}
                     </div>
                     <CustomSearchSelect value={pAmt.dept} onChange={(val) => handlePaymentMappingChange(type, 'dept', val)} options={masterDepartments} placeholder="Dept..." topChoice={deptTopChoice} suggestedValue={suggestion?.dept || null} />
@@ -81,14 +81,14 @@ export default function PaymentTypeModal({
                         <button
                           onClick={() => confirmPaymentSuggestion(type)}
                           title="ยอมรับค่าแนะนำ"
-                          style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                          style={{ padding: '4px 10px', background: 'var(--btn-ok-bg, #f0fdf4)', color: 'var(--btn-ok-text, #15803d)', border: '1px solid var(--btn-ok-border, #86efac)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                         >
                           <i className="fas fa-check"></i>
                         </button>
                         <button
                           onClick={() => rejectPaymentSuggestion(type)}
                           title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                          style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                          style={{ padding: '4px 10px', background: 'var(--btn-err-bg, #fff1f2)', color: 'var(--btn-err-text, #dc2626)', border: '1px solid var(--btn-err-border, #fecaca)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                         >
                           <i className="fas fa-times"></i>
                         </button>
@@ -147,11 +147,11 @@ export default function PaymentTypeModal({
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <div style={{
-                      background: isCustom ? '#f0fdf4' : 'var(--primary-light)',
-                      color: isCustom ? '#16a34a' : 'var(--primary)',
+                      background: isCustom ? 'var(--btn-ok-bg, #f0fdf4)' : 'var(--primary-light)',
+                      color: isCustom ? 'var(--btn-ok-text, #16a34a)' : 'var(--primary)',
                       padding: '0.4rem 0.5rem',
                       borderRadius: '4px',
-                      border: `1px solid ${isCustom ? '#86efac' : 'var(--primary-mid)'}`,
+                      border: `1px solid ${isCustom ? 'var(--btn-ok-border, #86efac)' : 'var(--primary-mid)'}`,
                       fontSize: '0.85rem',
                       fontWeight: 600,
                       textAlign: 'center',
@@ -190,14 +190,14 @@ export default function PaymentTypeModal({
                       <button
                         onClick={() => confirmPaymentSuggestion(type)}
                         title="ยอมรับค่าแนะนำ"
-                        style={{ padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                        style={{ padding: '4px 10px', background: 'var(--btn-ok-bg, #f0fdf4)', color: 'var(--btn-ok-text, #15803d)', border: '1px solid var(--btn-ok-border, #86efac)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                       >
                         <i className="fas fa-check"></i>
                       </button>
                       <button
                         onClick={() => rejectPaymentSuggestion(type)}
                         title="ปฏิเสธค่าแนะนำและล้างข้อมูล"
-                        style={{ padding: '4px 10px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
+                        style={{ padding: '4px 10px', background: 'var(--btn-err-bg, #fff1f2)', color: 'var(--btn-err-text, #dc2626)', border: '1px solid var(--btn-err-border, #fecaca)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}
                       >
                         <i className="fas fa-times"></i>
                       </button>
@@ -225,7 +225,7 @@ export default function PaymentTypeModal({
           </div>
         </div>
         <div className="mapping-modal-footer" style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-          <button className="btn-cancel" onClick={() => { setPaymentSuggestions({}); setIsAmountModalOpen(false); }} style={{ padding: '0.5rem 1rem', background: 'var(--gray-300)', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ยกเลิก</button>
+          <button className="btn-cancel" onClick={() => { setPaymentSuggestions({}); setIsAmountModalOpen(false); }} style={{ padding: '0.5rem 1rem', background: 'var(--gray-200)', color: 'var(--text-2)', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ยกเลิก</button>
           <button className="btn-confirm" onClick={saveAmountSelection} style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: '#fff', borderRadius: '4px', cursor: 'pointer', border: 'none' }}>ตกลง</button>
         </div>
       </div>

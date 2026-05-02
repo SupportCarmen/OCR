@@ -8,7 +8,7 @@ export default function CompanyInfoSection({
       <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         COMPANY INFORMATION
         {missingCompanyFields.length > 0 && (
-          <span style={{ fontSize: '0.75rem', background: '#dc2626', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+          <span style={{ fontSize: '0.75rem', background: 'var(--rose)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
             <i className="fas fa-exclamation-circle"></i> ข้อมูลไม่ครบ {missingCompanyFields.length} รายการ
           </span>
         )}
@@ -28,7 +28,7 @@ export default function CompanyInfoSection({
                 placeholder={placeholderMap[key]}
                 value={company[key]}
                 onChange={(e) => handleCompanyChange(e, key)}
-                style={missing ? { borderColor: '#dc2626', background: '#fff1f2' } : {}}
+                style={missing ? { borderColor: 'var(--rose)', background: 'var(--btn-err-bg, #fff1f2)' } : {}}
               />
             </React.Fragment>
           );

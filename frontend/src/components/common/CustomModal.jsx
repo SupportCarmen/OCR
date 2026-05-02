@@ -1,18 +1,6 @@
-import React from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
-/**
- * CustomModal - A premium replacement for browser alert() and confirm()
- * @param {object} props
- * @param {boolean} props.show - Whether to show the modal
- * @param {string} props.title - Modal title
- * @param {string} props.message - Modal message/body text
- * @param {'success'|'warning'|'error'|'info'} props.type - Styling and icon type
- * @param {Function} props.onConfirm - Callback when user clicks primary button
- * @param {Function} [props.onCancel] - Optional callback for secondary button (makes it a confirm modal)
- * @param {string} [props.confirmText] - Label for primary button
- * @param {string} [props.cancelText] - Label for secondary button
- */
 export default function CustomModal({
   show,
   title,
@@ -24,6 +12,27 @@ export default function CustomModal({
   cancelText = 'ยกเลิก',
   cancelStyle,
 }) {
+  const confirmRef = useRef(null)
+  const cancelRef  = useRef(null)
+
+  useEffect(() => {
+    if (!show) return
+    const timer = setTimeout(() => confirmRef.current?.focus(), 50)
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') { onCancel ? onCancel() : onConfirm?.(); return }
+      if (e.key !== 'Tab') return
+      const focusable = [cancelRef.current, confirmRef.current].filter(Boolean)
+      if (!focusable.length) return
+      if (e.shiftKey) {
+        if (document.activeElement === focusable[0]) { e.preventDefault(); focusable[focusable.length - 1].focus() }
+      } else {
+        if (document.activeElement === focusable[focusable.length - 1]) { e.preventDefault(); focusable[0].focus() }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => { clearTimeout(timer); document.removeEventListener('keydown', handleKeyDown) }
+  }, [show, onCancel, onConfirm])
+
   if (!show) return null
 
   const getIcon = () => {
@@ -49,23 +58,30 @@ export default function CustomModal({
   }
 
   return createPortal(
-    <div className="modal-overlay">
+    <div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      aria-describedby="modal-desc"
+    >
       <div className="modal-box">
-        <div className={`modal-icon ${type}`}>
-          {getIcon()}
-        </div>
-        <h3 className="modal-title">{title}</h3>
-        <p className="modal-msg">{message}</p>
-
+        <div className={`modal-icon ${type}`}>{getIcon()}</div>
+        <h3 className="modal-title" id="modal-title">{title}</h3>
+        <p className="modal-msg" id="modal-desc">{message}</p>
         <div className="modal-actions">
           {onCancel && (
-            <button className="btn btn-outline" style={cancelStyle} onClick={onCancel}>
+            <button ref={cancelRef} className="btn btn-outline" style={cancelStyle} onClick={onCancel}>
               {cancelText}
             </button>
           )}
           <button
-            className={`btn ${type === 'error' ? 'btn-danger' : type === 'warning' ? 'btn-primary' : 'btn-primary'}`}
-            style={type === 'error' ? { background: 'var(--rose)', color: 'white' } : type === 'warning' ? { background: 'var(--amber)', color: 'white' } : {}}
+            ref={confirmRef}
+            className={`btn ${type === 'error' ? 'btn-danger' : 'btn-primary'}`}
+            style={
+              type === 'error'   ? { background: 'var(--rose)',  color: 'white' } :
+              type === 'warning' ? { background: 'var(--amber)', color: 'white' } : {}
+            }
             onClick={onConfirm}
           >
             {confirmText}

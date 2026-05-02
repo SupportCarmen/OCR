@@ -6,17 +6,27 @@ const DEFAULT_STEPS = [
   { n: 5, label: 'Input Tax', sub: 'Reconciliation' },
 ]
 
-export default function StepWizard({ step, steps }) {
+export default function StepWizard({ step, steps, onStepClick }) {
   const STEPS = steps || DEFAULT_STEPS
   return (
     <div className="step-wizard-wrap">
       <div className="step-wizard">
         {STEPS.map((s, i) => {
-          const isDone   = step > s.n
-          const isActive = step === s.n
+          const isDone      = step > s.n
+          const isActive    = step === s.n
+          const isClickable = isDone && !!onStepClick
           return (
             <div key={s.n} style={{ display: 'contents' }}>
-              <div className={`step ${isActive ? 'active' : isDone ? 'done' : ''}`}>
+              <div
+                className={`step ${isActive ? 'active' : isDone ? 'done' : ''} ${isClickable ? 'clickable' : ''}`}
+                onClick={isClickable ? () => onStepClick(s.n) : undefined}
+                role={isClickable ? 'button' : undefined}
+                tabIndex={isClickable ? 0 : undefined}
+                title={isClickable ? `กลับไป Step ${s.n}: ${s.label}` : undefined}
+                onKeyDown={isClickable ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStepClick(s.n) }
+                } : undefined}
+              >
                 <div className="step-num">
                   {isDone ? <i className="fas fa-check" style={{ fontSize: '0.6rem' }} /> : String(s.n).padStart(2, '0')}
                 </div>

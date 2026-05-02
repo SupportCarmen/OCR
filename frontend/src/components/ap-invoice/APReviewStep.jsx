@@ -55,7 +55,7 @@ export default function APReviewStep({ ctrl }) {
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
                 padding: '0.2rem 0.7rem', borderRadius: '99px', fontWeight: 700, fontSize: '0.8rem',
-                background: isInclude ? 'var(--amber-50, #fffbeb)' : 'var(--blue-50, #eff6ff)',
+                background: isInclude ? 'var(--ap-include-bg, #fffbeb)' : 'var(--ap-exclude-bg, #eff6ff)',
                 color: isInclude ? 'var(--amber-700, #b45309)' : 'var(--blue-700, #1d4ed8)',
                 border: `1px solid ${isInclude ? 'var(--amber-300, #fcd34d)' : 'var(--blue-300, #93c5fd)'}`,
               }}>

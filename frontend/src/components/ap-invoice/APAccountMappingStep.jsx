@@ -38,24 +38,24 @@ export default function APAccountMappingStep({
       {/* Vendor info bar */}
       <div style={{
         display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', gap: '0',
-        background: '#f5f3ff', border: '1.5px solid #c4b5fd',
+        background: 'var(--ap-vendor-bg, #f5f3ff)', border: '1.5px solid var(--ap-vendor-border, #c4b5fd)',
         borderRadius: '12px', padding: '0',
         overflow: 'hidden', minWidth: 0,
       }}>
         {/* Vendor name block */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.6rem',
-          padding: '0.7rem 1.1rem', borderRight: '1.5px solid #c4b5fd', flexShrink: 0, minWidth: 0,
+          padding: '0.7rem 1.1rem', borderRight: '1.5px solid var(--ap-vendor-border, #c4b5fd)', flexShrink: 0, minWidth: 0,
         }}>
           <div style={{
-            width: 34, height: 34, borderRadius: '8px', background: '#7c3aed',
+            width: 34, height: 34, borderRadius: '8px', background: 'var(--ap-vendor-icon-bg, #7c3aed)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
             <i className="fas fa-building" style={{ color: '#fff', fontSize: '0.85rem' }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#3b0764' }}>{vendorDisplayName}</div>
-            <div style={{ fontSize: '0.75rem', color: '#7c3aed', marginTop: '0.05rem', fontWeight: 600 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--ap-vendor-text, #3b0764)' }}>{vendorDisplayName}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--ap-vendor-text-muted, #7c3aed)', marginTop: '0.05rem', fontWeight: 600 }}>
               รหัส: {vendorCode}
             </div>
           </div>
@@ -71,7 +71,7 @@ export default function APAccountMappingStep({
 
       {/* Invoice description */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--ap-vendor-text-muted, #7c3aed)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           <i className="fas fa-align-left" style={{ marginRight: '0.35rem' }} />
           Invoice Description 
         </label>
@@ -83,12 +83,12 @@ export default function APAccountMappingStep({
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: '0.55rem 0.85rem', fontSize: '0.88rem',
-            border: '1.5px solid #c4b5fd', borderRadius: '8px',
-            background: '#faf5ff', color: '#1e1b4b',
+            border: '1.5px solid var(--ap-inv-desc-border, #c4b5fd)', borderRadius: '8px',
+            background: 'var(--ap-inv-desc-bg, #faf5ff)', color: 'var(--ap-vendor-text, #1e1b4b)',
             outline: 'none',
           }}
-          onFocus={e => { e.target.style.borderColor = '#7c3aed'; e.target.style.boxShadow = '0 0 0 3px #ede9fe' }}
-          onBlur={e => { e.target.style.borderColor = '#c4b5fd'; e.target.style.boxShadow = 'none' }}
+          onFocus={e => { e.target.style.borderColor = 'var(--ap-vendor-icon-bg, #7c3aed)'; e.target.style.boxShadow = 'var(--ap-inv-desc-shadow, 0 0 0 3px #ede9fe)' }}
+          onBlur={e => { e.target.style.borderColor = 'var(--ap-inv-desc-border, #c4b5fd)'; e.target.style.boxShadow = 'none' }}
         />
       </div>
 
@@ -154,10 +154,10 @@ export default function APAccountMappingStep({
                   ? { code: item._suggestAcc, name: masterAccounts.find(a => a.code === item._suggestAcc)?.name || '', source: 'ai' }
                   : null
                 return (
-                  <tr key={ri} style={hasSuggest ? { background: '#f5f3ff' } : hasError ? { background: '#fff1f2' } : undefined}>
+                  <tr key={ri} style={hasSuggest ? { background: 'var(--ap-suggest-bg, #f5f3ff)' } : hasError ? { background: 'var(--ap-error-bg, #fff1f2)' } : undefined}>
                     <td style={{ fontSize: '0.83rem', color: 'var(--text-2)', paddingLeft: '1rem' }}>{item.description || '—'}</td>
                     <td style={{ padding: '0.35rem 0.5rem' }}>
-                      <div style={missingDept ? { borderRadius: '7px', outline: '2px solid #fca5a5' } : undefined}>
+                      <div style={missingDept ? { borderRadius: '7px', outline: '2px solid var(--ap-error-border, #fca5a5)' } : undefined}>
                         <CustomSearchSelect
                           value={item.deptCode || ''}
                           options={masterDepts}
@@ -168,7 +168,7 @@ export default function APAccountMappingStep({
                       </div>
                     </td>
                     <td style={{ padding: '0.35rem 0.5rem' }}>
-                      <div style={missingAcc ? { borderRadius: '7px', outline: '2px solid #fca5a5' } : undefined}>
+                      <div style={missingAcc ? { borderRadius: '7px', outline: '2px solid var(--ap-error-border, #fca5a5)' } : undefined}>
                         <CustomSearchSelect
                           value={item.accountCode || ''}
                           options={masterAccounts}
@@ -185,14 +185,14 @@ export default function APAccountMappingStep({
                             <button
                               onClick={() => onConfirmSuggest(ri)}
                               title="ยืนยัน"
-                              style={{ padding: '3px 8px', background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center' }}
+                              style={{ padding: '3px 8px', background: 'var(--btn-ok-bg, #f0fdf4)', color: 'var(--btn-ok-text, #15803d)', border: '1px solid var(--btn-ok-border, #86efac)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center' }}
                             >
                               <i className="fas fa-check" style={{ background: 'none', width: 'auto', height: 'auto', display: 'inline', padding: 0, color: 'inherit' }} />
                             </button>
                             <button
                               onClick={() => onRejectSuggest(ri)}
                               title="ปฏิเสธ"
-                              style={{ padding: '3px 8px', background: '#fff1f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center' }}
+                              style={{ padding: '3px 8px', background: 'var(--btn-err-bg, #fff1f2)', color: 'var(--btn-err-text, #dc2626)', border: '1px solid var(--btn-err-border, #fca5a5)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center' }}
                             >
                               <i className="fas fa-times" style={{ background: 'none', width: 'auto', height: 'auto', display: 'inline', padding: 0, color: 'inherit' }} />
                             </button>
@@ -237,18 +237,18 @@ function VendorInfoPill({ icon, label, value, last = false }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.15rem',
-      padding: '0.55rem 1rem', borderRight: last ? 'none' : '1px solid #ddd6fe',
+      padding: '0.55rem 1rem', borderRight: last ? 'none' : '1px solid var(--ap-vendor-pill-border, #ddd6fe)',
       flex: 1,
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: '0.3rem',
-        fontSize: '0.68rem', color: '#7c3aed', fontWeight: 700,
+        fontSize: '0.68rem', color: 'var(--ap-vendor-text-muted, #7c3aed)', fontWeight: 700,
         textTransform: 'uppercase', letterSpacing: '0.05em',
       }}>
         <i className={icon} style={{ fontSize: '0.6rem' }} />
         {label}
       </div>
-      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e1b4b' }}>{value}</div>
+      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--ap-vendor-text, #1e1b4b)' }}>{value}</div>
     </div>
   )
 }

@@ -21,9 +21,9 @@ class Settings(BaseSettings):
 
     # OpenRouter API
     openrouter_api_key: str = ""
-    openrouter_ocr_model: str
-    openrouter_ap_invoice_model: str = ""
-    openrouter_suggestion_model: str
+    openrouter_ocr_model: str = "google/gemini-2.0-flash-001"
+    openrouter_ap_invoice_model: str = "google/gemini-2.0-flash-001"
+    openrouter_suggestion_model: str = "google/gemini-2.0-flash-001"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # OCR engine label (informational — actual engine is the OpenRouter vision LLM)
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # Application
     app_host: str = "0.0.0.0"
     app_port: int = 8010
-    app_debug: bool = False
+    app_debug: bool = True
     allowed_origin_regex: str = r"https://[a-zA-Z0-9\-]+\.carmen4\.com"
     allowed_origins: str = "http://localhost:3010"
 

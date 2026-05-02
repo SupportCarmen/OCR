@@ -134,19 +134,19 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
-                <tr style={{ backgroundColor: '#2b4d81', color: '#fff' }}>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>Source</th>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>Tax Invoice No.</th>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>Tax Invoice Date</th>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>Vendor Name</th>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>TAX ID.</th>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>Branch No.</th>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>Description</th>
-                  <th style={{ color: '#fff', background: '#2b4d81' }}>Tax Profile</th>
-                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Tax Rate %</th>
-                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Net Amount</th>
-                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Tax</th>
-                  <th className="text-right" style={{ color: '#fff', background: '#2b4d81' }}>Total</th>
+                <tr style={{ backgroundColor: 'var(--bg-table-header, #2b4d81)', color: 'var(--text-table-header, #fff)' }}>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>Source</th>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>Tax Invoice No.</th>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>Tax Invoice Date</th>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>Vendor Name</th>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>TAX ID.</th>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>Branch No.</th>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>Description</th>
+                  <th style={{ color: 'inherit', background: 'inherit' }}>Tax Profile</th>
+                  <th className="text-right" style={{ color: 'inherit', background: 'inherit' }}>Tax Rate %</th>
+                  <th className="text-right" style={{ color: 'inherit', background: 'inherit' }}>Net Amount</th>
+                  <th className="text-right" style={{ color: 'inherit', background: 'inherit' }}>Tax</th>
+                  <th className="text-right" style={{ color: 'inherit', background: 'inherit' }}>Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,7 +161,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
                     <td>
                       <span style={{
                         background: 'var(--teal-light)', color: 'var(--teal)',
-                        border: '1px solid #99f6e4', borderRadius: '4px',
+                        border: '1px solid var(--btn-ok-border, #99f6e4)', borderRadius: '4px',
                         padding: '0.15rem 0.5rem', fontSize: '0.78rem', fontWeight: 700,
                       }}>
                         OCC
@@ -231,7 +231,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
 
       {showConfirm && createPortal(
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+          position: 'fixed', inset: 0, background: 'var(--modal-overlay-bg, rgba(0,0,0,0.45))',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
         }}>
           <div className="modal-box" style={{ textAlign: 'center' }}>
@@ -247,7 +247,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
               ต้องการดำเนินการต่อใช่ไหม?
             </p>
             <div style={{
-              background: 'var(--teal-light)', border: '1px solid #99f6e4', borderRadius: '6px',
+              background: 'var(--teal-light)', border: '1px solid var(--btn-ok-border, #99f6e4)', borderRadius: '6px',
               padding: '0.55rem 0.85rem', marginBottom: '1.25rem',
               color: 'var(--teal)', fontSize: '0.82rem', textAlign: 'left', display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
             }}>
@@ -256,9 +256,9 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
             </div>
             {submitError && (
               <div style={{
-                background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px',
+                background: 'var(--btn-err-bg, #fef2f2)', border: '1px solid var(--btn-err-border, #fca5a5)', borderRadius: '6px',
                 padding: '0.6rem 0.85rem', marginBottom: '1.25rem',
-                color: '#b91c1c', fontSize: '0.85rem', textAlign: 'left',
+                color: 'var(--btn-err-text, #b91c1c)', fontSize: '0.85rem', textAlign: 'left',
               }}>
                 <i className="fas fa-exclamation-circle" style={{ marginRight: '0.4rem' }} />
                 {submitError}
@@ -290,7 +290,7 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
 
       {showDiscardConfirm && createPortal(
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+          position: 'fixed', inset: 0, background: 'var(--modal-overlay-bg, rgba(0,0,0,0.45))',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
         }}>
           <div className="modal-box" style={{ textAlign: 'center' }}>
@@ -304,9 +304,9 @@ export default function InputTaxReconciliation({ details, headerData, onBack, on
               คุณเลือกที่จะ<strong>ไม่เพิ่ม Input Tax</strong> เข้าระบบ
             </p>
             <div style={{
-              background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px',
+              background: 'var(--btn-err-bg, #fef2f2)', border: '1px solid var(--btn-err-border, #fca5a5)', borderRadius: '6px',
               padding: '0.55rem 0.85rem', marginBottom: '1.5rem',
-              color: '#b91c1c', fontSize: '0.82rem', textAlign: 'left', display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
+              color: 'var(--btn-err-text, #b91c1c)', fontSize: '0.82rem', textAlign: 'left', display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
             }}>
               <i className="fas fa-flag-checkered" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
               <span>การดำเนินการนี้จะ<strong>จบกระบวนการทั้งหมด</strong>และกลับสู่หน้าเริ่มต้น</span>

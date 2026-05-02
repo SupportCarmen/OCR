@@ -109,7 +109,7 @@
 }
 
 .section-title {
-    font-size: 0.68rem; font-weight: 700;
+    font-size: 0.72rem; font-weight: 700;
     letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--text-4);
     margin-bottom: 1rem;
@@ -145,5 +145,5 @@
     .app-header .btn { width: 100%; justify-content: center; }
     .logo-box { width: 34px !important; height: 34px !important; }
     .main-content { gap: 1rem; }
-    .section-title { font-size: 0.62rem; }
+    .section-title { font-size: 0.68rem; }
 }

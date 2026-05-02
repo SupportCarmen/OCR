@@ -61,7 +61,7 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
         width: rect.width,
         maxHeight: '240px',
         overflowY: 'auto',
-        background: 'white',
+        background: 'var(--gray-50)',
         border: '1px solid var(--border)',
         borderRadius: '6px',
         boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
@@ -89,8 +89,8 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
     : filtered;
 
   const topBadge = topChoice?.source === 'history'
-    ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
-    : { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-wand-magic-sparkles' };
+    ? { label: 'History', bg: 'var(--btn-ok-bg, #f0fdf4)', color: 'var(--btn-ok-text, #16a34a)', border: 'var(--btn-ok-border, #86efac)', icon: 'fa-history' }
+    : { label: 'AI แนะนำ', bg: 'var(--ap-suggest-bg, #f5f3ff)', color: 'var(--primary, #7c3aed)', border: 'var(--primary-mid, #c4b5fd)', icon: 'fa-wand-magic-sparkles' };
 
   const selectedOption = value ? options.find(o => o.code === value) : null;
   const selectedDesc = selectedOption
@@ -109,7 +109,8 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
         onFocus={() => { setIsOpen(true); setSearchTerm(''); }}
         onChange={(e) => setSearchTerm(e.target.value)}
         title={isAISuggested ? `AI แนะนำ: ${suggestedValue}` : value && selectedDesc ? `${value} — ${selectedDesc}` : ''}
-        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--primary)' : isAISuggested ? '#c4b5fd' : hasError ? '#dc2626' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? '#f5f3ff' : hasError ? '#fff1f2' : 'white', color: isAISuggested ? '#6d28d9' : 'inherit' }}
+        className="search-select-input"
+        style={{ width: '100%', padding: '0.5rem 0.65rem', border: `1px solid ${isAISuggested ? 'var(--primary-mid)' : hasError ? 'var(--rose)' : 'var(--border)'}`, borderBottomColor: isOpen ? 'var(--primary)' : isAISuggested ? 'var(--primary-mid)' : hasError ? 'var(--rose)' : 'var(--border)', borderRadius: '6px', fontSize: '0.85rem', outline: 'none', transition: 'all 0.2s', fontFamily: "'DM Mono', monospace", background: isAISuggested ? 'var(--primary-light)' : hasError ? 'var(--rose-light)' : 'transparent', color: isAISuggested ? 'var(--primary)' : 'inherit' }}
       />
       {isOpen && createPortal(
         <div ref={dropdownRef} style={dropdownStyle}>
@@ -118,7 +119,7 @@ export default function CustomSearchSelect({ value, onChange, options, placehold
             <>
               <div
                 onMouseDown={(e) => { e.preventDefault(); onChange(topChoice.code); setIsOpen(false); }}
-                onMouseEnter={(e) => e.currentTarget.style.background = topChoice.source === 'history' ? '#dcfce7' : '#ede9fe'}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--primary-light)'}
                 onMouseLeave={(e) => e.currentTarget.style.background = topBadge.bg}
                 style={{ padding: '0.6rem 0.8rem', background: topBadge.bg, borderBottom: `1px solid ${topBadge.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', transition: 'background 0.1s' }}
               >

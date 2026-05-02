@@ -13,7 +13,7 @@ export default function TopLevelConfigSection({
         <label style={!bank ? { color: '#dc2626', fontWeight: 600 } : {}}>
           Bank {!bank && <span style={{ color: '#dc2626' }}>*</span>}
         </label>
-        <select value={bank} onChange={(e) => handleBankChange(e.target.value)} className="search-select-trigger" style={{ width: '100%', ...(!bank ? { borderColor: '#dc2626', background: '#fff1f2' } : {}) }}>
+        <select value={bank} onChange={(e) => handleBankChange(e.target.value)} className="search-select-trigger" style={{ width: '100%', ...(!bank ? { borderColor: 'var(--rose)', background: 'var(--btn-err-bg, #fff1f2)' } : {}) }}>
           <option value="">เลือกธนาคาร...</option>
           <option value="Bangkok Bank (BBL)">Bangkok Bank (BBL)</option>
           <option value="Kasikornbank (KBANK)">Kasikornbank (KBANK)</option>
@@ -35,7 +35,7 @@ export default function TopLevelConfigSection({
           File Source {!fileSource && <span style={{ color: '#dc2626' }}>*</span>}
         </label>
         <input type="text" placeholder="ระบุแหล่งที่มาไฟล์ (เช่น Email, Drive)" value={fileSource} onChange={(e) => setFileSource(e.target.value)}
-          style={!fileSource ? { borderColor: '#dc2626', background: '#fff1f2' } : {}} />
+          style={!fileSource ? { borderColor: 'var(--rose)', background: 'var(--btn-err-bg, #fff1f2)' } : {}} />
 
         <label>Description</label>
         <input type="text" placeholder="รายละเอียดเพิ่มเติม" value={description} onChange={(e) => setDescription(e.target.value)} />

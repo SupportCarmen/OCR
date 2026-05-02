@@ -35,7 +35,7 @@
     margin: 0 auto 1.5rem;
     padding: 10px;
     box-shadow: 0 10px 36px rgba(79,70,229,0.25), 0 4px 12px rgba(79,70,229,0.12);
-    animation: floatLogo 4s ease-in-out infinite;
+    animation: floatLogo 6s ease-in-out infinite;
     overflow: hidden;
 }
 
@@ -47,7 +47,7 @@
 
 @keyframes floatLogo {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-7px); }
+    50% { transform: translateY(-4px); }
 }
 
 .home-title {
@@ -195,7 +195,7 @@
 
 .module-card-tag {
     display: inline-flex; align-items: center; gap: 0.25rem;
-    font-size: 0.67rem; font-weight: 600;
+    font-size: 0.72rem; font-weight: 600;
     padding: 0.15rem 0.5rem;
     border-radius: 100px; letter-spacing: 0.04em;
 }
@@ -214,7 +214,7 @@
 .module-card-features { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
 .module-card-feature {
-    font-size: 0.68rem; font-weight: 500;
+    font-size: 0.72rem; font-weight: 500;
     color: var(--text-4);
     background: var(--gray-50); border: 1px solid var(--gray-100);
     border-radius: 100px; padding: 0.18rem 0.5rem;
@@ -274,5 +274,20 @@
     .module-card { padding: 1.25rem; }
     .module-card-icon { width: 40px; height: 40px; font-size: 1rem; }
     .module-card-name { font-size: 0.95rem; }
+}
+
+/* ─── DARK MODE ─── */
+[data-theme="dark"] .home-logo { background: #1e293b; box-shadow: 0 10px 36px rgba(99,102,241,0.2), 0 4px 12px rgba(99,102,241,0.1); }
+[data-theme="dark"] .home-hero::before { background: linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(6,182,212,0.04) 100%); }
+[data-theme="dark"] .module-card-footer { border-color: rgba(255,255,255,0.07); }
+[data-theme="dark"] .module-card-feature { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.07); }
+[data-theme="dark"] .module-card-arrow { background: rgba(255,255,255,0.05); border-color: var(--border); }
+[data-theme="dark"] .home-footer { border-color: rgba(255,255,255,0.07); }
+
+/* ─── DARK MODE TOGGLE ON HOME ─── */
+.home-dark-toggle {
+    position: absolute;
+    top: 1.5rem;
+    right: 2rem;
 }
 
