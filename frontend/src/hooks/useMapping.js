@@ -202,7 +202,7 @@ export function useMapping() {
     if (!masterAccounts.length) return;
 
     const fieldsToFetch = ['commission', 'tax', 'net'].filter(f =>
-      (!mappings[f] || (!mappings[f].dept && !mappings[f].acc)) &&
+      (!mappings[f] || !mappings[f].dept || !mappings[f].acc) &&
       !(mainSuggestions[f] && mainSuggestions[f].source === 'history')
     );
 
@@ -261,10 +261,16 @@ export function useMapping() {
   const confirmMainSuggestion = (key) => {
     const suggestion = mainSuggestions[key];
     if (suggestion) {
-      setMappings(prev => ({
-        ...prev,
-        [key]: { dept: suggestion.dept || '', acc: suggestion.acc || '' }
-      }));
+      setMappings(prev => {
+        const cur = prev[key] || { dept: '', acc: '' };
+        return {
+          ...prev,
+          [key]: {
+            dept: cur.dept || suggestion.dept || '',
+            acc: cur.acc || suggestion.acc || '',
+          }
+        };
+      });
     }
     setMainSuggestions(prev => ({ ...prev, [key]: null }));
     setSuggestionMeta(prev => ({ ...prev, [key]: null }));
@@ -278,10 +284,16 @@ export function useMapping() {
   const confirmPaymentSuggestion = (type) => {
     const suggestion = paymentSuggestions[type];
     if (suggestion) {
-      setPaymentAmount(prev => ({
-        ...prev,
-        [type]: { dept: suggestion.dept || '', acc: suggestion.acc || '' }
-      }));
+      setPaymentAmount(prev => {
+        const cur = prev[type] || { dept: '', acc: '' };
+        return {
+          ...prev,
+          [type]: {
+            dept: cur.dept || suggestion.dept || '',
+            acc: cur.acc || suggestion.acc || '',
+          }
+        };
+      });
     }
     setPaymentSuggestions(prev => ({ ...prev, [type]: null }));
   };
@@ -295,7 +307,13 @@ export function useMapping() {
       const next = { ...prev };
       ['commission', 'tax', 'net'].forEach(key => {
         const s = mainSuggestions[key];
-        if (s) next[key] = { dept: s.dept || '', acc: s.acc || '' };
+        if (s) {
+          const cur = next[key] || { dept: '', acc: '' };
+          next[key] = {
+            dept: cur.dept || s.dept || '',
+            acc: cur.acc || s.acc || '',
+          };
+        }
       });
       return next;
     });
@@ -305,7 +323,13 @@ export function useMapping() {
     setPaymentAmount(prev => {
       const next = { ...prev };
       Object.entries(paymentSuggestions).forEach(([type, s]) => {
-        if (s) next[type] = { dept: s.dept || '', acc: s.acc || '' };
+        if (s) {
+          const cur = next[type] || { dept: '', acc: '' };
+          next[type] = {
+            dept: cur.dept || s.dept || '',
+            acc: cur.acc || s.acc || '',
+          };
+        }
       });
       return next;
     });
@@ -320,7 +344,7 @@ export function useMapping() {
     const allTypes = specificTypes || [...activeScan.paymentTypes, ...customPaymentTypes];
 
     const needsAI = allTypes.filter(t =>
-      (!paymentAmount[t] || (!paymentAmount[t].dept && !paymentAmount[t].acc)) &&
+      (!paymentAmount[t] || !paymentAmount[t].dept || !paymentAmount[t].acc) &&
       !(paymentSuggestions[t] && paymentSuggestions[t].source === 'history')
     );
 
@@ -374,6 +398,7 @@ export function useMapping() {
       [type]: { ...prev[type], [field]: value }
     }));
     setSuggestionMeta(prev => ({ ...prev, [type]: null }));
+    setMainSuggestions(prev => ({ ...prev, [type]: null }));
   };
 
   const handlePaymentMappingChange = (type, field, value) => {
@@ -384,6 +409,7 @@ export function useMapping() {
         [field]: value
       }
     }));
+    setPaymentSuggestions(prev => ({ ...prev, [type]: null }));
   };
 
   const handleAddCustomType = () => {

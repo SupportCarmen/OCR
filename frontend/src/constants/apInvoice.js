@@ -1,9 +1,9 @@
 export const AP_STEPS = [
-  { n: 1, label: 'อัปโหลด',  sub: 'เอกสาร' },
-  { n: 2, label: 'จับคู่',   sub: 'Field Mapping' },
-  { n: 3, label: 'ตรวจสอบ', sub: 'Review' },
-  { n: 4, label: 'ผังบัญชี', sub: 'Account' },
-  { n: 5, label: 'สำเร็จ',  sub: 'Result' },
+  { n: 1, label: 'Upload',  sub: 'Document' },
+  { n: 2, label: 'Field',   sub: 'Mapping' },
+  { n: 3, label: 'Review',  sub: 'Data' },
+  { n: 4, label: 'Account', sub: 'Mapping' },
+  { n: 5, label: 'Success', sub: 'Result' },
 ]
 
 

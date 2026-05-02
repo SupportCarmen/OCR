@@ -69,9 +69,8 @@ export default function AccountMappingTable({
             const meta = suggestionMeta[key];
             const badge = meta === 'history'
               ? { label: 'History', bg: '#f0fdf4', color: '#16a34a', border: '#86efac', icon: 'fa-history' }
-              : meta === 'ai'
-                ? { label: 'AI แนะนำ', bg: '#f5f3ff', color: '#7c3aed', border: '#c4b5fd', icon: 'fa-wand-magic-sparkles' }
-                : null;
+              : null;
+            const hasSuggestionButtons = meta === 'ai' || meta === 'history';
 
             const suggestion = mainSuggestions[key] || null;
             const detFromMaster = suggestion?.dept ? masterDepartments.find(d => d.code === suggestion.dept) : null;
@@ -126,7 +125,7 @@ export default function AccountMappingTable({
                   />
                 </div>
                 <div style={{ display: 'flex', gap: '0.3rem' }}>
-                  {badge && (
+                  {hasSuggestionButtons && (
                     <>
                       <button
                         onClick={() => confirmMainSuggestion(key)}

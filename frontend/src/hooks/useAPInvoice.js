@@ -419,8 +419,8 @@ export function useAPInvoice() {
       setLineItems(prev => prev.map((item, idx) => {
         const s = suggestions[idx]
         if (!s) return item
-        const newDept = !item.deptCode && s.deptCode ? s.deptCode : null
-        const newAcc = !item.accountCode && s.accountCode ? s.accountCode : null
+        const newDept = (!item.deptCode || item._suggestDept) && s.deptCode ? s.deptCode : null
+        const newAcc = (!item.accountCode || item._suggestAcc) && s.accountCode ? s.accountCode : null
         if (newDept || newAcc) suggestedCount++
         return {
           ...item,
@@ -430,12 +430,16 @@ export function useAPInvoice() {
           _suggestAcc: newAcc || undefined,
         }
       }))
-      showToast(
-        suggestedCount > 0
-          ? `AI แนะนำรหัสบัญชีสำหรับ ${suggestedCount} รายการ — กรุณาตรวจสอบ`
-          : 'ไม่มีรายการที่ต้องการแนะนำเพิ่ม',
-        suggestedCount > 0 ? 'success' : 'info',
-      )
+      if (suggestedCount > 0) {
+        setModal({
+          show: true,
+          title: '✓ AI แนะนำรหัสบัญชี',
+          message: `AI แนะนำรหัสบัญชีสำหรับ ${suggestedCount} รายการ — กรุณาตรวจสอบ`,
+          type: 'success',
+          confirmText: 'ตกลง',
+          onConfirm: () => setModal({ show: false }),
+        })
+      }
     } catch (err) {
       console.error('AI suggest error:', err)
       showToast('ไม่สามารถแนะนำรหัสบัญชีได้ กรุณาลองใหม่', 'error')
@@ -452,9 +456,22 @@ export function useAPInvoice() {
         description: item.description || '',
         unit_price: parseNum(item.unitPrice ?? item.lineTotal ?? 0),
       }))
-      .filter((_, idx) => !lineItems[idx].deptCode || !lineItems[idx].accountCode)
+      .filter((_, idx) => {
+        const item = lineItems[idx]
+        return !item.deptCode || !item.accountCode || item._suggestDept || item._suggestAcc
+      })
 
-    if (!itemsToSuggest.length) return
+    if (!itemsToSuggest.length) {
+      setModal({
+        show: true,
+        title: '✓ Mapping Complete',
+        message: 'All items have been mapped. No further suggestions needed.',
+        type: 'success',
+        confirmText: 'OK',
+        onConfirm: () => setModal({ show: false }),
+      })
+      return
+    }
 
     if (!headerData.invhDesc) {
       setModal({

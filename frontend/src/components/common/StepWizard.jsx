@@ -1,7 +1,7 @@
 const DEFAULT_STEPS = [
-  { n: 1, label: 'เลือกธนาคาร', sub: 'และไฟล์' },
-  { n: 2, label: 'AI อ่านข้อมูล', sub: '' },
-  { n: 3, label: 'ตรวจสอบข้อมูล', sub: '' },
+  { n: 1, label: 'Select Bank', sub: '& File' },
+  { n: 2, label: 'AI Extract', sub: '' },
+  { n: 3, label: 'Review', sub: 'Data' },
   { n: 4, label: 'Accounting', sub: 'Review' },
   { n: 5, label: 'Input Tax', sub: 'Reconciliation' },
 ]
@@ -22,7 +22,7 @@ export default function StepWizard({ step, steps, onStepClick }) {
                 onClick={isClickable ? () => onStepClick(s.n) : undefined}
                 role={isClickable ? 'button' : undefined}
                 tabIndex={isClickable ? 0 : undefined}
-                title={isClickable ? `กลับไป Step ${s.n}: ${s.label}` : undefined}
+                title={isClickable ? `Back to Step ${s.n}: ${s.label}` : undefined}
                 onKeyDown={isClickable ? (e) => {
                   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStepClick(s.n) }
                 } : undefined}
